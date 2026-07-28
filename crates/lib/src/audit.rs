@@ -125,11 +125,11 @@ impl TaskRef {
                 audit.fault("dirty", &path, "member has dirty or untracked files");
             }
             let source = self.source(&member.source)?;
-            if path.is_dir() && source.is_dir() && !git::reachable_from_head(&path, &source)? {
+            if path.is_dir() && source.is_dir() && !git::landed(&path, &source)? {
                 audit.fault(
                     "reachability",
                     &path,
-                    "member HEAD is not reachable from the integration checkout HEAD",
+                    "member HEAD is neither reachable nor tree-equivalent to the integration checkout HEAD",
                 );
             }
         }

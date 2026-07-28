@@ -39,7 +39,7 @@ pub fn clean(root: &Path) -> Result<bool> {
     Ok(text(root, &["status", "--porcelain=v1", "--untracked-files=all"])?.is_empty())
 }
 
-pub fn reachable_from_head(member: &Path, source: &Path) -> Result<bool> {
+pub fn landed(member: &Path, source: &Path) -> Result<bool> {
     let head = text(member, &["rev-parse", "HEAD"])?;
     let status = command()
         .arg("-C")
@@ -47,7 +47,12 @@ pub fn reachable_from_head(member: &Path, source: &Path) -> Result<bool> {
         .args(["merge-base", "--is-ancestor", &head, "HEAD"])
         .status()
         .map_err(|error| Error::new(format!("cannot run git: {error}")))?;
-    Ok(status.success())
+    if status.success() {
+        return Ok(true);
+    }
+    let member_tree = text(member, &["rev-parse", "HEAD^{tree}"])?;
+    let source_tree = text(source, &["rev-parse", "HEAD^{tree}"])?;
+    Ok(member_tree == source_tree)
 }
 
 pub fn registered(source: &Path, member: &Path) -> Result<bool> {

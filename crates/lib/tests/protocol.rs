@@ -170,7 +170,8 @@ fn member_seat_is_fail_closed_and_requires_landed_reachability() {
             .is_err()
     );
 
-    git(&source, &["merge", "--ff-only", "member"]);
+    git(&source, &["merge", "--squash", "member"]);
+    git(&source, &["commit", "-m", "land task work"]);
     fixture
         .space
         .member_remove("local/member", "repo", true)

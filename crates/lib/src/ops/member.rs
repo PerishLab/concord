@@ -56,9 +56,9 @@ impl Space {
             return Err(Error::new("member has dirty or untracked files"));
         }
         let source = task.source(&member.source)?;
-        if !git::reachable_from_head(&path, &source)? {
+        if !git::landed(&path, &source)? {
             return Err(Error::new(
-                "member HEAD is not reachable from the integration checkout HEAD",
+                "member HEAD is neither reachable nor tree-equivalent to the integration checkout HEAD",
             ));
         }
         let actions = vec![
