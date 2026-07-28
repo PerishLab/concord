@@ -39,7 +39,7 @@ fn serve(archive: Vec<u8>) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let port = listener.local_addr().expect("address").port();
     std::thread::spawn(move || {
-        for stream in listener.incoming().take(2) {
+        for stream in listener.incoming().take(8) {
             let mut stream = stream.expect("stream");
             let mut request = [0u8; 2048];
             let read = stream.read(&mut request).expect("request");
@@ -148,9 +148,46 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
 
     let upgraded_releases = serve(archive());
     let upgraded_config = config(fixture.path(), &upgraded_releases);
+    let status = run(
+        &upgraded_config,
+        &[
+            "--json",
+            "--home",
+            &argument_home_text,
+            "skill",
+            "status",
+            "--version",
+            "0.3.0",
+        ],
+    );
+    assert!(status.status.success());
+    let status: serde_json::Value = serde_json::from_slice(&status.stdout).expect("status json");
+    assert_eq!(status["operation"], "status");
+    assert_eq!(status["seats"][0]["state"], "current");
+    assert_eq!(status["seats"][0]["action"], "none");
+
+    let dry_run = run(
+        &upgraded_config,
+        &[
+            "--json",
+            "--home",
+            &argument_home_text,
+            "skill",
+            "upgrade",
+            "--version",
+            "0.3.0",
+            "--dry-run",
+        ],
+    );
+    assert!(dry_run.status.success());
+    let dry_run: serde_json::Value = serde_json::from_slice(&dry_run.stdout).expect("dry-run json");
+    assert_eq!(dry_run["operation"], "upgrade_dry_run");
+    assert_eq!(dry_run["seats"][0]["action"], "none");
+
     let upgraded = run(
         &upgraded_config,
         &[
+            "--json",
             "--home",
             &argument_home_text,
             "skill",
@@ -163,6 +200,13 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
         upgraded.status.success(),
         "{}",
         String::from_utf8_lossy(&upgraded.stderr)
+    );
+    let upgraded: serde_json::Value =
+        serde_json::from_slice(&upgraded.stdout).expect("upgrade json");
+    assert!(upgraded["changed"].as_array().expect("changed").is_empty());
+    assert_eq!(
+        upgraded["unchanged"].as_array().expect("unchanged").len(),
+        1
     );
     #[cfg(unix)]
     {
@@ -195,4 +239,28 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
         String::from_utf8_lossy(&removed.stderr)
     );
     assert!(!skill.exists(), "managed target removed exactly");
+}
+
+#[test]
+fn unmanaged_status_is_diagnostic_but_dry_run_refuses() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    let releases = serve(archive());
+    let config_path = config(fixture.path(), &releases);
+    let home = fixture.path().join("argument-home");
+    let home = home.display().to_string();
+
+    let status = run(
+        &config_path,
+        &["--json", "--home", &home, "skill", "status"],
+    );
+    assert!(status.status.success());
+    let status: serde_json::Value = serde_json::from_slice(&status.stdout).expect("status json");
+    assert!(status["seats"].as_array().expect("seats").is_empty());
+
+    let dry_run = run(
+        &config_path,
+        &["--home", &home, "skill", "upgrade", "--dry-run"],
+    );
+    assert!(!dry_run.status.success());
+    assert!(String::from_utf8_lossy(&dry_run.stderr).contains("not actionable"));
 }

@@ -1,5 +1,5 @@
 use concord_core::{Audit, Error, Plan, Result};
-use plumb::skill::{Done, Record};
+use plumb::skill::{Done, Record, Report};
 use serde_json::json;
 
 pub fn plan(plan: &Plan, json_output: bool) -> Result<()> {
@@ -97,6 +97,10 @@ pub fn skill_done(action: &str, done: &Done, json_output: bool) -> Result<()> {
                     "agent": seat.agent,
                     "path": seat.path.display().to_string(),
                 })).collect::<Vec<_>>(),
+                "unchanged": done.same.iter().map(|seat| json!({
+                    "agent": seat.agent,
+                    "path": seat.path.display().to_string(),
+                })).collect::<Vec<_>>(),
                 "skipped": done.left.iter().map(|skip| json!({
                     "path": skip.path.display().to_string(),
                     "reason": skip.note,
@@ -109,8 +113,43 @@ pub fn skill_done(action: &str, done: &Done, json_output: bool) -> Result<()> {
     for seat in &done.kept {
         println!("{action} {} {}", seat.agent, seat.path.display());
     }
+    for seat in &done.same {
+        println!("unchanged {} {}", seat.agent, seat.path.display());
+    }
     for skip in &done.left {
         println!("skipped {}: {}", skip.path.display(), skip.note);
+    }
+    Ok(())
+}
+
+pub fn skill_report(operation: &str, report: &Report, json_output: bool) -> Result<()> {
+    if json_output {
+        value(
+            json!({
+                "operation": operation,
+                "channel": report.channel,
+                "explicit": report.explicit,
+                "target": report.target,
+                "seats": report.seats,
+            }),
+            true,
+        );
+        return Ok(());
+    }
+    println!("target {} {}", report.channel, report.target.version);
+    if report.seats.is_empty() {
+        println!("unmanaged");
+    }
+    for status in &report.seats {
+        println!(
+            "{} {} -> {} {} {} {}",
+            status.agent,
+            status.installed,
+            report.target.version,
+            status.state,
+            status.action,
+            status.path.display()
+        );
     }
     Ok(())
 }

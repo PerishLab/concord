@@ -149,7 +149,7 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
 name = "concord"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "clap",
  "concord-core",
@@ -162,7 +162,7 @@ dependencies = [
 
 [[package]]
 name = "concord-core"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "fs2",
  "plumb",
@@ -411,14 +411,15 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "plumb"
-version = "0.12.4"
+version = "0.13.0"
 source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
-checksum = "b42e8a0dd3daa9a22a82c05c314e7b0d13a4539c1b649403a30208f5e0afc005"
+checksum = "84a8829ceaf917a5f9eb43a3c80c228047ea3e497c1c57f1168fc111668b4505"
 dependencies = [
  "clap",
  "flate2",
  "pin-project-lite",
  "plumb-macro",
+ "semver",
  "serde",
  "serde_json",
  "sha2",
@@ -429,9 +430,9 @@ dependencies = [
 
 [[package]]
 name = "plumb-macro"
-version = "0.12.4"
+version = "0.13.0"
 source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
-checksum = "21dae177fb8b087cf6716d2c410c69fb9272b20df93b1c91997c68eb13a0e5ef"
+checksum = "2200a645ebd50651b7965d3e20920210082b818887acf37a4d3721c126b9c731"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -523,6 +524,12 @@ dependencies = [
  "rustls-pki-types",
  "untrusted",
 ]
+
+[[package]]
+name = "semver"
+version = "1.0.28"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
 
 [[package]]
 name = "serde"

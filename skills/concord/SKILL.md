@@ -14,9 +14,10 @@ truth.
 
 Repository: https://git.perish.top/PerishFire/concord
 
-Report defects, missing shapes, and unclear guidance there as issues. When a
-newer stable release is available, run `concord skill upgrade` and validate it
-before preserving compatibility with an older managed installation.
+Report defects, missing shapes, and unclear guidance there as issues. Use
+`concord skill status` to check stable without changing an installation. When
+a newer stable release is available, run `concord skill upgrade` and validate
+it before preserving compatibility with an older managed installation.
 
 Before any stateful task operation, read
 [references/protocol.md](references/protocol.md) completely. For pure command
@@ -147,9 +148,15 @@ Managed skill operations are:
 concord skill install [--channel stable|beta] [--version <version>]
 concord skill install --path <agent-skills>/concord
 concord skill list
+concord skill status
+concord skill upgrade --dry-run
 concord skill upgrade
 concord skill uninstall
 ```
 
 Install and upgrade only replace paths proven Concord-managed by both the state
 ledger and in-path marker. `--force` applies only to an already managed install.
+Status and upgrade dry-run fetch release metadata but do not download the skill
+artifact or write managed state. Current upgrades are successful no-ops;
+implicit rollback and immutable same-version digest drift refuse, while an
+explicit older `--version` is a deliberate rollback.
