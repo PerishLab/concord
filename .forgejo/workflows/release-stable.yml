@@ -45,7 +45,7 @@ jobs:
           set -eu
           version="$VERSION_OVERRIDE"
           if [ -z "$version" ]; then
-            version=$(cargo metadata --no-deps --format-version 1 | sed -n 's/.*"version":"\\([^"]*\\)".*/\\1/p' | head -1)
+            version=$(cargo metadata --no-deps --format-version 1 | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' | head -1)
           fi
           test -n "$version"
           echo "value=$version" >> "$GITHUB_OUTPUT"
