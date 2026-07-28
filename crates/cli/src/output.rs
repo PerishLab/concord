@@ -1,4 +1,5 @@
 use concord_core::{Audit, Error, Plan, Result};
+use plumb::skill::{Done, Record};
 use serde_json::json;
 
 pub fn plan(plan: &Plan, json_output: bool) -> Result<()> {
@@ -85,6 +86,68 @@ pub fn value(value: serde_json::Value, json_output: bool) {
         }
         value => println!("{}", plain(&value)),
     }
+}
+
+pub fn skill_done(action: &str, done: &Done, json_output: bool) -> Result<()> {
+    if json_output {
+        value(
+            json!({
+                "action": action,
+                "changed": done.kept.iter().map(|seat| json!({
+                    "agent": seat.agent,
+                    "path": seat.path.display().to_string(),
+                })).collect::<Vec<_>>(),
+                "skipped": done.left.iter().map(|skip| json!({
+                    "path": skip.path.display().to_string(),
+                    "reason": skip.note,
+                })).collect::<Vec<_>>(),
+            }),
+            true,
+        );
+        return Ok(());
+    }
+    for seat in &done.kept {
+        println!("{action} {} {}", seat.agent, seat.path.display());
+    }
+    for skip in &done.left {
+        println!("skipped {}: {}", skip.path.display(), skip.note);
+    }
+    Ok(())
+}
+
+pub fn skill_records(records: &[Record], json_output: bool) -> Result<()> {
+    if json_output {
+        value(
+            serde_json::Value::Array(
+                records
+                    .iter()
+                    .map(|record| {
+                        json!({
+                            "agent": record.agent,
+                            "path": record.path.display().to_string(),
+                            "version": record.version,
+                            "url": record.url,
+                            "sha256": record.sha,
+                        })
+                    })
+                    .collect(),
+            ),
+            true,
+        );
+        return Ok(());
+    }
+    if records.is_empty() {
+        println!("no managed Concord skill");
+    }
+    for record in records {
+        println!(
+            "{} {} {}",
+            record.agent,
+            record.version,
+            record.path.display()
+        );
+    }
+    Ok(())
 }
 
 fn plain(value: &serde_json::Value) -> String {

@@ -20,4 +20,15 @@ curl -fsS --retry 5 --retry-all-errors \
   "$base/$channel/versions/$version/$name.tar.gz" \
   -o "$tmp/archive.tar.gz"
 tar -xzf "$tmp/archive.tar.gz" -C "$tmp"
-"$tmp/$name/concord" --version
+binary="$tmp/$name/concord"
+"$binary" --version
+
+skill="$tmp/agent-skills/concord"
+"$binary" --home "$tmp/home" --releases "$base" \
+  skill install --channel "$channel" --version "$version" --path "$skill"
+test -f "$skill/SKILL.md"
+test -f "$skill/metadata.json"
+"$binary" --home "$tmp/home" --releases "$base" skill list |
+  grep -F "$skill"
+"$binary" --home "$tmp/home" --releases "$base" skill uninstall
+test ! -e "$skill"

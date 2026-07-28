@@ -1,3 +1,4 @@
+use crate::skill::SkillArgs;
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -5,7 +6,13 @@ use std::path::PathBuf;
 #[command(version, about)]
 pub struct Cli {
     #[arg(long, global = true)]
+    pub config: Option<PathBuf>,
+    #[arg(long, global = true)]
     pub root: Option<PathBuf>,
+    #[arg(long, global = true)]
+    pub home: Option<PathBuf>,
+    #[arg(long, global = true)]
+    pub releases: Option<String>,
     #[arg(long, global = true)]
     pub json: bool,
     #[command(subcommand)]
@@ -30,6 +37,8 @@ pub enum Command {
     Resource(ResourceArgs),
     #[command(about = "Normalize private task permissions")]
     Permissions(PermissionArgs),
+    #[command(about = "Manage Concord agent skill installations")]
+    Skill(SkillArgs),
     #[command(about = "Audit protocol agreement")]
     Audit(AuditArgs),
 }
@@ -44,7 +53,7 @@ pub struct ConfigArgs {
 pub enum ConfigCommand {
     #[command(about = "Print the selected config path")]
     Path,
-    #[command(about = "Print the resolved domain-space root")]
+    #[command(about = "Print resolved runtime configuration")]
     Show,
 }
 

@@ -9,11 +9,17 @@ Configuration contains one absolute domain-space root:
 
 ```toml
 domain_space_root = "/srv/projects"
+home = "/home/operator/.concord"
+releases = "https://releases.concord.perish.uk"
 ```
 
-The config path comes from `CONCORD_CONFIG` or the platform config home.
-`CONCORD_DOMAIN_SPACE_ROOT` and the global `--root` option provide controlled
-overrides. Concord does not assume `~/Projects`.
+The default config path is `~/.config/concord/config.toml` on Unix and
+`%USERPROFILE%\AppData\Roaming\concord\config.toml` on Windows; global
+`--config` selects an explicit file. Runtime policy follows the Plumb cascade:
+defaults, file, typed `CONCORD_` environment, then arguments.
+`CONCORD_DOMAIN_SPACE_ROOT` or `--root` supplies the required task root;
+`CONCORD_HOME` or `--home` selects user state. Concord does not assume
+`~/Projects`, and skill commands do not require task-domain configuration.
 
 Common operations are explicit and composable:
 
@@ -51,3 +57,18 @@ concord resource show perish.code/ship-feature logs
 
 `concord --help` is the complete command grammar. The stable binary is
 installed with `manage.sh` on Linux/macOS or `manage.ps1` on Windows.
+
+Concord also ships its operating brief as a release-matched managed skill:
+
+```text
+concord skill install
+concord skill install --path ~/.codex/skills/concord
+concord skill list
+concord skill upgrade
+concord skill uninstall
+```
+
+Default installation detects present Claude, Codex, shared agent, and OpenCode
+skill directories. Replacement and removal require both Concord's
+`state/skills.json` record and the target's `metadata.json` ownership marker;
+unmanaged paths are refused.

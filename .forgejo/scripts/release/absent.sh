@@ -16,6 +16,7 @@ for name in \
   concord-x86_64-unknown-linux-gnu.tar.gz \
   concord-aarch64-apple-darwin.tar.gz \
   concord-x86_64-pc-windows-msvc.zip \
+  concord-skill.tar.gz \
   metadata.json; do
   if held=$(aws --endpoint-url "$endpoint" s3api head-object \
     --bucket "$CONCORD_RELEASES_S3_BUCKET" \

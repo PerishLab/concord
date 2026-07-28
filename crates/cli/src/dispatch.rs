@@ -4,20 +4,38 @@ use crate::args::{
     AuditArgs, Cli, Command, ConfigCommand, DomainCommand, MemberCommand, PermissionCommand,
     RepoCommand, TaskCommand,
 };
+use crate::config::Config;
 use crate::output;
-use concord_core::{Add, Config, Plan, Result, Space};
+use crate::skill;
+use concord_core::{Add, Plan, Result, Space};
 use serde_json::json;
 
 pub fn run(cli: Cli) -> Result<()> {
     if let Command::Config(config) = &cli.command
         && matches!(config.command, ConfigCommand::Path)
     {
-        output::value(json!(Config::path()?.display().to_string()), cli.json);
+        output::value(
+            json!(Config::path(cli.config.as_deref())?.display().to_string()),
+            cli.json,
+        );
         return Ok(());
     }
-    let space = Space::new(Config::load(cli.root.as_deref())?);
-    match cli.command {
-        Command::Config(config) => config_command(&space, config.command, cli.json),
+    let config = Config::load(
+        cli.config.as_deref(),
+        cli.root.as_deref(),
+        cli.home.as_deref(),
+        cli.releases.as_deref(),
+    )?;
+    let command = match cli.command {
+        Command::Skill(skill) => return skill::run(&config, skill.command, cli.json),
+        Command::Config(config_command) => {
+            return config_command_run(&config, config_command.command, cli.json);
+        }
+        command => command,
+    };
+    let space = Space::new(config.root()?);
+    match command {
+        Command::Config(_) | Command::Skill(_) => unreachable!("handled before task config"),
         Command::Domain(domain) => domain_command(&space, domain.command, cli.json),
         Command::Repo(repo) => repo_command(&space, repo.command, cli.json),
         Command::Task(task) => task_command(&space, task.command, cli.json),
@@ -33,12 +51,16 @@ pub fn run(cli: Cli) -> Result<()> {
     }
 }
 
-fn config_command(space: &Space, command: ConfigCommand, json_output: bool) -> Result<()> {
+fn config_command_run(config: &Config, command: ConfigCommand, json_output: bool) -> Result<()> {
     match command {
         ConfigCommand::Path => unreachable!("config path exits before loading the space"),
         ConfigCommand::Show => {
             output::value(
-                json!({"domain_space_root": space.path().display().to_string()}),
+                json!({
+                    "domain_space_root": config.domain_space_root.display().to_string(),
+                    "home": config.home.display().to_string(),
+                    "releases": config.releases,
+                }),
                 json_output,
             );
             Ok(())

@@ -1,6 +1,8 @@
 mod args;
+mod config;
 mod dispatch;
 mod output;
+mod skill;
 
 use args::Cli;
 use clap::Parser;

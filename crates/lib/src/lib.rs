@@ -11,7 +11,7 @@ mod path;
 mod store;
 
 pub use audit::{Audit, Fault};
-pub use config::{Config, Root};
+pub use config::Root;
 pub use error::{Error, Result};
 pub use memory::{Memory, MemoryRead};
 pub use model::{Member, Registry, Repo, Task};

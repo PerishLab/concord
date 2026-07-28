@@ -34,5 +34,5 @@ authorship is never protocol truth.
 - `runseal :guard` must pass before `runseal :land`.
 - `plumb doctor .` and `ectropy --strict .` must report no unknown or blind
   structure before landing.
-- The initial release is CLI-only. Skill content joins later through Plumb's
-  shared skill mechanism.
+- Skill content ships through Plumb's shared skill mechanism. Concord owns its
+  vocabulary and standing; Plumb owns packaging and managed placement.
