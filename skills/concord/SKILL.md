@@ -10,6 +10,14 @@ installed task policy, repository instructions, recorded filesystem and Git
 state, and current authorization as truth; authorship or agent memory is never
 truth.
 
+## Upstream
+
+Repository: https://git.perish.top/PerishFire/concord
+
+Report defects, missing shapes, and unclear guidance there as issues. When a
+newer stable release is available, run `concord skill upgrade` and validate it
+before preserving compatibility with an older managed installation.
+
 Before any stateful task operation, read
 [references/protocol.md](references/protocol.md) completely. For pure command
 discovery, prefer `concord <command> --help`.
