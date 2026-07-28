@@ -1,0 +1,51 @@
+[scan]
+include = [
+  "crates/**/*.rs",
+]
+exclude = [
+  "**/target/**",
+]
+
+[module]
+roots = [
+  "crates/*/src",
+  "crates/*/tests",
+]
+
+[limit]
+block = 4
+path = 4
+file = 300
+fanout = 10
+markup = 8
+param = 4
+
+[comment]
+allow = false
+
+[word]
+single = true
+
+[[grant]]
+syntax = "test"
+paths = ["crates/*/tests/**/*.rs"]
+
+[[grant]]
+syntax = "environment"
+paths = ["crates/*/tests/**/*.rs"]
+
+[[grant]]
+syntax = "environment"
+paths = ["crates/lib/src/config.rs"]
+
+[[boundary]]
+paths = [".forgejo/**"]
+note = "release infrastructure is guarded by its native format and syntax checks"
+allow = ["path", "comment"]
+
+[[boundary]]
+paths = [".runseal/**"]
+note = "operator glue is guarded by deno format and type checks"
+allow = ["path", "comment", "word"]
+
+[vocabulary]

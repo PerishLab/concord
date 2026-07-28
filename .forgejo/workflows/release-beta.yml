@@ -1,0 +1,139 @@
+name: release-beta
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_override:
+        description: "Required prerelease version"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: concord-release-beta
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: docker
+    container: mirror.perish.lan/ci/deno
+    steps:
+      - uses: actions/checkout@v6
+      - uses: PerishLab/actions/setup-plumb@main
+      - uses: PerishLab/actions/setup-ectropy@main
+      - name: Guard
+        run: |
+          deno run \
+            --allow-read \
+            --allow-write \
+            --allow-env \
+            --allow-net \
+            --allow-run \
+            --config .runseal/deno.json \
+            --lock .runseal/deno.lock \
+            --frozen=true \
+            .runseal/wrappers/guard.ts
+      - name: Validate prerelease
+        env:
+          RELEASE_VERSION: ${{ inputs.version_override }}
+        run: |
+          set -eu
+          case "$RELEASE_VERSION" in
+            *-*) ;;
+            *) echo "beta release requires a prerelease version" >&2; exit 1 ;;
+          esac
+
+  linux:
+    needs: validate
+    runs-on: docker
+    container: mirror.perish.lan/ci/deno
+    steps:
+      - uses: actions/checkout@v6
+      - run: sh .forgejo/scripts/release/package.sh "${{ inputs.version_override }}" x86_64-unknown-linux-gnu
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*.tar.gz
+
+  macos:
+    needs: validate
+    runs-on: macos
+    steps:
+      - uses: actions/checkout@v6
+      - run: sh .forgejo/scripts/release/package.sh "${{ inputs.version_override }}" aarch64-apple-darwin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*.tar.gz
+
+  windows:
+    needs: validate
+    runs-on: windows
+    steps:
+      - uses: actions/checkout@v6
+      - run: pwsh -NoProfile -File .forgejo/scripts/release/package.ps1 "${{ inputs.version_override }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*.zip
+
+  publish:
+    needs: [linux, macos, windows]
+    runs-on: docker
+    container: mirror.perish.lan/ci/deno
+    env:
+      CONCORD_RELEASES_PUBLIC_URL: ${{ vars.CONCORD_RELEASES_PUBLIC_URL }}
+      CONCORD_RELEASES_S3_AK: ${{ secrets.CONCORD_RELEASES_S3_AK }}
+      CONCORD_RELEASES_S3_BUCKET: ${{ secrets.CONCORD_RELEASES_S3_BUCKET }}
+      CONCORD_RELEASES_S3_SK: ${{ secrets.CONCORD_RELEASES_S3_SK }}
+      CONCORD_RELEASES_S3_URL: ${{ secrets.CONCORD_RELEASES_S3_URL }}
+      RELEASE_CHANNEL: beta
+      RELEASE_VERSION: ${{ inputs.version_override }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: bash .forgejo/scripts/release/publish.sh
+
+  smoke-linux:
+    needs: publish
+    runs-on: docker
+    container: mirror.perish.lan/ci/deno
+    env:
+      CONCORD_RELEASES_PUBLIC_URL: ${{ vars.CONCORD_RELEASES_PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: |
+          sleep 30
+          sh .forgejo/scripts/release/smoke.sh "$RELEASE_VERSION" beta
+        env:
+          RELEASE_VERSION: ${{ inputs.version_override }}
+
+  smoke-macos:
+    needs: publish
+    runs-on: macos
+    env:
+      CONCORD_RELEASES_PUBLIC_URL: ${{ vars.CONCORD_RELEASES_PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: |
+          sleep 30
+          sh .forgejo/scripts/release/smoke.sh "$RELEASE_VERSION" beta
+        env:
+          RELEASE_VERSION: ${{ inputs.version_override }}
+
+  smoke-windows:
+    needs: publish
+    runs-on: windows
+    env:
+      CONCORD_RELEASES_PUBLIC_URL: ${{ vars.CONCORD_RELEASES_PUBLIC_URL }}
+      RELEASE_VERSION: ${{ inputs.version_override }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: |
+          Start-Sleep -Seconds 30
+          pwsh -NoProfile -File .forgejo/scripts/release/smoke.ps1 "$env:RELEASE_VERSION" beta

@@ -1,0 +1,162 @@
+name: release-stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_override:
+        description: "Replay one immutable version; empty publishes Cargo.toml version"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: concord-release-stable
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: docker
+    container: mirror.perish.lan/ci/deno
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: PerishLab/actions/setup-plumb@main
+      - uses: PerishLab/actions/setup-ectropy@main
+      - name: Guard
+        run: |
+          deno run \
+            --allow-read \
+            --allow-write \
+            --allow-env \
+            --allow-net \
+            --allow-run \
+            --config .runseal/deno.json \
+            --lock .runseal/deno.lock \
+            --frozen=true \
+            .runseal/wrappers/guard.ts
+      - id: version
+        env:
+          VERSION_OVERRIDE: ${{ inputs.version_override }}
+        run: |
+          set -eu
+          version="$VERSION_OVERRIDE"
+          if [ -z "$version" ]; then
+            version=$(cargo metadata --no-deps --format-version 1 | sed -n 's/.*"version":"\\([^"]*\\)".*/\\1/p' | head -1)
+          fi
+          test -n "$version"
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+  linux:
+    needs: prepare
+    runs-on: docker
+    container: mirror.perish.lan/ci/deno
+    steps:
+      - uses: actions/checkout@v6
+      - name: Package
+        run: sh .forgejo/scripts/release/package.sh "${{ needs.prepare.outputs.version }}" x86_64-unknown-linux-gnu
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*.tar.gz
+
+  macos:
+    needs: prepare
+    runs-on: macos
+    steps:
+      - uses: actions/checkout@v6
+      - name: Package
+        run: sh .forgejo/scripts/release/package.sh "${{ needs.prepare.outputs.version }}" aarch64-apple-darwin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*.tar.gz
+
+  windows:
+    needs: prepare
+    runs-on: windows
+    steps:
+      - uses: actions/checkout@v6
+      - name: Package
+        run: pwsh -NoProfile -File .forgejo/scripts/release/package.ps1 "${{ needs.prepare.outputs.version }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*.zip
+
+  publish:
+    needs: [prepare, linux, macos, windows]
+    runs-on: docker
+    container: mirror.perish.lan/ci/deno
+    env:
+      CONCORD_RELEASES_PUBLIC_URL: ${{ vars.CONCORD_RELEASES_PUBLIC_URL }}
+      CONCORD_RELEASES_S3_AK: ${{ secrets.CONCORD_RELEASES_S3_AK }}
+      CONCORD_RELEASES_S3_BUCKET: ${{ secrets.CONCORD_RELEASES_S3_BUCKET }}
+      CONCORD_RELEASES_S3_SK: ${{ secrets.CONCORD_RELEASES_S3_SK }}
+      CONCORD_RELEASES_S3_URL: ${{ secrets.CONCORD_RELEASES_S3_URL }}
+      RELEASE_CHANNEL: stable
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish immutable release
+        run: bash .forgejo/scripts/release/publish.sh
+
+  smoke-linux:
+    needs: [prepare, publish]
+    runs-on: docker
+    container: mirror.perish.lan/ci/deno
+    env:
+      CONCORD_RELEASES_PUBLIC_URL: ${{ vars.CONCORD_RELEASES_PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: |
+          sleep 30
+          sh .forgejo/scripts/release/smoke.sh "${{ needs.prepare.outputs.version }}" stable
+
+  smoke-macos:
+    needs: [prepare, publish]
+    runs-on: macos
+    env:
+      CONCORD_RELEASES_PUBLIC_URL: ${{ vars.CONCORD_RELEASES_PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: |
+          sleep 30
+          sh .forgejo/scripts/release/smoke.sh "${{ needs.prepare.outputs.version }}" stable
+
+  smoke-windows:
+    needs: [prepare, publish]
+    runs-on: windows
+    env:
+      CONCORD_RELEASES_PUBLIC_URL: ${{ vars.CONCORD_RELEASES_PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: |
+          Start-Sleep -Seconds 30
+          pwsh -NoProfile -File .forgejo/scripts/release/smoke.ps1 "${{ needs.prepare.outputs.version }}" stable
+
+  tag:
+    needs: [prepare, publish, smoke-linux, smoke-macos, smoke-windows]
+    if: ${{ inputs.version_override == '' }}
+    permissions:
+      contents: write
+    runs-on: docker
+    container: mirror.perish.lan/ci/deno
+    steps:
+      - uses: actions/checkout@v6
+      - name: Tag release
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -eu
+          git config user.name forgejo-actions
+          git config user.email actions@git.perish.top
+          git tag -a "$RELEASE_VERSION" -m "$RELEASE_VERSION"
+          git push origin "refs/tags/$RELEASE_VERSION"

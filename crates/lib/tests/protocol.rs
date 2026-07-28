@@ -1,0 +1,252 @@
+use concord_core::{Add, Memory, Root, Space};
+use std::path::Path;
+use std::process::Command;
+use tempfile::TempDir;
+
+struct Fixture {
+    _temp: TempDir,
+    space: Space,
+}
+
+impl Fixture {
+    fn new() -> Self {
+        let temp = tempfile::tempdir().expect("temporary domain space");
+        let root = Root::new(temp.path()).expect("canonical root");
+        Self {
+            space: Space::new(root),
+            _temp: temp,
+        }
+    }
+
+    fn init_task(&self, name: &str) {
+        self.space
+            .domain_init("local", true)
+            .expect("initialize domain");
+        self.space
+            .task_start(&format!("local/{name}"), true)
+            .expect("start task");
+    }
+
+    fn source(&self, name: &str) -> std::path::PathBuf {
+        let path = self.space.path().join("local").join(name);
+        std::fs::create_dir_all(&path).expect("create repository");
+        git(&path, &["init", "-b", "main"]);
+        git(&path, &["config", "user.name", "Concord Test"]);
+        git(&path, &["config", "user.email", "concord@example.invalid"]);
+        std::fs::write(path.join("README.md"), "# fixture\n").expect("write fixture");
+        git(&path, &["add", "README.md"]);
+        git(&path, &["commit", "-m", "init"]);
+        path
+    }
+}
+
+#[test]
+fn repo_less_task_memory_obeys_revisions_and_consent_boundaries() {
+    let fixture = Fixture::new();
+    fixture.init_task("memory");
+    let task = fixture.space.resolve("local/memory").expect("resolve task");
+    let memory = Memory::new(&task);
+
+    assert!(memory.allocate("too-early").is_err());
+    memory
+        .init("# Current objective\n")
+        .expect("initialize memory");
+    let imported = fixture.space.path().join("probe");
+    std::fs::write(&imported, "#!/bin/sh\n").expect("write resource");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&imported, std::fs::Permissions::from_mode(0o755))
+            .expect("make resource executable");
+    }
+    let seat = memory
+        .import("evidence", &imported)
+        .expect("import resource");
+    assert!(seat.join("probe").is_file());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(seat.join("probe"))
+            .expect("resource metadata")
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(mode, 0o700);
+    }
+    let first = memory.read().expect("read memory");
+    let second = memory
+        .write(&first.revision, "# Current objective\n\nShip Concord.\n")
+        .expect("replace memory");
+    assert_ne!(first.revision, second.revision);
+    assert!(memory.write(&first.revision, "stale").is_err());
+
+    let (current, phase) = memory
+        .settle(
+            &second.revision,
+            "# Phase goal\n\nProve revisions.\n",
+            "# Current objective\n\nContinue.\n",
+        )
+        .expect("settle phase");
+    assert!(phase.ends_with("PHASE-00.md"));
+    assert_ne!(current.revision, second.revision);
+    assert!(task.audit().expect("audit task").ok());
+    assert!(fixture.space.task_finish("local/memory", false).is_err());
+
+    fixture
+        .space
+        .memory_remove("local/memory", true)
+        .expect("remove exact memory target");
+    fixture
+        .space
+        .task_finish("local/memory", true)
+        .expect("finish empty task");
+}
+
+#[test]
+fn rehome_repairs_worktrees_and_makes_cross_domain_sources_explicit() {
+    let fixture = Fixture::new();
+    fixture.init_task("moving");
+    fixture
+        .space
+        .domain_init("other", true)
+        .expect("initialize target domain");
+    let source = fixture.source("repo");
+    fixture
+        .space
+        .member_add(
+            Add {
+                task: "local/moving",
+                name: "repo",
+                source: &source,
+                branch: None,
+                orphan: false,
+            },
+            true,
+        )
+        .expect("add member");
+
+    fixture
+        .space
+        .task_rehome("local/moving", "other", true)
+        .expect("rehome task");
+    let task = fixture
+        .space
+        .resolve("other/moving")
+        .expect("resolve rehomed task");
+    assert!(Path::new(&task.task().repo[0].source).is_absolute());
+    assert!(task.audit().expect("audit rehomed task").ok());
+}
+
+#[test]
+fn member_seat_is_fail_closed_and_requires_landed_reachability() {
+    let fixture = Fixture::new();
+    fixture.init_task("member");
+    let source = fixture.source("repo");
+    fixture
+        .space
+        .member_add(
+            Add {
+                task: "local/member",
+                name: "repo",
+                source: &source,
+                branch: None,
+                orphan: false,
+            },
+            true,
+        )
+        .expect("add member");
+    let task = fixture.space.resolve("local/member").expect("resolve task");
+    let member = task.member_path("repo");
+    assert!(task.audit().expect("audit task").ok());
+
+    std::fs::write(member.join("work.txt"), "in progress\n").expect("write task work");
+    assert!(!task.land_audit().expect("preflight").ok());
+    git(&member, &["add", "work.txt"]);
+    git(&member, &["commit", "-m", "task work"]);
+    assert!(
+        fixture
+            .space
+            .member_remove("local/member", "repo", false)
+            .is_err()
+    );
+
+    git(&source, &["merge", "--ff-only", "member"]);
+    fixture
+        .space
+        .member_remove("local/member", "repo", true)
+        .expect("remove landed member");
+    assert!(
+        fixture
+            .space
+            .resolve("local/member")
+            .expect("resolve repo-less task")
+            .task()
+            .repo
+            .is_empty()
+    );
+}
+
+#[test]
+fn rename_preserves_the_member_branch_and_audit_reports_missing_seats() {
+    let fixture = Fixture::new();
+    fixture.init_task("before");
+    let source = fixture.source("repo");
+    fixture
+        .space
+        .member_add(
+            Add {
+                task: "local/before",
+                name: "repo",
+                source: &source,
+                branch: None,
+                orphan: false,
+            },
+            true,
+        )
+        .expect("add member");
+    fixture
+        .space
+        .task_rename("local/before", "after", true)
+        .expect("rename task");
+    let task = fixture
+        .space
+        .resolve("local/after")
+        .expect("resolve renamed task");
+    assert_eq!(task.task().repo[0].branch.as_deref(), Some("before"));
+    assert!(task.audit().expect("audit renamed task").ok());
+
+    git(
+        &source,
+        &[
+            "worktree",
+            "remove",
+            task.member_path("repo").to_str().unwrap(),
+        ],
+    );
+    let audit = task.audit().expect("audit missing seat");
+    assert!(!audit.ok());
+    assert_eq!(audit.faults[0].kind, "presence");
+}
+
+fn git(root: &Path, args: &[&str]) {
+    let mut command = Command::new("git");
+    for name in [
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_COMMON_DIR",
+        "GIT_DIR",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_PREFIX",
+        "GIT_QUARANTINE_PATH",
+        "GIT_WORK_TREE",
+    ] {
+        command.env_remove(name);
+    }
+    let status = command
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .status()
+        .expect("run git");
+    assert!(status.success(), "git {} failed", args.join(" "));
+}
