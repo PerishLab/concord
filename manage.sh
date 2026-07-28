@@ -214,8 +214,9 @@ install_concord() {
   [ -f "$candidate" ] || { echo "archive missing concord" >&2; exit 1; }
   chmod +x "$candidate"
   staged_version=$("$candidate" --version)
+  binary_version=${VERSION%%-*}
   case "$staged_version" in
-    *"$VERSION"*) ;;
+    *"$binary_version"*) ;;
     *) echo "binary version mismatch: $staged_version" >&2; exit 1 ;;
   esac
 

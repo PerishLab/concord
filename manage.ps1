@@ -165,7 +165,8 @@ function Install-Concord {
             throw 'archive missing concord.exe'
         }
         $stagedVersion = (& $candidate --version | Out-String).Trim()
-        if ($stagedVersion -notmatch [regex]::Escape($resolvedVersion)) {
+        $binaryVersion = ($resolvedVersion -split '-')[0]
+        if ($stagedVersion -notmatch [regex]::Escape($binaryVersion)) {
             throw "binary version mismatch: $stagedVersion"
         }
 

@@ -37,6 +37,22 @@ cat > "$release/metadata.json" <<EOF
 }
 EOF
 
+beta="$version-beta.1"
+beta_release="$fixture/public/beta/versions/$beta"
+mkdir -p "$beta_release"
+cp "$release/$archive" "$beta_release/$archive"
+cat > "$beta_release/metadata.json" <<EOF
+{
+  "releaseVersion": "$beta",
+  "assets": [
+    {
+      "name": "$archive",
+      "sha256": "$digest"
+    }
+  ]
+}
+EOF
+
 base="file://$fixture/public"
 "$root/manage.sh" install --version "$version" --public-url "$base" \
   --install-root "$fixture/install" --bin-dir "$fixture/bin"
@@ -47,6 +63,13 @@ test "$("$fixture/bin/concord" --version)" = "concord $version"
 "$root/manage.sh" uninstall --install-root "$fixture/install" \
   --bin-dir "$fixture/bin"
 test ! -e "$fixture/bin/concord"
+
+"$root/manage.sh" install --channel beta --version "$beta" --public-url "$base" \
+  --install-root "$fixture/beta-install" --bin-dir "$fixture/beta-bin"
+test -x "$fixture/beta-install/v$beta/concord"
+test "$("$fixture/beta-bin/concord" --version)" = "concord $version"
+"$root/manage.sh" uninstall --install-root "$fixture/beta-install" \
+  --bin-dir "$fixture/beta-bin"
 
 mkdir -p "$fixture/legacy-bin"
 cp "$binary" "$fixture/legacy-bin/concord"

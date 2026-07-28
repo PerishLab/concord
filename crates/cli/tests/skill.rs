@@ -123,6 +123,17 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
         "concord"
     );
     assert!(argument_home.join("state/skills.json").is_file(), "ledger");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        let mode = fs::metadata(argument_home.join("state/skills.json"))
+            .expect("ledger")
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(mode, 0o600, "ledger stays private");
+    }
     assert!(
         !fixture.path().join("home/state/skills.json").exists(),
         "argument layer must override file home"
@@ -153,6 +164,17 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
         "{}",
         String::from_utf8_lossy(&upgraded.stderr)
     );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        let mode = fs::metadata(argument_home.join("state/skills.json"))
+            .expect("ledger")
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(mode, 0o600, "ledger replacement stays private");
+    }
 
     fs::write(skill.join("metadata.json"), "{}").expect("spoil marker");
     let refused = run(
