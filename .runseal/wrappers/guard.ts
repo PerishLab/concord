@@ -34,12 +34,14 @@ await bin("deno").run([
   ".runseal/wrappers/land.ts",
   ".runseal/wrappers/release.ts",
   ".forgejo/scripts/release/metadata.ts",
+  ".forgejo/scripts/release/presign.ts",
 ]);
 
 io.print("==> shell syntax");
 await bin("sh").run(["-n", "manage.sh"]);
 await bin("sh").run(["-n", ".forgejo/scripts/release/package.sh"]);
 await bin("sh").run(["-n", ".forgejo/scripts/release/smoke.sh"]);
+await bin("bash").run(["-n", ".forgejo/scripts/release/absent.sh"]);
 await bin("bash").run(["-n", ".forgejo/scripts/release/publish.sh"]);
 
 io.print("==> plumb doctor");

@@ -20,7 +20,16 @@ jobs:
   prepare:
     runs-on: docker
     container: mirror.perish.lan/ci/deno
+    env:
+      CONCORD_RELEASES_S3_AK: ${{ secrets.CONCORD_RELEASES_S3_AK }}
+      CONCORD_RELEASES_S3_BUCKET: ${{ secrets.CONCORD_RELEASES_S3_BUCKET }}
+      CONCORD_RELEASES_S3_SK: ${{ secrets.CONCORD_RELEASES_S3_SK }}
+      CONCORD_RELEASES_S3_URL: ${{ secrets.CONCORD_RELEASES_S3_URL }}
+      RELEASE_CHANNEL: stable
     outputs:
+      put_linux: ${{ steps.presign.outputs.put_linux }}
+      put_macos: ${{ steps.presign.outputs.put_macos }}
+      put_windows: ${{ steps.presign.outputs.put_windows }}
       version: ${{ steps.version.outputs.value }}
     steps:
       - uses: actions/checkout@v6
@@ -49,6 +58,14 @@ jobs:
           fi
           test -n "$version"
           echo "value=$version" >> "$GITHUB_OUTPUT"
+      - name: Refuse immutable overwrite
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: bash .forgejo/scripts/release/absent.sh
+      - id: presign
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: deno run --allow-env --allow-write="$GITHUB_OUTPUT" .forgejo/scripts/release/presign.ts
 
   linux:
     needs: prepare
@@ -58,10 +75,12 @@ jobs:
       - uses: actions/checkout@v6
       - name: Package
         run: sh .forgejo/scripts/release/package.sh "${{ needs.prepare.outputs.version }}" x86_64-unknown-linux-gnu
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux
-          path: dist/*.tar.gz
+      - name: Deliver
+        env:
+          PUT_URL: ${{ needs.prepare.outputs.put_linux }}
+        run: |
+          curl -fsS --retry 3 --retry-all-errors -T dist/concord-x86_64-unknown-linux-gnu.tar.gz \
+            -H 'Cache-Control: public,max-age=31536000,immutable' "$PUT_URL"
 
   macos:
     needs: prepare
@@ -70,10 +89,12 @@ jobs:
       - uses: actions/checkout@v6
       - name: Package
         run: sh .forgejo/scripts/release/package.sh "${{ needs.prepare.outputs.version }}" aarch64-apple-darwin
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos
-          path: dist/*.tar.gz
+      - name: Deliver
+        env:
+          PUT_URL: ${{ needs.prepare.outputs.put_macos }}
+        run: |
+          curl -fsS --retry 3 --retry-all-errors -T dist/concord-aarch64-apple-darwin.tar.gz \
+            -H 'Cache-Control: public,max-age=31536000,immutable' "$PUT_URL"
 
   windows:
     needs: prepare
@@ -82,10 +103,13 @@ jobs:
       - uses: actions/checkout@v6
       - name: Package
         run: pwsh -NoProfile -File .forgejo/scripts/release/package.ps1 "${{ needs.prepare.outputs.version }}"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          path: dist/*.zip
+      - name: Deliver
+        env:
+          PUT_URL: ${{ needs.prepare.outputs.put_windows }}
+        run: |
+          curl.exe -fsS --retry 3 --retry-all-errors -T dist/concord-x86_64-pc-windows-msvc.zip `
+            -H "Cache-Control: public,max-age=31536000,immutable" "$env:PUT_URL"
+          if ($LASTEXITCODE -ne 0) { throw "deliver failed: $LASTEXITCODE" }
 
   publish:
     needs: [prepare, linux, macos, windows]
@@ -101,10 +125,6 @@ jobs:
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
       - name: Publish immutable release
         run: bash .forgejo/scripts/release/publish.sh
 
