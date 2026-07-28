@@ -13,10 +13,11 @@ home = "/home/operator/.concord"
 releases = "https://releases.concord.perish.uk"
 ```
 
-The default config path is `~/.config/concord/config.toml` on Unix and
-`%USERPROFILE%\AppData\Roaming\concord\config.toml` on Windows; global
-`--config` selects an explicit file. Runtime policy follows the Plumb cascade:
-defaults, file, typed `CONCORD_` environment, then arguments.
+The default config path is `~/.concord/concord.toml` on Unix and
+`%LOCALAPPDATA%\concord\concord.toml` on Windows; global `--config` selects an
+explicit file. Concord does not discover or fall back to another config seat.
+Runtime policy follows the Plumb cascade: defaults, file, typed `CONCORD_`
+environment, then arguments.
 `CONCORD_DOMAIN_SPACE_ROOT` or `--root` supplies the required task root;
 `CONCORD_HOME` or `--home` selects user state. Concord does not assume
 `~/Projects`, and skill commands do not require task-domain configuration.
@@ -56,7 +57,20 @@ concord resource show perish.code/ship-feature logs
 ```
 
 `concord --help` is the complete command grammar. The stable binary is
-installed with `manage.sh` on Linux/macOS or `manage.ps1` on Windows.
+installed or updated with `manage.sh` on Linux/macOS or `manage.ps1` on
+Windows:
+
+```text
+manage.sh install
+manage.sh update
+manage.sh uninstall
+```
+
+Managers verify release metadata and the staged binary before activating a
+versioned seat under `~/.local/share/concord/vX.Y.Z/`. The stable
+`~/.local/bin/concord` entrypoint points at the selected version. Existing
+entrypoints and version seats are replaced only when their ownership can be
+proven; `--retain=false` explicitly prunes older managed versions.
 
 Concord also ships its operating brief as a release-matched managed skill:
 

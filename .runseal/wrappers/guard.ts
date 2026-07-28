@@ -42,12 +42,16 @@ await bin("sh").run(["-n", "manage.sh"]);
 await bin("sh").run(["-n", ".forgejo/scripts/release/package.sh"]);
 await bin("sh").run(["-n", ".forgejo/scripts/release/skill.sh"]);
 await bin("sh").run(["-n", ".forgejo/scripts/release/skill-smoke.sh"]);
+await bin("sh").run(["-n", ".forgejo/scripts/release/manager-smoke.sh"]);
 await bin("sh").run(["-n", ".forgejo/scripts/release/smoke.sh"]);
 await bin("bash").run(["-n", ".forgejo/scripts/release/absent.sh"]);
 await bin("bash").run(["-n", ".forgejo/scripts/release/publish.sh"]);
 
 io.print("==> skill package");
 await bin("sh").run([".forgejo/scripts/release/skill-smoke.sh"]);
+
+io.print("==> manager smoke");
+await bin("sh").run([".forgejo/scripts/release/manager-smoke.sh"]);
 
 io.print("==> plumb doctor");
 await bin("plumb").run(["doctor", "."]);

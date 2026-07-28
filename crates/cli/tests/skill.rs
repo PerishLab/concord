@@ -46,7 +46,7 @@ fn serve(archive: Vec<u8>) -> String {
             let request = String::from_utf8_lossy(&request[..read]);
             let body = if request.contains("metadata.json") {
                 format!(
-                    r#"{{"releaseVersion":"0.2.0","artifacts":{{"skillTarGz":{{"name":"concord-skill.tar.gz","url":"http://127.0.0.1:{port}/concord-skill.tar.gz","sha256":"{digest}"}}}}}}"#
+                    r#"{{"releaseVersion":"0.3.0","artifacts":{{"skillTarGz":{{"name":"concord-skill.tar.gz","url":"http://127.0.0.1:{port}/concord-skill.tar.gz","sha256":"{digest}"}}}}}}"#
                 )
                 .into_bytes()
             } else {
@@ -105,7 +105,7 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
             "skill",
             "install",
             "--version",
-            "0.2.0",
+            "0.3.0",
             "--path",
             &skill_text,
         ],
@@ -145,7 +145,7 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
             "skill",
             "upgrade",
             "--version",
-            "0.2.0",
+            "0.3.0",
         ],
     );
     assert!(

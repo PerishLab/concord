@@ -1,0 +1,63 @@
+use serde_json::Value;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+
+fn run(home: &Path, arguments: &[&str]) -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_concord"));
+    command
+        .env_remove("CONCORD_DOMAIN_SPACE_ROOT")
+        .env_remove("CONCORD_HOME")
+        .env_remove("CONCORD_RELEASES")
+        .args(arguments);
+    if cfg!(windows) {
+        command
+            .env("LOCALAPPDATA", home.join("data"))
+            .env("USERPROFILE", home.join("profile"));
+    } else {
+        command.env("HOME", home);
+    }
+    command.output().expect("run concord")
+}
+
+fn expected(home: &Path) -> PathBuf {
+    if cfg!(windows) {
+        return home.join("data/concord/concord.toml");
+    }
+    home.join(".concord/concord.toml")
+}
+
+fn legacy(home: &Path) -> PathBuf {
+    if cfg!(windows) {
+        return home.join("profile/AppData/Roaming/concord/config.toml");
+    }
+    home.join(".config/concord/config.toml")
+}
+
+#[test]
+fn default_config_uses_only_the_product_seat() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    let old = legacy(fixture.path());
+    fs::create_dir_all(old.parent().expect("legacy parent")).expect("legacy parent");
+    fs::write(&old, "domain_space_root = \"/legacy\"\n").expect("legacy config");
+
+    let path = run(fixture.path(), &["config", "path"]);
+    assert!(
+        path.status.success(),
+        "{}",
+        String::from_utf8_lossy(&path.stderr)
+    );
+    assert_eq!(
+        String::from_utf8(path.stdout).expect("config path").trim(),
+        expected(fixture.path()).display().to_string()
+    );
+
+    let shown = run(fixture.path(), &["--json", "config", "show"]);
+    assert!(
+        shown.status.success(),
+        "{}",
+        String::from_utf8_lossy(&shown.stderr)
+    );
+    let config: Value = serde_json::from_slice(&shown.stdout).expect("config json");
+    assert_eq!(config["domain_space_root"], "");
+}

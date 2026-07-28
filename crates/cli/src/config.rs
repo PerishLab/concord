@@ -83,12 +83,9 @@ fn selected(file: Option<&Path>) -> Result<Option<PathBuf>> {
 }
 
 fn default_path() -> Result<PathBuf> {
-    let home = plumb::config::home()
-        .ok_or_else(|| Error::new("platform home is unavailable; pass --config"))?;
-    if cfg!(windows) {
-        return Ok(home.join("AppData/Roaming/concord/config.toml"));
-    }
-    Ok(home.join(".config/concord/config.toml"))
+    plumb::config::data("concord")
+        .map(|home| home.join("concord.toml"))
+        .ok_or_else(|| Error::new("platform data home is unavailable; pass --config"))
 }
 
 fn absolute(path: &Path) -> Result<PathBuf> {
