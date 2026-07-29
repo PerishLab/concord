@@ -28,6 +28,9 @@ reachability or exact tree equivalence.
 
 - `memory write` and `memory settle` accept one explicit stdin payload without
   ambiguously framing two inputs.
+- One canonical repository can back concurrent task members when every member
+  has a distinct mutable branch and worktree seat. Concord treats the branch,
+  not the repository as a whole, as the unit of mutable ownership.
 - Member creation refuses an already existing target branch during both dry
   run and apply, before changing the registry or worktree set.
 - The installer removes superseded managed versions after activating and

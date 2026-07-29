@@ -26,6 +26,9 @@ equivalence 证明。
 
 - `memory write` 与 `memory settle` 可以接收一个显式 stdin payload，同时拒绝
   无法区分边界的双 stdin 输入。
+- 当每个 member 都有独立的 mutable branch 与 worktree seat 时，同一个
+  canonical repository 可以同时服务多个 task。Concord 以 branch 而非整个
+  repository 作为可变所有权单元。
 - Member 创建会在 dry run 与 apply 阶段都提前拒绝已存在的目标 branch，不改变
   registry 或 worktree 集合。
 - Installer 会在激活并验证所选版本后移除旧的受管版本；如果明确需要离线本地
