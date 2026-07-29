@@ -204,7 +204,7 @@ fn member_command(space: &Space, command: MemberCommand, json_output: bool) -> R
             )
         }
         MemberCommand::Preflight { task } => {
-            output::audit(&space.resolve(&task)?.land_audit()?, json_output)
+            output::preflight(&space.resolve(&task)?.preflight()?, json_output)
         }
         MemberCommand::RemoveLanded { task, name, apply } => guarded(
             space.member_remove(&task, &name, false)?,

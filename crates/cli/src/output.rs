@@ -1,4 +1,4 @@
-use concord_core::{Audit, Error, Plan, Result};
+use concord_core::{Audit, Error, LandingProof, Plan, Preflight, Result};
 use plumb::skill::{Done, Record, Report};
 use serde_json::json;
 
@@ -67,6 +67,73 @@ pub fn audit(audit: &Audit, json_output: bool) -> Result<()> {
             "protocol audit found {} fault(s)",
             audit.faults.len()
         )))
+    }
+}
+
+pub fn preflight(preflight: &Preflight, json_output: bool) -> Result<()> {
+    if json_output {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(preflight)
+                .map_err(|error| Error::new(format!("cannot encode preflight: {error}")))?
+        );
+    } else {
+        human_preflight(preflight);
+    }
+    if preflight.ok() {
+        Ok(())
+    } else {
+        Err(Error::new(format!(
+            "member preflight found {} fault(s) and {} unproved member(s)",
+            preflight.faults.len(),
+            preflight.unproved()
+        )))
+    }
+}
+
+fn human_preflight(preflight: &Preflight) {
+    println!("preflight: {}", preflight.target);
+    for member in &preflight.members {
+        println!("  member: {}", member.name);
+        println!("    path: {}", member.path);
+        println!("    source: {}", member.source);
+        println!("    expected branch: {}", member.expected_branch);
+        if let Some(proof) = &member.proof {
+            println!(
+                "    identity: {} = {}",
+                proof.source_identity, proof.member_identity
+            );
+            println!("    worktree: registered");
+            println!("    branch: {}", proof.branch);
+            println!("    clean");
+            human_landing(&proof.landing);
+        }
+    }
+    if preflight.ok() {
+        println!("  ready to remove landed members");
+    }
+    for fault in &preflight.faults {
+        println!("  {}: {}: {}", fault.kind, fault.path, fault.message);
+    }
+}
+
+fn human_landing(landing: &LandingProof) {
+    match landing {
+        LandingProof::Reachable {
+            member_head,
+            integration_head,
+        } => println!(
+            "    landed: reachable ({} -> {})",
+            member_head, integration_head
+        ),
+        LandingProof::TreeEquivalent {
+            member_tree,
+            integration_tree,
+            ..
+        } => println!(
+            "    landed: tree-equivalent ({} = {})",
+            member_tree, integration_tree
+        ),
     }
 }
 

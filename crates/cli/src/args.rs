@@ -159,7 +159,7 @@ pub enum MemberCommand {
         #[arg(long)]
         dry_run: bool,
     },
-    #[command(about = "Audit cleanliness and landed reachability")]
+    #[command(about = "Prove cleanliness and landed reachability")]
     Preflight { task: String },
     #[command(about = "Remove a clean, reachable landed worktree")]
     RemoveLanded {

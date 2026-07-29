@@ -33,6 +33,11 @@ concord member preflight perish.code/ship-feature
 concord memory read perish.code/ship-feature --json
 ```
 
+Member preflight returns one record per declared member. A successful record
+proves canonical repository identity, the expected branch, a clean worktree,
+and either landed commit reachability or exact tree equivalence. JSON output
+carries the Git identities, heads, and trees used as evidence.
+
 Creation prints its plan and executes by default; add `--dry-run` to stop after
 planning. Deletion, task migration, permission normalization, and landed-seat
 removal only execute with `--apply`.

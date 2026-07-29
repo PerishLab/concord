@@ -56,7 +56,7 @@ impl Space {
             return Err(Error::new("member has dirty or untracked files"));
         }
         let source = task.source(&member.source)?;
-        if !git::landed(&path, &source)? {
+        if git::landing(&path, &source)?.is_none() {
             return Err(Error::new(
                 "member HEAD is neither reachable nor tree-equivalent to the integration checkout HEAD",
             ));

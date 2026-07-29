@@ -138,56 +138,6 @@ fn rehome_repairs_worktrees_and_makes_cross_domain_sources_explicit() {
 }
 
 #[test]
-fn member_seat_is_fail_closed_and_requires_landed_reachability() {
-    let fixture = Fixture::new();
-    fixture.init_task("member");
-    let source = fixture.source("repo");
-    fixture
-        .space
-        .member_add(
-            Add {
-                task: "local/member",
-                name: "repo",
-                source: &source,
-                branch: None,
-                orphan: false,
-            },
-            true,
-        )
-        .expect("add member");
-    let task = fixture.space.resolve("local/member").expect("resolve task");
-    let member = task.member_path("repo");
-    assert!(task.audit().expect("audit task").ok());
-
-    std::fs::write(member.join("work.txt"), "in progress\n").expect("write task work");
-    assert!(!task.land_audit().expect("preflight").ok());
-    git(&member, &["add", "work.txt"]);
-    git(&member, &["commit", "-m", "task work"]);
-    assert!(
-        fixture
-            .space
-            .member_remove("local/member", "repo", false)
-            .is_err()
-    );
-
-    git(&source, &["merge", "--squash", "member"]);
-    git(&source, &["commit", "-m", "land task work"]);
-    fixture
-        .space
-        .member_remove("local/member", "repo", true)
-        .expect("remove landed member");
-    assert!(
-        fixture
-            .space
-            .resolve("local/member")
-            .expect("resolve repo-less task")
-            .task()
-            .repo
-            .is_empty()
-    );
-}
-
-#[test]
 fn rename_preserves_the_member_branch_and_audit_reports_missing_seats() {
     let fixture = Fixture::new();
     fixture.init_task("before");

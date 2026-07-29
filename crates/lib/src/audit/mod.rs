@@ -1,9 +1,13 @@
+mod preflight;
+
 use crate::git;
 use crate::path::held_mode;
 use crate::{Domain, Result, Space, TaskRef};
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::path::Path;
+
+pub use preflight::{LandingProof, MemberPreflight, MemberProof, Preflight};
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Audit {
@@ -114,25 +118,6 @@ impl TaskRef {
             }
         }
         memory_permissions(&mut audit, &root.join(".task"))?;
-        Ok(audit)
-    }
-
-    pub fn land_audit(&self) -> Result<Audit> {
-        let mut audit = self.audit()?;
-        for member in &self.task().repo {
-            let path = self.member_path(&member.name);
-            if path.is_dir() && !git::clean(&path)? {
-                audit.fault("dirty", &path, "member has dirty or untracked files");
-            }
-            let source = self.source(&member.source)?;
-            if path.is_dir() && source.is_dir() && !git::landed(&path, &source)? {
-                audit.fault(
-                    "reachability",
-                    &path,
-                    "member HEAD is neither reachable nor tree-equivalent to the integration checkout HEAD",
-                );
-            }
-        }
         Ok(audit)
     }
 

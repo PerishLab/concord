@@ -10,7 +10,7 @@ mod ops;
 mod path;
 mod store;
 
-pub use audit::{Audit, Fault};
+pub use audit::{Audit, Fault, LandingProof, MemberPreflight, MemberProof, Preflight};
 pub use config::Root;
 pub use error::{Error, Result};
 pub use memory::{Memory, MemoryRead};

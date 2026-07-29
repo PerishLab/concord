@@ -2,6 +2,19 @@ use crate::{Error, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+pub enum Landing {
+    Reachable {
+        member_head: String,
+        source_head: String,
+    },
+    TreeEquivalent {
+        member_head: String,
+        source_head: String,
+        member_tree: String,
+        source_tree: String,
+    },
+}
+
 pub fn text(root: &Path, args: &[&str]) -> Result<String> {
     let output = command()
         .arg("-C")
@@ -39,20 +52,32 @@ pub fn clean(root: &Path) -> Result<bool> {
     Ok(text(root, &["status", "--porcelain=v1", "--untracked-files=all"])?.is_empty())
 }
 
-pub fn landed(member: &Path, source: &Path) -> Result<bool> {
-    let head = text(member, &["rev-parse", "HEAD"])?;
+pub fn landing(member: &Path, source: &Path) -> Result<Option<Landing>> {
+    let member_head = text(member, &["rev-parse", "HEAD"])?;
+    let source_head = text(source, &["rev-parse", "HEAD"])?;
     let status = command()
         .arg("-C")
         .arg(source)
-        .args(["merge-base", "--is-ancestor", &head, "HEAD"])
+        .args(["merge-base", "--is-ancestor", &member_head, &source_head])
         .status()
         .map_err(|error| Error::new(format!("cannot run git: {error}")))?;
     if status.success() {
-        return Ok(true);
+        return Ok(Some(Landing::Reachable {
+            member_head,
+            source_head,
+        }));
     }
     let member_tree = text(member, &["rev-parse", "HEAD^{tree}"])?;
     let source_tree = text(source, &["rev-parse", "HEAD^{tree}"])?;
-    Ok(member_tree == source_tree)
+    if member_tree != source_tree {
+        return Ok(None);
+    }
+    Ok(Some(Landing::TreeEquivalent {
+        member_head,
+        source_head,
+        member_tree,
+        source_tree,
+    }))
 }
 
 pub fn registered(source: &Path, member: &Path) -> Result<bool> {
