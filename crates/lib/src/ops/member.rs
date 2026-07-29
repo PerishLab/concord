@@ -20,6 +20,7 @@ impl Space {
             return Err(Error::new("integration checkout is not clean"));
         }
         let branch = request.branch.unwrap_or(&task.task().name);
+        ensure_branch_absent(&source, branch)?;
         let path = task.member_path(request.name);
         let actions = vec![
             action(
@@ -37,6 +38,7 @@ impl Space {
             let _lock = self.lock()?;
             let task = self.resolve(request.task)?;
             task.ensure_exact()?;
+            ensure_branch_absent(&source, branch)?;
             add_member(&task, request, &source, branch, &path)?;
         }
         Ok(Plan::new("member.add", actions, apply))
@@ -77,6 +79,15 @@ impl Space {
         }
         Ok(Plan::new("member.remove-landed", actions, apply))
     }
+}
+
+fn ensure_branch_absent(source: &Path, branch: &str) -> Result<()> {
+    if git::branch_exists(source, branch)? {
+        return Err(Error::new(format!(
+            "target branch already exists: {branch}"
+        )));
+    }
+    Ok(())
 }
 
 fn add_member(

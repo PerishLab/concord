@@ -52,6 +52,21 @@ pub fn clean(root: &Path) -> Result<bool> {
     Ok(text(root, &["status", "--porcelain=v1", "--untracked-files=all"])?.is_empty())
 }
 
+pub fn branch_exists(root: &Path, branch: &str) -> Result<bool> {
+    let reference = format!("refs/heads/{branch}");
+    let status = command()
+        .arg("-C")
+        .arg(root)
+        .args(["show-ref", "--verify", "--quiet", &reference])
+        .status()
+        .map_err(|error| Error::new(format!("cannot run git: {error}")))?;
+    match status.code() {
+        Some(0) => Ok(true),
+        Some(1) => Ok(false),
+        _ => Err(Error::new(format!("cannot inspect target branch {branch}"))),
+    }
+}
+
 pub fn landing(member: &Path, source: &Path) -> Result<Option<Landing>> {
     let member_head = text(member, &["rev-parse", "HEAD"])?;
     let source_head = text(source, &["rev-parse", "HEAD"])?;
