@@ -119,7 +119,11 @@ pub struct ImportPreflight {
     pub reserve_inodes: Option<u64>,
 }
 
-pub(crate) fn inspect(task: &TaskRef) -> TaskResources {
+pub(crate) fn host() -> Observation<HostMemory> {
+    measure::host_memory()
+}
+
+pub(crate) fn inspect(task: &TaskRef, host_memory: &Observation<HostMemory>) -> TaskResources {
     let task_footprint = footprint("task", &task.path(), TASK_WARN, TASK_CRIT);
     let members = task
         .task()
@@ -153,13 +157,10 @@ pub(crate) fn inspect(task: &TaskRef) -> TaskResources {
         Err(error) => vec![unknown("resources", &resources_root, error.to_string())],
     };
     let filesystem = measure::filesystem(&task.path());
-    let host_memory = measure::host_memory();
     let mut status = task_footprint.status;
     for footprint in members.iter().chain(memory.iter()).chain(resources.iter()) {
         status = worst(status, footprint.status);
     }
-    status = worst(status, filesystem.status);
-    status = worst(status, host_memory.status);
     TaskResources {
         identity: task.identity(),
         status,
@@ -168,7 +169,7 @@ pub(crate) fn inspect(task: &TaskRef) -> TaskResources {
         memory,
         resources,
         filesystem,
-        host_memory,
+        host_memory: host_memory.clone(),
     }
 }
 

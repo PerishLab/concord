@@ -56,17 +56,17 @@ impl Audit {
 
 impl Space {
     pub fn audit(&self) -> Result<Audit> {
-        self.audit_with_resources(true)
+        self.audit_with_resources(Some(&resource::host()))
     }
 
-    fn audit_with_resources(&self, resources: bool) -> Result<Audit> {
+    fn audit_with_resources(&self, host: Option<&Observation<HostMemory>>) -> Result<Audit> {
         let mut audit = Audit {
             target: self.path().display().to_string(),
             faults: Vec::new(),
             resources: Vec::new(),
         };
         for domain in self.domains()? {
-            merge(&mut audit, domain.audit_with_resources(resources)?);
+            merge(&mut audit, domain.audit_with_resources(host)?);
         }
         Ok(audit)
     }
@@ -74,10 +74,10 @@ impl Space {
 
 impl Domain {
     pub fn audit(&self) -> Result<Audit> {
-        self.audit_with_resources(true)
+        self.audit_with_resources(Some(&resource::host()))
     }
 
-    fn audit_with_resources(&self, resources: bool) -> Result<Audit> {
+    fn audit_with_resources(&self, host: Option<&Observation<HostMemory>>) -> Result<Audit> {
         let mut audit = Audit {
             target: self.name().to_string(),
             faults: Vec::new(),
@@ -94,7 +94,7 @@ impl Domain {
         for task in &registry.task {
             merge(
                 &mut audit,
-                self.task(&task.name)?.audit_with_resources(resources)?,
+                self.task(&task.name)?.audit_with_resources(host)?,
             );
         }
         for entry in std::fs::read_dir(self.tasks_path())? {
@@ -114,14 +114,14 @@ impl Domain {
 
 impl TaskRef {
     pub fn audit(&self) -> Result<Audit> {
-        self.audit_with_resources(true)
+        self.audit_with_resources(Some(&resource::host()))
     }
 
     pub(crate) fn agreement(&self) -> Result<Audit> {
-        self.audit_with_resources(false)
+        self.audit_with_resources(None)
     }
 
-    fn audit_with_resources(&self, resources: bool) -> Result<Audit> {
+    fn audit_with_resources(&self, host: Option<&Observation<HostMemory>>) -> Result<Audit> {
         let mut audit = Audit {
             target: self.identity(),
             faults: Vec::new(),
@@ -158,8 +158,8 @@ impl TaskRef {
             }
         }
         memory::permissions(&mut audit, &root.join(".task"))?;
-        if resources {
-            audit.resources.push(resource::inspect(self));
+        if let Some(host) = host {
+            audit.resources.push(resource::inspect(self, host));
         }
         Ok(audit)
     }
