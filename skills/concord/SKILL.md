@@ -67,6 +67,9 @@ building or operating a repository rather than restating its clauses here.
 
 - One task has one fixed home domain, zero or more repository members, and at
   most one task-level `.task/`. A repo-less task is valid.
+- Mutable ownership attaches to one branch in one worktree. One canonical
+  source may back several task members concurrently when their worktree paths
+  and mutable branches are distinct.
 - Ordinary mutation requires agreement among the registry entry, member path,
   canonical source identity, and Git worktree metadata.
 - Integration checkouts are clean landed-state mirrors. Never branch, commit,
@@ -103,7 +106,7 @@ Concord currently enforces:
 - task-root, declared-member, canonical-source, branch, and Git worktree
   agreement;
 - private task, memory, and resource permissions;
-- clean source checkout before member creation;
+- clean source checkout and an absent target branch before member creation;
 - clean and reachable or tree-equivalent member state before landed removal;
 - locking, registry compare-before-replace, and memory revision CAS;
 - explicit plans, default-on creation, and execution gates for destructive or
@@ -122,6 +125,8 @@ The following remain agent-held law; no machine will stop every violation:
 - recognizing foreign territory and declining adoption;
 - choosing the correct home domain and repository integration/landing
   conventions;
+- coordinating semantic overlap and landing order among concurrent task
+  branches;
 - discovering repository-local instructions before acting;
 - deciding whether work needs a task or durable memory;
 - proving dirty or untracked member payload is durably preserved before land;

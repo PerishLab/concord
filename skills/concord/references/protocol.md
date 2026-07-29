@@ -87,8 +87,10 @@ Rules:
   user's home. Cross-domain sources should be explicit.
 - The branch defaults to the task name. Record `branch` only when different.
 - Top-level `[[repo]]` entries are annotations, not task members.
-- A canonical repository may join several tasks only through distinct
-  worktrees and distinct branches. One mutable branch has at most one owner.
+- Mutable ownership attaches to one branch in one worktree. A canonical
+  repository may join several tasks concurrently when every member has a
+  distinct worktree path and mutable branch. One mutable branch has at most one
+  owner.
 - Task rename changes the task root and registry identity together. Preserve
   member branch names through overrides unless repository policy separately
   authorizes branch rename.
@@ -141,6 +143,16 @@ read-only work without retained artifacts, and transient scratch work need no
 task. Parallel lines touching one repository use separate tasks, branches, and
 worktrees.
 
+For example, these members may coexist:
+
+```text
+task-a/repo-a -> source repo-a, branch task-a
+task-b/repo-a -> source repo-a, branch task-b
+```
+
+Each task owns its branch and worktree seat. Semantic overlap and landing order
+remain ordinary coordination between the branches.
+
 Start creates one coherent registry entry and private root, then the first
 member if needed. Add `.task/` only under the memory rule below.
 
@@ -188,7 +200,8 @@ Block mutation on any mismatch until explicitly resolved.
 
 Use `concord member add` with the canonical integration checkout. Keep
 cross-domain members under the existing home task root. The source checkout
-must be clean.
+must be clean. Resolve the mutable branch from the task name or recorded
+override, then add the member when its worktree path and branch are distinct.
 
 ### Land a repository
 

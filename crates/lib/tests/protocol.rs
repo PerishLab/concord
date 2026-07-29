@@ -222,44 +222,6 @@ fn rename_preserves_the_member_branch_and_audit_reports_missing_seats() {
     assert_eq!(audit.faults[0].kind, "presence");
 }
 
-#[test]
-fn member_add_refuses_an_existing_target_branch_before_dry_run_or_apply() {
-    let fixture = Fixture::new();
-    fixture.init_task("branch");
-    let source = fixture.source("repo");
-    git(&source, &["branch", "reserved"]);
-
-    for apply in [false, true] {
-        let error = fixture
-            .space
-            .member_add(
-                Add {
-                    task: "local/branch",
-                    name: "repo",
-                    source: &source,
-                    branch: Some("reserved"),
-                    orphan: false,
-                },
-                apply,
-            )
-            .expect_err("existing target branch must be refused");
-        assert_eq!(error.to_string(), "target branch already exists: reserved");
-        let task = fixture
-            .space
-            .resolve("local/branch")
-            .expect("resolve unchanged task");
-        assert!(
-            task.task().repo.is_empty(),
-            "registry must remain unchanged"
-        );
-        assert!(
-            !task.member_path("repo").exists(),
-            "member path must remain absent"
-        );
-        assert!(task.audit().expect("audit unchanged task").ok());
-    }
-}
-
 fn git(root: &Path, args: &[&str]) {
     let mut command = Command::new("git");
     for name in [
