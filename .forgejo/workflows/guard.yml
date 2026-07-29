@@ -38,3 +38,18 @@ jobs:
             --lock .runseal/deno.lock \
             --frozen=true \
             .runseal/wrappers/guard.ts
+
+  windows:
+    runs-on: windows
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Rust guard
+        run: |
+          cargo fmt --all --check
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          cargo test --locked --workspace
+
+      - name: Manager single-option smoke
+        run: pwsh -NoProfile -File manage.ps1 install --help

@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $command = if ($args.Length -gt 0) { $args[0] } else { 'install' }
-$remaining = if ($args.Length -gt 1) { $args[1..($args.Length - 1)] } else { @() }
+[string[]]$remaining = if ($args.Length -gt 1) { $args[1..($args.Length - 1)] } else { @() }
 if ($command -in @('-h', '--help', 'help')) {
     $command = 'install'
     $remaining = @('--help')

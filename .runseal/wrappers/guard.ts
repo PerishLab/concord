@@ -51,7 +51,17 @@ io.print("==> skill package");
 await bin("sh").run([".forgejo/scripts/release/skill-smoke.sh"]);
 
 io.print("==> manager smoke");
-await bin("sh").run([".forgejo/scripts/release/manager-smoke.sh"]);
+if (Deno.build.os === "windows") {
+  await bin("pwsh").run([
+    "-NoProfile",
+    "-File",
+    "manage.ps1",
+    "install",
+    "--help",
+  ]);
+} else {
+  await bin("sh").run([".forgejo/scripts/release/manager-smoke.sh"]);
+}
 
 io.print("==> plumb doctor");
 await bin("plumb").run(["doctor", "."]);

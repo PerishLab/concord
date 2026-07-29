@@ -222,7 +222,51 @@ fn rename_preserves_the_member_branch_and_audit_reports_missing_seats() {
     assert_eq!(audit.faults[0].kind, "presence");
 }
 
+#[cfg(windows)]
+#[test]
+fn failed_member_add_rolls_back_the_created_branch() {
+    let fixture = Fixture::new();
+    fixture.init_task("rollback");
+    let source = fixture.source("repo");
+    let error = fixture
+        .space
+        .member_add(
+            Add {
+                task: "local/rollback",
+                name: "CON",
+                source: &source,
+                branch: None,
+                orphan: false,
+            },
+            true,
+        )
+        .expect_err("reserved worktree path must fail");
+    assert!(error.to_string().contains("git worktree add failed"));
+    assert!(!branch_exists(&source, "rollback"));
+    let task = fixture
+        .space
+        .resolve("local/rollback")
+        .expect("resolve unchanged task");
+    assert!(task.task().repo.is_empty());
+    assert!(task.audit().expect("audit unchanged task").ok());
+}
+
+#[cfg(windows)]
+fn branch_exists(root: &Path, branch: &str) -> bool {
+    let reference = format!("refs/heads/{branch}");
+    git_command(root)
+        .args(["show-ref", "--verify", "--quiet", &reference])
+        .status()
+        .expect("inspect branch")
+        .success()
+}
+
 fn git(root: &Path, args: &[&str]) {
+    let status = git_command(root).args(args).status().expect("run git");
+    assert!(status.success(), "git {} failed", args.join(" "));
+}
+
+fn git_command(root: &Path) -> Command {
     let mut command = Command::new("git");
     for name in [
         "GIT_ALTERNATE_OBJECT_DIRECTORIES",
@@ -236,11 +280,6 @@ fn git(root: &Path, args: &[&str]) {
     ] {
         command.env_remove(name);
     }
-    let status = command
-        .arg("-C")
-        .arg(root)
-        .args(args)
-        .status()
-        .expect("run git");
-    assert!(status.success(), "git {} failed", args.join(" "));
+    command.arg("-C").arg(root);
+    command
 }

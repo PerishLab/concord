@@ -11,10 +11,15 @@ mkdir -p "$fixture/unpacked"
 tar -xzf "$fixture/concord-skill.tar.gz" -C "$fixture/unpacked"
 test -f "$fixture/unpacked/concord/SKILL.md"
 test -f "$fixture/unpacked/concord/references/protocol.md"
-jq -e \
-  '.schema == 1 and .name == "concord" and
-   .version == "0.2.0-test" and .keeper == "concord"' \
-  "$fixture/unpacked/concord/metadata.json" >/dev/null
+deno eval '
+  const value = JSON.parse(await Deno.readTextFile(Deno.args[0]));
+  if (
+    value.schema !== 1 ||
+    value.name !== "concord" ||
+    value.version !== "0.2.0-test" ||
+    value.keeper !== "concord"
+  ) Deno.exit(1);
+' "$fixture/unpacked/concord/metadata.json"
 
 for name in \
   concord-x86_64-unknown-linux-gnu.tar.gz \
@@ -32,12 +37,17 @@ CI_COMMIT=fixture \
     --allow-read="$fixture" \
     --allow-write="$fixture" \
     "$root/.forgejo/scripts/release/metadata.ts"
-jq -e \
-  '.schema == 1 and .version == "0.2.0-test" and
-   .releaseVersion == "0.2.0-test" and
-   (.assets | length == 3) and
-   (.artifacts | length == 1) and
-   (.artifacts.skillTarGz.sha256 | length == 64) and
-   (.artifacts.skillTarGz.url |
-     endswith("/stable/versions/0.2.0-test/concord-skill.tar.gz"))' \
-  "$fixture/metadata.json" >/dev/null
+deno eval '
+  const value = JSON.parse(await Deno.readTextFile(Deno.args[0]));
+  if (
+    value.schema !== 1 ||
+    value.version !== "0.2.0-test" ||
+    value.releaseVersion !== "0.2.0-test" ||
+    value.assets.length !== 3 ||
+    Object.keys(value.artifacts).length !== 1 ||
+    value.artifacts.skillTarGz.sha256.length !== 64 ||
+    !value.artifacts.skillTarGz.url.endsWith(
+      "/stable/versions/0.2.0-test/concord-skill.tar.gz",
+    )
+  ) Deno.exit(1);
+' "$fixture/metadata.json"

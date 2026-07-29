@@ -22,16 +22,21 @@ fn run(home: &Path, arguments: &[&str]) -> Output {
 
 fn expected(home: &Path) -> PathBuf {
     if cfg!(windows) {
-        return home.join("data/concord/concord.toml");
+        return home.join("data").join("concord").join("concord.toml");
     }
-    home.join(".concord/concord.toml")
+    home.join(".concord").join("concord.toml")
 }
 
 fn legacy(home: &Path) -> PathBuf {
     if cfg!(windows) {
-        return home.join("profile/AppData/Roaming/concord/config.toml");
+        return home
+            .join("profile")
+            .join("AppData")
+            .join("Roaming")
+            .join("concord")
+            .join("config.toml");
     }
-    home.join(".config/concord/config.toml")
+    home.join(".config").join("concord").join("config.toml")
 }
 
 #[test]

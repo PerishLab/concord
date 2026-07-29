@@ -16,9 +16,10 @@ pub enum Landing {
 }
 
 pub fn text(root: &Path, args: &[&str]) -> Result<String> {
+    let root = git_path(root);
     let output = command()
         .arg("-C")
-        .arg(root)
+        .arg(&*root)
         .args(args)
         .output()
         .map_err(|error| Error::new(format!("cannot run git: {error}")))?;
@@ -54,9 +55,10 @@ pub fn clean(root: &Path) -> Result<bool> {
 
 pub fn branch_exists(root: &Path, branch: &str) -> Result<bool> {
     let reference = format!("refs/heads/{branch}");
+    let root = git_path(root);
     let status = command()
         .arg("-C")
-        .arg(root)
+        .arg(&*root)
         .args(["show-ref", "--verify", "--quiet", &reference])
         .status()
         .map_err(|error| Error::new(format!("cannot run git: {error}")))?;
@@ -70,9 +72,10 @@ pub fn branch_exists(root: &Path, branch: &str) -> Result<bool> {
 pub fn landing(member: &Path, source: &Path) -> Result<Option<Landing>> {
     let member_head = text(member, &["rev-parse", "HEAD"])?;
     let source_head = text(source, &["rev-parse", "HEAD"])?;
+    let source_arg = git_path(source);
     let status = command()
         .arg("-C")
-        .arg(source)
+        .arg(&*source_arg)
         .args(["merge-base", "--is-ancestor", &member_head, &source_head])
         .status()
         .map_err(|error| Error::new(format!("cannot run git: {error}")))?;
@@ -109,6 +112,7 @@ pub fn registered(source: &Path, member: &Path) -> Result<bool> {
 }
 
 pub fn repair(source: &Path, member: &Path) -> Result<()> {
+    let member = git_path(member);
     let member = member
         .to_str()
         .ok_or_else(|| Error::new("member path is not utf8"))?;
@@ -116,33 +120,64 @@ pub fn repair(source: &Path, member: &Path) -> Result<()> {
 }
 
 pub fn add(source: &Path, path: &Path, branch: &str, orphan: bool) -> Result<()> {
-    let source = source
+    let source_arg = git_path(source);
+    let source_arg = source_arg
         .to_str()
         .ok_or_else(|| Error::new("source path is not utf8"))?;
-    let path = path
+    let path_arg = git_path(path);
+    let path_arg = path_arg
         .to_str()
         .ok_or_else(|| Error::new("member path is not utf8"))?;
-    let mut args = vec!["-C", source, "worktree", "add"];
+    let mut args = vec!["-C", source_arg, "worktree", "add"];
     if orphan {
-        args.extend(["--orphan", "-b", branch, path]);
+        args.extend(["--orphan", "-b", branch, path_arg]);
     } else {
-        args.extend(["-b", branch, path]);
+        args.extend(["-b", branch, path_arg]);
     }
     let output = command().args(args).output()?;
     if !output.status.success() {
-        return Err(Error::new(format!(
-            "git worktree add failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        )));
+        let failure = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        if let Err(cleanup) = rollback_add(source, path, branch) {
+            return Err(Error::new(format!(
+                "git worktree add failed: {failure}; failed to roll back branch {branch}: {cleanup}"
+            )));
+        }
+        return Err(Error::new(format!("git worktree add failed: {failure}")));
     }
     Ok(())
 }
 
 pub fn remove(source: &Path, path: &Path) -> Result<()> {
+    let path = git_path(path);
     let path = path
         .to_str()
         .ok_or_else(|| Error::new("member path is not utf8"))?;
     run(source, &["worktree", "remove", path])
+}
+
+fn rollback_add(source: &Path, path: &Path, branch: &str) -> Result<()> {
+    if !path.exists() && branch_exists(source, branch)? {
+        run(source, &["branch", "-D", branch])?;
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn git_path(path: &Path) -> PathBuf {
+    if let Some(text) = path.to_str() {
+        if let Some(rest) = text.strip_prefix("\\\\?\\UNC\\") {
+            return PathBuf::from(format!("\\\\{rest}"));
+        }
+        if let Some(rest) = text.strip_prefix("\\\\?\\") {
+            return PathBuf::from(rest);
+        }
+    }
+    path.to_path_buf()
+}
+
+#[cfg(not(windows))]
+fn git_path(path: &Path) -> PathBuf {
+    path.to_path_buf()
 }
 
 fn command() -> Command {

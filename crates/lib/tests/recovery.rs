@@ -25,6 +25,7 @@ impl Fixture {
             .expect("start task");
     }
 
+    #[cfg(unix)]
     fn seat(&self, name: &str) -> std::path::PathBuf {
         self.task(name);
         let task = self
