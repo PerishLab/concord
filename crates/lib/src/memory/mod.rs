@@ -1,5 +1,7 @@
+mod copy;
+
 use crate::path::{mode, private_dir, private_file, revision};
-use crate::{Error, Result, TaskRef};
+use crate::{Error, ImportPreflight, Result, TaskRef};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
@@ -103,17 +105,10 @@ impl<'a> Memory<'a> {
 
     pub fn import(&self, name: &str, source: &Path) -> Result<PathBuf> {
         crate::model::component("resource seat", name)?;
-        let source = source.canonicalize().map_err(|error| {
-            Error::new(format!(
-                "cannot resolve resource source {}: {error}",
-                source.display()
-            ))
-        })?;
         let _lock = self.task.lock()?;
         self.task.ensure_exact()?;
         self.require_root()?;
         let root = self.root().join("resources");
-        private_dir(&root)?;
         let seat = root.join(name);
         if seat.exists() {
             return Err(Error::new(format!(
@@ -121,20 +116,37 @@ impl<'a> Memory<'a> {
                 seat.display()
             )));
         }
+        let preflight = crate::audit::resource::import_preflight(source, &seat, &self.root())?;
+        let source = PathBuf::from(preflight.source);
+        private_dir(&root)?;
         private_dir(&seat)?;
         let result = if source.is_dir() {
-            copy_children(&source, &seat)
+            copy::tree(&source, &seat)
         } else {
             let filename = source
                 .file_name()
                 .ok_or_else(|| Error::new("resource source has no filename"))?;
-            copy_file(&source, &seat.join(filename))
+            copy::file(&source, &seat.join(filename))
         };
         if let Err(error) = result {
             let _ = std::fs::remove_dir_all(&seat);
             return Err(error);
         }
         Ok(seat)
+    }
+
+    pub fn preflight_import(&self, name: &str, source: &Path) -> Result<ImportPreflight> {
+        crate::model::component("resource seat", name)?;
+        self.task.ensure_exact()?;
+        self.require_root()?;
+        let seat = self.root().join("resources").join(name);
+        if seat.exists() {
+            return Err(Error::new(format!(
+                "resource seat already exists: {}",
+                seat.display()
+            )));
+        }
+        crate::audit::resource::import_preflight(source, &seat, &self.root())
     }
 
     pub fn resources(&self) -> Result<Vec<PathBuf>> {
@@ -240,45 +252,6 @@ fn normalize(root: &Path, resources: bool) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn copy_children(source: &Path, target: &Path) -> Result<()> {
-    for entry in std::fs::read_dir(source)? {
-        let entry = entry?;
-        let kind = entry.file_type()?;
-        let to = target.join(entry.file_name());
-        if kind.is_symlink() {
-            return Err(Error::new(format!(
-                "resource import refuses symbolic link {}",
-                entry.path().display()
-            )));
-        }
-        if kind.is_dir() {
-            private_dir(&to)?;
-            copy_children(&entry.path(), &to)?;
-        } else if kind.is_file() {
-            copy_file(&entry.path(), &to)?;
-        } else {
-            return Err(Error::new(format!(
-                "resource import refuses special file {}",
-                entry.path().display()
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn copy_file(source: &Path, target: &Path) -> Result<()> {
-    let bytes = std::fs::read(source)?;
-    crate::path::replace(
-        target,
-        &bytes,
-        if held_owner_execute(source)? {
-            0o700
-        } else {
-            0o600
-        },
-    )
 }
 
 fn held_owner_execute(path: &Path) -> Result<bool> {

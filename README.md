@@ -33,6 +33,25 @@ concord member preflight perish.code/ship-feature
 concord memory read perish.code/ship-feature --json
 ```
 
+`audit` keeps protocol agreement and local resource health separate. Protocol
+faults still fail the command; resource findings are advisory `OK`, `WARN`,
+`CRIT`, or `UNKNOWN` observations and never make a task impossible to inspect,
+land, or clean up. Each task audit measures allocated task, member, memory, and
+resource-seat bytes, plus the task filesystem, inode capacity where available,
+and current host memory:
+
+| Observation | WARN | CRIT |
+| --- | ---: | ---: |
+| task or member footprint | 2 GiB | 8 GiB |
+| memory or resource seat | 512 MiB | 2 GiB |
+| filesystem or inode use | 60% | 75% |
+| host memory available | 40% | 25% |
+
+These intentionally conservative defaults catch accidental growth early in a
+Rust-oriented workplane. Concord records no resource history and attributes no
+arbitrary process to a task. Use global `--json` for structured observations;
+an unavailable platform metric is reported as `UNKNOWN`.
+
 Member preflight returns one record per declared member. A successful record
 proves canonical repository identity, the expected branch, a clean worktree,
 and either landed commit reachability or exact tree equivalence. JSON output
@@ -64,6 +83,11 @@ concord resource allocate perish.code/ship-feature evidence
 concord resource import perish.code/ship-feature logs --source ./logs
 concord resource show perish.code/ship-feature logs
 ```
+
+Import preflight measures the complete source tree and preserves at least 25%
+filesystem and inode headroom (with a 1 GiB minimum byte reserve). Apply
+rechecks under the task lock and copies files as a stream. Member creation also
+refuses to expand a filesystem already at the critical threshold.
 
 `concord --help` is the complete command grammar. The stable binary is
 installed or updated with `manage.sh` on Linux/macOS or `manage.ps1` on

@@ -10,6 +10,7 @@ impl Space {
         component("member name", request.name)?;
         let task = self.resolve(request.task)?;
         task.ensure_exact()?;
+        crate::audit::resource::ensure_expansion_headroom(&task.path())?;
         let source = request.source.canonicalize().map_err(|error| {
             Error::new(format!(
                 "cannot resolve source {}: {error}",

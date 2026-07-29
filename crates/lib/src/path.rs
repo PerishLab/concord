@@ -50,6 +50,23 @@ pub fn replace(path: &Path, bytes: &[u8], permissions: u32) -> Result<()> {
     result
 }
 
+pub fn copy_private(source: &Path, target: &Path, permissions: u32) -> Result<()> {
+    let parent = target
+        .parent()
+        .ok_or_else(|| Error::new("managed file has no parent"))?;
+    private_dir(parent)?;
+    let name = target
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| Error::new("managed filename is not utf8"))?;
+    let temporary = parent.join(format!(".{name}.concord-{}", std::process::id()));
+    let result = copy_install(source, &temporary, target, permissions);
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    result
+}
+
 fn install(temporary: &Path, path: &Path, bytes: &[u8], permissions: u32) -> Result<()> {
     let mut file = std::fs::OpenOptions::new()
         .write(true)
@@ -59,6 +76,19 @@ fn install(temporary: &Path, path: &Path, bytes: &[u8], permissions: u32) -> Res
     file.sync_all()?;
     mode(temporary, permissions)?;
     std::fs::rename(temporary, path)?;
+    Ok(())
+}
+
+fn copy_install(source: &Path, temporary: &Path, target: &Path, permissions: u32) -> Result<()> {
+    let mut source = std::fs::File::open(source)?;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(temporary)?;
+    std::io::copy(&mut source, &mut file)?;
+    file.sync_all()?;
+    mode(temporary, permissions)?;
+    std::fs::rename(temporary, target)?;
     Ok(())
 }
 

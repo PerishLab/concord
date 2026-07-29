@@ -48,7 +48,9 @@ building or operating a repository rather than restating its clauses here.
 1. Resolve the domain-space root from config, `CONCORD_DOMAIN_SPACE_ROOT`, or
    `--root`. Never assume `~/Projects`.
 2. Resolve the requested task. Enter its task root, read `.task/MAIN.md` through
-   `concord memory read` when present, and run `concord audit`.
+   `concord memory read` when present, and run `concord audit`. Treat agreement
+   faults as protocol blockers and resource `WARN`, `CRIT`, or `UNKNOWN`
+   findings as early operational evidence, not as disagreement.
 3. Before acting in a member repository, enter that member and discover every
    applicable repository instruction file. Run the repository's normal Plumb
    doctor before changing its shape.
@@ -80,6 +82,12 @@ building or operating a repository rather than restating its clauses here.
   carries live execution state; settled rationale moves into numbered phases.
 - Existing memory and retained task artifacts require exact-target deletion
   consent. Landing permission to discard member files is separate.
+- Resource health is a low-frequency task-entry audit surface. It has no
+  history database, does not attribute arbitrary processes, and never
+  authorizes automatic cleanup.
+- Read, audit, landing, and cleanup remain available under resource pressure.
+  Operations that expand the managed footprint may refuse when their current
+  preflight cannot preserve conservative headroom.
 - Renaming, rehoming, legacy adoption, and mismatch repair are explicit
   migrations. Never perform one merely because a layout differs.
 
@@ -101,7 +109,13 @@ Concord currently enforces:
 - explicit plans, default-on creation, and execution gates for destructive or
   migratory commands;
 - task finish only when no members or retained filesystem state remain;
-- resource-seat initialization plus refusal of links and special files.
+- task, member, memory, and resource-seat allocated-footprint observations in
+  every task audit;
+- filesystem capacity, inode capacity where available, and host
+  available-memory observations with explicit `UNKNOWN`;
+- resource-import whole-tree size and headroom preflight, streaming private
+  copy, plus refusal of links and special files;
+- refusal to add a member when the target filesystem is already critical.
 
 The following remain agent-held law; no machine will stop every violation:
 

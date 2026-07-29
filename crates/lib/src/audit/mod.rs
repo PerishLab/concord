@@ -1,4 +1,6 @@
+mod memory;
 mod preflight;
+pub(crate) mod resource;
 
 use crate::git;
 use crate::path::held_mode;
@@ -8,11 +10,15 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 pub use preflight::{LandingProof, MemberPreflight, MemberProof, Preflight};
+pub use resource::{
+    Filesystem, Footprint, HostMemory, ImportPreflight, Inodes, Observation, Status, TaskResources,
+};
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Audit {
     pub target: String,
     pub faults: Vec<Fault>,
+    pub resources: Vec<TaskResources>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -38,12 +44,17 @@ impl Audit {
 
 impl Space {
     pub fn audit(&self) -> Result<Audit> {
+        self.audit_with_resources(true)
+    }
+
+    fn audit_with_resources(&self, resources: bool) -> Result<Audit> {
         let mut audit = Audit {
             target: self.path().display().to_string(),
             faults: Vec::new(),
+            resources: Vec::new(),
         };
         for domain in self.domains()? {
-            merge(&mut audit, domain.audit()?);
+            merge(&mut audit, domain.audit_with_resources(resources)?);
         }
         Ok(audit)
     }
@@ -51,9 +62,14 @@ impl Space {
 
 impl Domain {
     pub fn audit(&self) -> Result<Audit> {
+        self.audit_with_resources(true)
+    }
+
+    fn audit_with_resources(&self, resources: bool) -> Result<Audit> {
         let mut audit = Audit {
             target: self.name().to_string(),
             faults: Vec::new(),
+            resources: Vec::new(),
         };
         permission(&mut audit, &self.tasks_path(), 0o700)?;
         permission(&mut audit, &self.registry_path(), 0o600)?;
@@ -64,7 +80,10 @@ impl Domain {
             .map(|task| task.name.as_str())
             .collect::<BTreeSet<_>>();
         for task in &registry.task {
-            merge(&mut audit, self.task(&task.name)?.audit()?);
+            merge(
+                &mut audit,
+                self.task(&task.name)?.audit_with_resources(resources)?,
+            );
         }
         for entry in std::fs::read_dir(self.tasks_path())? {
             let entry = entry?;
@@ -83,9 +102,18 @@ impl Domain {
 
 impl TaskRef {
     pub fn audit(&self) -> Result<Audit> {
+        self.audit_with_resources(true)
+    }
+
+    pub(crate) fn agreement(&self) -> Result<Audit> {
+        self.audit_with_resources(false)
+    }
+
+    fn audit_with_resources(&self, resources: bool) -> Result<Audit> {
         let mut audit = Audit {
             target: self.identity(),
             faults: Vec::new(),
+            resources: Vec::new(),
         };
         let root = self.path();
         if !root.is_dir() {
@@ -117,12 +145,15 @@ impl TaskRef {
                 );
             }
         }
-        memory_permissions(&mut audit, &root.join(".task"))?;
+        memory::permissions(&mut audit, &root.join(".task"))?;
+        if resources {
+            audit.resources.push(resource::inspect(self));
+        }
         Ok(audit)
     }
 
     pub(crate) fn ensure_exact(&self) -> Result<()> {
-        let audit = self.audit()?;
+        let audit = self.agreement()?;
         if audit.ok() {
             Ok(())
         } else {
@@ -191,78 +222,6 @@ fn member_audit(audit: &mut Audit, task: &TaskRef, member: &crate::Member) -> Re
     Ok(())
 }
 
-fn memory_permissions(audit: &mut Audit, root: &Path) -> Result<()> {
-    if !root.exists() {
-        return Ok(());
-    }
-    permission(audit, root, 0o700)?;
-    if !root.join("MAIN.md").is_file() {
-        audit.fault(
-            "presence",
-            &root.join("MAIN.md"),
-            "task memory exists without MAIN.md",
-        );
-    }
-    for entry in std::fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        if entry.file_name() == "resources" && entry.file_type()?.is_dir() {
-            permission(audit, &path, 0o700)?;
-            visit_resources(audit, &path)?;
-        } else if entry.file_type()?.is_dir() {
-            permission(audit, &path, 0o700)?;
-            visit(audit, &path)?;
-        } else {
-            permission(audit, &path, 0o600)?;
-        }
-    }
-    Ok(())
-}
-
-fn visit(audit: &mut Audit, root: &Path) -> Result<()> {
-    for entry in std::fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        let kind = entry.file_type()?;
-        if kind.is_symlink() {
-            audit.fault("memory", &path, "symbolic links are not managed memory");
-        } else if kind.is_dir() {
-            permission(audit, &path, 0o700)?;
-            visit(audit, &path)?;
-        } else {
-            permission(audit, &path, 0o600)?;
-        }
-    }
-    Ok(())
-}
-
-fn visit_resources(audit: &mut Audit, root: &Path) -> Result<()> {
-    for entry in std::fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        let kind = entry.file_type()?;
-        if kind.is_symlink() {
-            audit.fault(
-                "resource",
-                &path,
-                "symbolic links are not private resources",
-            );
-        } else if kind.is_dir() {
-            permission(audit, &path, 0o700)?;
-            visit_resources(audit, &path)?;
-        } else if let Some(held) = held_mode(&path)?
-            && held & 0o077 != 0
-        {
-            audit.fault(
-                "permission",
-                &path,
-                format!("mode {held:04o} exposes a private resource"),
-            );
-        }
-    }
-    Ok(())
-}
-
 fn permission(audit: &mut Audit, path: &Path, wanted: u32) -> Result<()> {
     if !path.exists() {
         return Ok(());
@@ -281,4 +240,5 @@ fn permission(audit: &mut Audit, path: &Path, wanted: u32) -> Result<()> {
 
 fn merge(target: &mut Audit, source: Audit) {
     target.faults.extend(source.faults);
+    target.resources.extend(source.resources);
 }

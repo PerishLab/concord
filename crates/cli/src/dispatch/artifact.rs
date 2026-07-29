@@ -176,11 +176,19 @@ pub fn resource_command(space: &Space, command: ResourceCommand, json_output: bo
             let task = space.resolve(&task)?;
             let memory = Memory::new(&task);
             let target = memory.root().join("resources").join(&name);
+            let preflight = memory.preflight_import(&name, &source)?;
             let mut plan = Plan::single(
                 "resource.import",
                 "import",
                 &target,
-                format!("private copy of {}", source.display()),
+                format!(
+                    "private copy of {}; {} entries, {} required bytes, {} available bytes, {} reserved bytes",
+                    preflight.source,
+                    preflight.entries,
+                    preflight.required_bytes,
+                    preflight.available_bytes,
+                    preflight.reserve_bytes
+                ),
             );
             if dry_run {
                 return output::mutation(&plan, None, json_output);

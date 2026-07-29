@@ -62,7 +62,7 @@ impl Preflight {
 
 impl TaskRef {
     pub fn preflight(&self) -> Result<Preflight> {
-        let audit = self.audit()?;
+        let audit = self.agreement()?;
         let mut preflight = Preflight {
             target: audit.target,
             members: Vec::new(),

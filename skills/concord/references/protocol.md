@@ -6,6 +6,7 @@
 - [Domain and registry](#domain-and-registry)
 - [Agreement and identity](#agreement-and-identity)
 - [Entering and starting](#entering-and-starting)
+- [Resource health](#resource-health)
 - [Lifecycle](#lifecycle)
 - [Long-running memory](#long-running-memory)
 - [Recovery and migration](#recovery-and-migration)
@@ -143,6 +144,39 @@ worktrees.
 Start creates one coherent registry entry and private root, then the first
 member if needed. Add `.task/` only under the memory rule below.
 
+## Resource health
+
+Task entry runs one low-frequency resource observation through the existing
+`concord audit` surface. Audit presents two independent planes:
+
+- agreement faults describe a mismatch in the task protocol and fail the
+  command;
+- resource observations describe local headroom as `OK`, `WARN`, `CRIT`, or
+  `UNKNOWN` and remain advisory.
+
+Concord measures allocated bytes for the whole task, each member, `.task/`, and
+each resource seat. It also observes the task filesystem, inode capacity where
+the platform exposes it, and current host available memory and swap. Thresholds
+are deliberately conservative:
+
+| Observation | WARN | CRIT |
+| --- | ---: | ---: |
+| task or member footprint | 2 GiB | 8 GiB |
+| memory or resource seat | 512 MiB | 2 GiB |
+| filesystem or inode use | 60% | 75% |
+| host memory available | 40% | 25% |
+
+Resource status never blocks read-only diagnosis, audit, landing, or cleanup.
+Only an operation that expands the managed footprint may refuse on current
+headroom. Resource import inspects the entire source before creating its seat,
+preserves 25% filesystem and inode capacity with a minimum 1 GiB byte reserve,
+rechecks under the task lock, and streams private copies. Member creation
+refuses when its target filesystem is already at the critical threshold.
+
+There is no resource history database, daemon, timer, process ownership
+inference, or automatic cleanup. An unavailable observation is explicit
+`UNKNOWN`; it is never guessed from another metric.
+
 ## Lifecycle
 
 ### Resume
@@ -212,8 +246,9 @@ next phase with `concord memory settle`. Keep still-active constraints in
 
 `resources/` holds opaque support material such as raw outputs or fetched
 documentation. Initialize memory before allocating resources. Import through
-Concord so links and special files are refused and privacy modes are preserved.
-Do not copy secrets unless recovery genuinely requires them.
+Concord so links and special files are refused, headroom is proved, privacy
+modes are preserved, and file contents are streamed rather than held whole in
+memory. Do not copy secrets unless recovery genuinely requires them.
 
 Default toward deleting memory at task completion, but only with exact consent.
 

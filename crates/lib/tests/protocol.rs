@@ -59,6 +59,13 @@ fn repo_less_task_memory_obeys_revisions_and_consent_boundaries() {
         std::fs::set_permissions(&imported, std::fs::Permissions::from_mode(0o755))
             .expect("make resource executable");
     }
+    let import = memory
+        .preflight_import("evidence", &imported)
+        .expect("preflight resource");
+    assert_eq!(import.logical_bytes, 10);
+    assert_eq!(import.entries, 1);
+    assert!(import.required_bytes >= import.logical_bytes);
+    assert!(import.available_bytes > import.required_bytes + import.reserve_bytes);
     let seat = memory
         .import("evidence", &imported)
         .expect("import resource");
@@ -100,6 +107,42 @@ fn repo_less_task_memory_obeys_revisions_and_consent_boundaries() {
         .space
         .task_finish("local/memory", true)
         .expect("finish empty task");
+}
+
+#[cfg(unix)]
+#[test]
+fn resource_import_preflight_refuses_symbolic_links_without_allocating_a_seat() {
+    use std::os::unix::fs::symlink;
+
+    let fixture = Fixture::new();
+    fixture.init_task("linked-resource");
+    let task = fixture
+        .space
+        .resolve("local/linked-resource")
+        .expect("resolve task");
+    let memory = Memory::new(&task);
+    memory
+        .init("# Current objective\n")
+        .expect("initialize memory");
+
+    let source = fixture.space.path().join("resource-source");
+    std::fs::create_dir(&source).expect("create source");
+    std::fs::write(source.join("held"), "evidence").expect("write source");
+    symlink(source.join("held"), source.join("alias")).expect("link source");
+
+    let error = memory
+        .preflight_import("evidence", &source)
+        .expect_err("symbolic links must be refused");
+    assert!(error.to_string().contains("refuses symbolic link"));
+    assert!(!memory.root().join("resources/evidence").exists());
+
+    let linked_source = fixture.space.path().join("linked-source");
+    symlink(source.join("held"), &linked_source).expect("link whole source");
+    let error = memory
+        .preflight_import("linked-evidence", &linked_source)
+        .expect_err("a linked source must be refused");
+    assert!(error.to_string().contains("refuses symbolic link"));
+    assert!(!memory.root().join("resources/linked-evidence").exists());
 }
 
 #[test]

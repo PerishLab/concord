@@ -15,6 +15,11 @@ authorship is never protocol truth.
   `--apply`.
 - Lock, re-read, compare, then replace files atomically. Do not add a hidden
   database or persistent journal.
+- Keep protocol agreement and resource health separate. Resource warnings are
+  audit facts, not protocol faults; read, audit, landing, and cleanup remain
+  available.
+- Gate footprint-expanding operations on current headroom. Do not infer task
+  ownership for arbitrary processes or silently clean retained state.
 - Memory is opaque Markdown. Concord owns revisions and whole-file writes, not
   the meaning of headings.
 - Git owns member payload and repository-specific landing. Concord owns the
@@ -23,7 +28,8 @@ authorship is never protocol truth.
 ## Architecture
 
 - `crates/lib` is the complete protocol kernel: configuration, discovery,
-  registry, audit, Git seats, memory, permissions, and plans.
+  registry, protocol and resource audit, Git seats, memory, permissions, and
+  plans.
 - `crates/cli` contains clap grammar and output dispatch only.
 - Dependency direction is `cli -> lib`. Operator glue lives in `.runseal`;
   product behavior does not.

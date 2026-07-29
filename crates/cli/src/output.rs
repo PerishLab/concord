@@ -1,3 +1,5 @@
+mod audit_report;
+
 use concord_core::{Audit, Error, LandingProof, Plan, Preflight, Result};
 use plumb::skill::{Done, Record, Report};
 use serde_json::json;
@@ -54,10 +56,13 @@ pub fn audit(audit: &Audit, json_output: bool) -> Result<()> {
     } else {
         println!("audit: {}", audit.target);
         if audit.ok() {
-            println!("  true to the protocol");
+            println!("  agreement: true to the protocol");
         }
         for fault in &audit.faults {
             println!("  {}: {}: {}", fault.kind, fault.path, fault.message);
+        }
+        for resources in &audit.resources {
+            audit_report::human(resources);
         }
     }
     if audit.ok() {
