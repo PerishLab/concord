@@ -52,6 +52,10 @@ concord memory settle perish.code/ship-feature \
   --expect SHA256 --phase-file PHASE.md --main-file MAIN.md
 ```
 
+`memory write --file -` reads MAIN from stdin. `memory settle` accepts `-` for
+either `--phase-file` or `--main-file`; the other input must remain a file so
+the two payloads are never ambiguously framed.
+
 Resource payload remains opaque after Concord allocates or imports its private
 seat:
 

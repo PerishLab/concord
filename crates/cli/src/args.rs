@@ -193,7 +193,11 @@ pub enum MemoryCommand {
         task: String,
         #[arg(long)]
         expect: String,
-        #[arg(long)]
+        #[arg(
+            long,
+            value_name = "PATH|-",
+            help = "Read MAIN.md from PATH or stdin (-)"
+        )]
         file: PathBuf,
         #[arg(long)]
         dry_run: bool,
@@ -203,9 +207,17 @@ pub enum MemoryCommand {
         task: String,
         #[arg(long)]
         expect: String,
-        #[arg(long)]
+        #[arg(
+            long,
+            value_name = "PATH|-",
+            help = "Read the phase from PATH or stdin (-)"
+        )]
         phase_file: PathBuf,
-        #[arg(long)]
+        #[arg(
+            long,
+            value_name = "PATH|-",
+            help = "Read MAIN.md from PATH or stdin (-)"
+        )]
         main_file: PathBuf,
         #[arg(long)]
         dry_run: bool,

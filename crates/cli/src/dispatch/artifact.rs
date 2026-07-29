@@ -3,6 +3,7 @@ use crate::dispatch::guarded;
 use crate::output;
 use concord_core::{Memory, Plan, Result, Space};
 use serde_json::json;
+use std::io::Read;
 use std::path::Path;
 
 pub fn memory_command(space: &Space, command: MemoryCommand, json_output: bool) -> Result<()> {
@@ -62,6 +63,11 @@ pub fn memory_command(space: &Space, command: MemoryCommand, json_output: bool) 
         } => {
             let task = space.resolve(&task)?;
             let memory = Memory::new(&task);
+            if stdin(&phase_file) && stdin(&main_file) {
+                return Err(concord_core::Error::new(
+                    "memory settle accepts stdin for only one input",
+                ));
+            }
             let plan = Plan::single(
                 "memory.settle",
                 "settle",
@@ -193,7 +199,18 @@ pub fn resource_command(space: &Space, command: ResourceCommand, json_output: bo
 }
 
 fn read(path: &Path) -> Result<String> {
+    if stdin(path) {
+        let mut content = String::new();
+        std::io::stdin()
+            .read_to_string(&mut content)
+            .map_err(|error| concord_core::Error::new(format!("cannot read stdin: {error}")))?;
+        return Ok(content);
+    }
     std::fs::read_to_string(path).map_err(|error| {
         concord_core::Error::new(format!("cannot read input {}: {error}", path.display()))
     })
+}
+
+fn stdin(path: &Path) -> bool {
+    path == Path::new("-")
 }
