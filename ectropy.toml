@@ -1,6 +1,7 @@
 [scan]
 include = [
   "crates/**/*.rs",
+  "docs/**/*.md",
 ]
 exclude = [
   "**/target/**",
@@ -10,6 +11,7 @@ exclude = [
 roots = [
   "crates/*/src",
   "crates/*/tests",
+  "docs",
 ]
 
 [limit]
