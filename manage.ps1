@@ -14,7 +14,7 @@ $defaultInstall = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'concord'
 $defaultBin = if ($env:USERPROFILE) { Join-Path $env:USERPROFILE '.local\bin' } elseif ($env:HOME) { Join-Path $env:HOME '.local/bin' } else { '.' }
 $installRoot = if ($env:CONCORD_INSTALL_ROOT) { $env:CONCORD_INSTALL_ROOT } else { $defaultInstall }
 $localBinDir = if ($env:CONCORD_LOCAL_BIN_DIR) { $env:CONCORD_LOCAL_BIN_DIR } else { $defaultBin }
-$retain = if ($env:CONCORD_RETAIN) { $env:CONCORD_RETAIN } else { 'true' }
+$retain = if ($env:CONCORD_RETAIN) { $env:CONCORD_RETAIN } else { 'false' }
 $marker = 'concord-manager-v1'
 
 for ($i = 0; $i -lt $remaining.Length; $i++) {
@@ -40,6 +40,11 @@ Usage:
   manage.ps1 install [--channel stable|beta] [--version X.Y.Z] [--retain[=true|false]]
   manage.ps1 update [--channel stable|beta] [--version X.Y.Z] [--retain[=true|false]]
   manage.ps1 uninstall [--version X.Y.Z]
+
+install and update leave exactly one version on disk. Earlier versions are
+removed once the new binary is in place and answers --version. Rolling back is
+install --version <older>, which fetches that version again; released artifacts
+are immutable and always retrievable. Pass --retain to keep what is there.
 
 Options:
   --public-url <url>     release metadata and artifact base URL

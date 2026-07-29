@@ -15,7 +15,7 @@ VERSION=${CONCORD_VERSION:-}
 PUBLIC_URL=${CONCORD_RELEASES_PUBLIC_URL:-https://releases.concord.perish.uk}
 INSTALL_ROOT=${CONCORD_INSTALL_ROOT:-"$HOME/.local/share/concord"}
 LOCAL_BIN_DIR=${CONCORD_LOCAL_BIN_DIR:-"$HOME/.local/bin"}
-RETAIN=${CONCORD_RETAIN:-true}
+RETAIN=${CONCORD_RETAIN:-false}
 MARKER=concord-manager-v1
 
 while [ $# -gt 0 ]; do
@@ -40,6 +40,12 @@ Usage:
   manage.sh install [--channel stable|beta] [--version X.Y.Z] [--retain[=true|false]]
   manage.sh update [--channel stable|beta] [--version X.Y.Z] [--retain[=true|false]]
   manage.sh uninstall [--version X.Y.Z]
+
+install and update leave exactly one version on disk. Earlier versions are
+removed once the new binary is linked and answers --version, and each removal is
+named. Rolling back is install --version <older>, which fetches that version
+again; released artifacts are immutable and always retrievable. Pass --retain to
+keep what is already there.
 
 Options:
   --public-url <url>     release metadata and artifact base URL

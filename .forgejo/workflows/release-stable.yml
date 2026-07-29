@@ -58,6 +58,10 @@ jobs:
           fi
           test -n "$version"
           echo "value=$version" >> "$GITHUB_OUTPUT"
+      - name: Changelog
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: plumb changelog . --version "$RELEASE_VERSION"
       - name: Refuse immutable overwrite
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.value }}

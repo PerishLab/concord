@@ -36,3 +36,17 @@ authorship is never protocol truth.
   structure before landing.
 - Skill content ships through Plumb's shared skill mechanism. Concord owns its
   vocabulary and standing; Plumb owns packaging and managed placement.
+
+## Release
+
+- `manage.sh` and `manage.ps1` leave exactly one version under the install root.
+  Earlier versions are removed once the new binary is linked and answers
+  `--version`, and each removal is named. `--retain` keeps what is there. The
+  default was the opposite, protecting a rollback path that does not exist:
+  `install --version <older>` refetches, so nothing ever read what accumulated.
+- A stable release refuses to publish without
+  `docs/CHANGELOG/v<version>/{en,zh}/{INDEX.md,MIGRATION.md}`, enforced by the
+  `Changelog` step in `release-stable.yml` before anything irreversible.
+  `plumb doctor` does not check this: a changelog is owed by a release, not by a
+  working tree. A release requiring nothing of anyone still writes MIGRATION.md
+  saying so. See `plumb/docs/changelog.md`.
