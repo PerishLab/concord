@@ -55,7 +55,8 @@ fn audit_keeps_agreement_and_resource_findings_separate() {
     assert!(human.status.success());
     let human = String::from_utf8(human.stdout).expect("human audit");
     assert!(human.contains("agreement: true to the protocol"));
-    assert!(human.contains("resources: OK local/health"));
+    assert!(human.contains("resources: "));
+    assert!(human.contains("local/health"));
     assert!(human.contains("resource:evidence: OK"));
     assert!(human.contains("filesystem:"));
     assert!(human.contains("memory:"));

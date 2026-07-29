@@ -55,11 +55,22 @@ pub fn audit(audit: &Audit, json_output: bool) -> Result<()> {
         );
     } else {
         println!("audit: {}", audit.target);
-        if audit.ok() {
+        let (gating, hygiene): (Vec<_>, Vec<_>) =
+            audit.faults.iter().partition(|fault| fault.gates());
+        if gating.is_empty() {
             println!("  agreement: true to the protocol");
         }
-        for fault in &audit.faults {
+        for fault in gating {
             println!("  {}: {}: {}", fault.kind, fault.path, fault.message);
+        }
+        if !hygiene.is_empty() {
+            println!(
+                "  hygiene: {} finding(s); reported, does not gate mutation",
+                hygiene.len()
+            );
+            for fault in hygiene {
+                println!("    {}: {}: {}", fault.kind, fault.path, fault.message);
+            }
         }
         for resources in &audit.resources {
             audit_report::human(resources);

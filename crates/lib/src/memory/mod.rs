@@ -175,6 +175,17 @@ impl<'a> Memory<'a> {
         Ok(seat)
     }
 
+    pub fn links(&self) -> Result<Vec<PathBuf>> {
+        let root = self.root();
+        if !root.exists() {
+            return Ok(Vec::new());
+        }
+        let mut found = Vec::new();
+        links(&root, &mut found)?;
+        found.sort();
+        Ok(found)
+    }
+
     pub fn normalize(&self) -> Result<()> {
         let root = self.root();
         if !root.exists() {
@@ -232,6 +243,19 @@ fn read(path: &Path) -> Result<MemoryRead> {
     })
 }
 
+fn links(root: &Path, found: &mut Vec<PathBuf>) -> Result<()> {
+    for entry in std::fs::read_dir(root)? {
+        let entry = entry?;
+        let kind = entry.file_type()?;
+        if kind.is_symlink() {
+            found.push(entry.path());
+        } else if kind.is_dir() {
+            links(&entry.path(), found)?;
+        }
+    }
+    Ok(())
+}
+
 fn normalize(root: &Path, resources: bool) -> Result<()> {
     mode(root, 0o700)?;
     for entry in std::fs::read_dir(root)? {
@@ -239,10 +263,7 @@ fn normalize(root: &Path, resources: bool) -> Result<()> {
         let path = entry.path();
         let kind = entry.file_type()?;
         if kind.is_symlink() {
-            return Err(Error::new(format!(
-                "managed memory contains a symbolic link: {}",
-                path.display()
-            )));
+            continue;
         }
         if kind.is_dir() {
             normalize(&path, resources || entry.file_name() == "resources")?;

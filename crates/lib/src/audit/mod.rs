@@ -28,9 +28,21 @@ pub struct Fault {
     pub message: String,
 }
 
+const HYGIENE: [&str; 3] = ["permission", "memory", "resource"];
+
+impl Fault {
+    pub fn gates(&self) -> bool {
+        !HYGIENE.contains(&self.kind.as_str())
+    }
+}
+
 impl Audit {
     pub fn ok(&self) -> bool {
         self.faults.is_empty()
+    }
+
+    pub fn agrees(&self) -> bool {
+        !self.faults.iter().any(Fault::gates)
     }
 
     fn fault(&mut self, kind: &str, path: &Path, message: impl Into<String>) {
@@ -154,12 +166,12 @@ impl TaskRef {
 
     pub(crate) fn ensure_exact(&self) -> Result<()> {
         let audit = self.agreement()?;
-        if audit.ok() {
+        if audit.agrees() {
             Ok(())
         } else {
             Err(crate::Error::new(format!(
                 "task protocol mismatch: {} fault(s); run concord audit {}",
-                audit.faults.len(),
+                audit.faults.iter().filter(|fault| fault.gates()).count(),
                 self.identity()
             )))
         }

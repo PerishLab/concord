@@ -104,8 +104,10 @@ Concord currently enforces:
 
 - task/domain/member component syntax and registry schema validation;
 - task-root, declared-member, canonical-source, branch, and Git worktree
-  agreement;
-- private task, memory, and resource permissions;
+  agreement, which alone gates ordinary mutation;
+- private task, memory, and resource permissions, reported by audit as hygiene
+  of Concord's own storage and repaired by `permissions normalize`, but never
+  gating the mutation that would clear them;
 - clean source checkout and an absent target branch before member creation;
 - clean and reachable or tree-equivalent member state before landed removal;
 - locking, registry compare-before-replace, and memory revision CAS;

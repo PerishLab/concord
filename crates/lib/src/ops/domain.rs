@@ -55,11 +55,14 @@ impl Space {
 
     pub fn normalize(&self, identity: &str, apply: bool) -> Result<Plan> {
         let task = self.resolve(identity)?;
-        let actions = vec![action(
+        let mut actions = vec![action(
             "chmod",
             &task.path(),
             "task structure 0700 and managed memory private",
         )];
+        for link in crate::Memory::new(&task).links()? {
+            actions.push(action("skip", &link, "symbolic link is not a mode target"));
+        }
         if apply {
             let _lock = self.lock()?;
             let task = self.resolve(identity)?;
