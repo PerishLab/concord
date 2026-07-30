@@ -15,6 +15,15 @@ await bin("cargo").run([
   "warnings",
 ]);
 
+io.print("==> cargo check release");
+await bin("cargo").run([
+  "check",
+  "--locked",
+  "--workspace",
+  "--all-targets",
+  "--release",
+]);
+
 io.print("==> cargo test");
 await bin("cargo").run(["test", "--locked", "--workspace"]);
 
