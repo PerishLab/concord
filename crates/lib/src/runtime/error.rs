@@ -4,14 +4,39 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct Error {
+    code: String,
     message: String,
+    details: Option<serde_json::Value>,
 }
 
 impl Error {
     pub fn new(message: impl Into<String>) -> Self {
+        Self::typed("concord.error", message)
+    }
+
+    pub fn typed(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
+            code: code.into(),
             message: message.into(),
+            details: None,
         }
+    }
+
+    pub fn with_details(mut self, details: serde_json::Value) -> Self {
+        self.details = Some(details);
+        self
+    }
+
+    pub fn code(&self) -> &str {
+        &self.code
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    pub fn details(&self) -> Option<&serde_json::Value> {
+        self.details.as_ref()
     }
 }
 

@@ -64,16 +64,28 @@ removal only execute with `--apply`.
 Task memory uses whole-file compare-and-swap:
 
 ```text
-concord memory init perish.code/ship-feature --file MAIN.md
+concord memory init perish.code/ship-feature --file -
 concord memory read perish.code/ship-feature --json
-concord memory write perish.code/ship-feature --expect SHA256 --file MAIN.md
+concord memory read perish.code/ship-feature --section focus --section next
+concord memory patch perish.code/ship-feature --file -
+concord memory write perish.code/ship-feature --expect SHA256 --file -
 concord memory settle perish.code/ship-feature \
-  --expect SHA256 --phase-file PHASE.md --main-file MAIN.md
+  --expect SHA256 --phase-file - --main-file MAIN.md
+concord memory phase list perish.code/ship-feature
 ```
 
-`memory write --file -` reads MAIN from stdin. `memory settle` accepts `-` for
-either `--phase-file` or `--main-file`; the other input must remain a file so
-the two payloads are never ambiguously framed.
+All mutation inputs accept `-`; prefer stdin for generated content. Explicit
+files are bounded regular inputs and are consumed after a complete successful
+mutation by default. Use `--keep-file` or settle's `--keep-files` to retain
+them. If post-apply cleanup fails, Concord returns a typed nonzero error with
+`applied=true` and the resulting revision rather than rolling memory back.
+
+New memory may use the `concord-memory:v1` fixed-section envelope. A projected
+`--section` result embeds its whole-file revision and can be sent directly to
+`memory patch`; patching splices only selected source ranges. MAIN is limited
+to 400 lines/64 KiB and each immutable PHASE to 800 lines/128 KiB. Audit
+reports schema and limit violations as non-gating memory hygiene, while 16
+retained phases emit a non-failing advisory.
 
 Resource payload remains opaque after Concord allocates or imports its private
 seat:

@@ -72,6 +72,12 @@ pub fn audit(audit: &Audit, json_output: bool) -> Result<()> {
                 println!("    {}: {}: {}", fault.kind, fault.path, fault.message);
             }
         }
+        for observation in &audit.observations {
+            println!(
+                "  advisory: {}: {}: {}",
+                observation.kind, observation.path, observation.message
+            );
+        }
         for resources in &audit.resources {
             audit_report::human(resources);
         }

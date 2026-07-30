@@ -1,212 +1,917 @@
-[scan]
-include = [
-  "crates/**/*.rs",
-  "docs/**/*.md",
-  "skills/**/*.md",
+[[boundary]]
+allow = [
+    "path",
+    "comment",
 ]
-exclude = [
-  "**/target/**",
-]
+note = "release infrastructure is guarded by its native format and syntax checks"
+paths = [".forgejo/**"]
 
-[module]
-roots = [
-  "crates/*/src",
-  "crates/*/tests",
-  "docs",
-  "skills/*",
+[[boundary]]
+allow = [
+    "path",
+    "comment",
+    "word",
 ]
-
-[limit]
-block = 4
-path = 4
-file = 300
-fanout = 10
-markup = 8
-param = 4
+note = "operator glue is guarded by deno format and type checks"
+paths = [".runseal/**"]
 
 [comment]
 allow = false
 
+[[grant]]
+paths = ["crates/*/tests/**/*.rs"]
+syntax = "test"
+
+[[grant]]
+paths = [
+    "crates/*/tests/**/*.rs",
+    "crates/lib/src/config.rs",
+]
+syntax = "environment"
+
+[limit]
+block = 4
+fanout = 10
+file = 300
+markup = 8
+param = 4
+path = 4
+
+[module]
+roots = [
+    "crates/*/src",
+    "crates/*/tests",
+    "docs",
+    "skills/*",
+]
+
+[scan]
+exclude = ["**/target/**"]
+include = [
+    "crates/**/*.rs",
+    "docs/**/*.md",
+    "skills/**/*.md",
+]
+
+[[vocabulary.term]]
+description = "The Concord audit command argument bundle is one CLI grammar atom."
+name = "AuditArgs"
+
+[[vocabulary.term]]
+description = "The Concord configuration command argument bundle is one CLI grammar atom."
+name = "ConfigArgs"
+
+[[vocabulary.term]]
+description = "The Concord configuration command family is one CLI grammar atom."
+name = "ConfigCommand"
+
+[[vocabulary.term]]
+description = "The Concord domain command argument bundle is one CLI grammar atom."
+name = "DomainArgs"
+
+[[vocabulary.term]]
+description = "The Concord domain command family is one CLI grammar atom."
+name = "DomainCommand"
+
+[[vocabulary.term]]
+description = "The host-memory observation is one Concord resource-report atom."
+name = "HostMemory"
+
+[[vocabulary.term]]
+description = "The resource-import preflight proof is one Concord protocol atom."
+name = "ImportPreflight"
+
+[[vocabulary.term]]
+description = "The measured resource-import size is one Concord implementation atom."
+name = "ImportSize"
+
+[[vocabulary.term]]
+description = "The landing proof is one Concord protocol result atom."
+name = "LandingProof"
+
+[[vocabulary.term]]
+description = "The memory critical threshold is one Concord resource-policy constant."
+name = "MEMORY_CRIT"
+
+[[vocabulary.term]]
+description = "The memory warning threshold is one Concord resource-policy constant."
+name = "MEMORY_WARN"
+
+[[vocabulary.term]]
+description = "The minimum filesystem reserve is one Concord resource-policy constant."
+name = "MINIMUM_RESERVE"
+
+[[vocabulary.term]]
+description = "The Concord member command argument bundle is one CLI grammar atom."
+name = "MemberArgs"
+
+[[vocabulary.term]]
+description = "The Concord member command family is one CLI grammar atom."
+name = "MemberCommand"
+
+[[vocabulary.term]]
+description = "The per-member landing preflight is one Concord protocol atom."
+name = "MemberPreflight"
+
+[[vocabulary.term]]
+description = "The per-member landing proof is one Concord protocol atom."
+name = "MemberProof"
+
+[[vocabulary.term]]
+description = "The Concord memory command argument bundle is one CLI grammar atom."
+name = "MemoryArgs"
+
+[[vocabulary.term]]
+description = "The Concord memory command family is one CLI grammar atom."
+name = "MemoryCommand"
+
+[[vocabulary.term]]
+description = "A revision-bound task-memory reading is one Concord protocol atom."
+name = "MemoryRead"
+
+[[vocabulary.term]]
+description = "The Concord permission command argument bundle is one CLI grammar atom."
+name = "PermissionArgs"
+
+[[vocabulary.term]]
+description = "The Concord permission command family is one CLI grammar atom."
+name = "PermissionCommand"
+
+[[vocabulary.term]]
+description = "The landed-member removal command is one Concord lifecycle atom."
+name = "RemoveLanded"
+
+[[vocabulary.term]]
+description = "The Concord repository command argument bundle is one CLI grammar atom."
+name = "RepoArgs"
+
+[[vocabulary.term]]
+description = "The Concord repository command family is one CLI grammar atom."
+name = "RepoCommand"
+
+[[vocabulary.term]]
+description = "The Concord resource command argument bundle is one CLI grammar atom."
+name = "ResourceArgs"
+
+[[vocabulary.term]]
+description = "The Concord resource command family is one CLI grammar atom."
+name = "ResourceCommand"
+
+[[vocabulary.term]]
+description = "The resource-seat critical threshold is one Concord resource-policy constant."
+name = "SEAT_CRIT"
+
+[[vocabulary.term]]
+description = "The resource-seat warning threshold is one Concord resource-policy constant."
+name = "SEAT_WARN"
+
+[[vocabulary.term]]
+description = "The Concord skill command argument bundle is one CLI grammar atom."
+name = "SkillArgs"
+
+[[vocabulary.term]]
+description = "The Concord skill command family is one CLI grammar atom."
+name = "SkillCommand"
+
+[[vocabulary.term]]
+description = "The task-footprint critical threshold is one Concord resource-policy constant."
+name = "TASK_CRIT"
+
+[[vocabulary.term]]
+description = "The task-footprint warning threshold is one Concord resource-policy constant."
+name = "TASK_WARN"
+
+[[vocabulary.term]]
+description = "The Concord task command argument bundle is one CLI grammar atom."
+name = "TaskArgs"
+
+[[vocabulary.term]]
+description = "The Concord task command family is one CLI grammar atom."
+name = "TaskCommand"
+
+[[vocabulary.term]]
+description = "A resolved task reference is one Concord protocol identity atom."
+name = "TaskRef"
+
+[[vocabulary.term]]
+description = "The resource report for one task is one Concord protocol atom."
+name = "TaskResources"
+
+[[vocabulary.term]]
+description = "Tree equivalence is one named Concord landing relation."
+name = "TreeEquivalent"
+
+[[vocabulary.term]]
+description = "The filesystem-use critical threshold is one Concord resource-policy constant."
+name = "USED_CRIT"
+
+[[vocabulary.term]]
+description = "The filesystem-use warning threshold is one Concord resource-policy constant."
+name = "USED_WARN"
+
+[[vocabulary.term]]
+description = "This names one Concord empty-task resource-report scenario."
+name = "a_task_that_holds_nothing_stays_ok_whatever_the_host_reports"
+
+[[vocabulary.term]]
+description = "Adding a member seat is one Concord registry transaction."
+name = "add_member"
+
+[[vocabulary.term]]
+description = "This names one Concord resource-seat recovery scenario."
+name = "an_out_of_band_symlink_does_not_strand_its_resource_seat"
+
+[[vocabulary.term]]
+description = "The argument-layer home is one Concord configuration test atom."
+name = "argument_home"
+
+[[vocabulary.term]]
+description = "The encoded argument-layer home is one Concord configuration test atom."
+name = "argument_home_text"
+
+[[vocabulary.term]]
+description = "This names one Concord audit contract scenario."
+name = "audit_keeps_agreement_and_resource_findings_separate"
+
+[[vocabulary.term]]
+description = "The human audit report is one Concord output atom."
+name = "audit_report"
+
+[[vocabulary.term]]
+description = "Resource-inclusive audit is one Concord audit mode."
+name = "audit_with_resources"
+
+[[vocabulary.term]]
+description = "Available bytes is one serialized Concord resource metric."
+name = "available_bytes"
+
+[[vocabulary.term]]
+description = "Available inodes is one serialized Concord resource metric."
+name = "available_inodes"
+
+[[vocabulary.term]]
+description = "Available memory percent is one serialized Concord resource metric."
+name = "available_percent"
+
+[[vocabulary.term]]
+description = "Branch-existence inspection is one Concord Git test operation."
+name = "branch_exists"
+
+[[vocabulary.term]]
+description = "Changed-or-unchanged skill state is one Concord skill decision."
+name = "changed_or_same"
+
+[[vocabulary.term]]
+description = "Overflow-checked resource arithmetic is one Concord safety operation."
+name = "checked_add"
+
+[[vocabulary.term]]
+description = "Direct child directories are one Concord resource-measurement input."
+name = "child_directories"
+
+[[vocabulary.term]]
+description = "Direct child paths are one Concord resource traversal input."
+name = "child_paths"
+
+[[vocabulary.term]]
+description = "The fixture configuration path is one Concord test atom."
+name = "config_path"
+
+[[vocabulary.term]]
+description = "The domain containing the current path is one Concord discovery concept."
+name = "containing_domain"
+
+[[vocabulary.term]]
+description = "Atomic installation from a copied file is one Concord filesystem operation."
+name = "copy_install"
+
+[[vocabulary.term]]
+description = "Allocation counting is one Concord footprint operation."
+name = "count_allocation"
+
+[[vocabulary.term]]
+description = "The inherited current directory is one typed Concord configuration field."
+name = "current_dir"
+
+[[vocabulary.term]]
+description = "This names one Concord configuration contract scenario."
+name = "default_config_uses_only_the_product_seat"
+
+[[vocabulary.term]]
+description = "The canonical Concord configuration path is one configuration concept."
+name = "default_path"
+
+[[vocabulary.term]]
+description = "Domain initialization is one Concord lifecycle operation."
+name = "domain_init"
+
+[[vocabulary.term]]
+description = "The domain-space root is one canonical Concord configuration field."
+name = "domain_space_root"
+
+[[vocabulary.term]]
+description = "Dry run is one established Concord mutation mode and CLI field."
+name = "dry_run"
+
+[[vocabulary.term]]
+description = "Target-branch absence is one Concord member-creation invariant."
+name = "ensure_branch_absent"
+
+[[vocabulary.term]]
+description = "Exact four-surface agreement is one Concord mutation precondition."
+name = "ensure_exact"
+
+[[vocabulary.term]]
+description = "Expansion headroom is one Concord resource-safety precondition."
+name = "ensure_expansion_headroom"
+
+[[vocabulary.term]]
+description = "A tree-equivalent fixture proof is one Concord test atom."
+name = "equivalent_proof"
+
+[[vocabulary.term]]
+description = "The registry-derived expected branch is one Concord proof field."
+name = "expected_branch"
+
+[[vocabulary.term]]
+description = "This names one Concord failed-member-add rollback scenario."
+name = "failed_member_add_rolls_back_the_created_branch"
+
+[[vocabulary.term]]
+description = "The environment-isolated Git test command is one Concord test helper."
+name = "git_command"
+
+[[vocabulary.term]]
+description = "Native Git path normalization is one Concord runtime operation."
+name = "git_path"
+
+[[vocabulary.term]]
+description = "The retained owner-execute bit is one Concord resource-copy property."
+name = "held_owner_execute"
+
+[[vocabulary.term]]
+description = "Threshold-derived resource status is one Concord resource decision."
+name = "high_status"
+
+[[vocabulary.term]]
+description = "Host memory is one serialized Concord task-resource field."
+name = "host_memory"
+
+[[vocabulary.term]]
+description = "The human landing proof rendering is one Concord output atom."
+name = "human_landing"
+
+[[vocabulary.term]]
+description = "The human preflight rendering is one Concord output atom."
+name = "human_preflight"
+
+[[vocabulary.term]]
+description = "An initialized fixture task is one Concord protocol test operation."
+name = "init_task"
+
+[[vocabulary.term]]
+description = "Inode headroom is one Concord resource-safety calculation."
+name = "inode_headroom"
+
+[[vocabulary.term]]
+description = "The inode availability note is one serialized Concord resource field."
+name = "inode_note"
+
+[[vocabulary.term]]
+description = "Inode statistics are one Concord filesystem observation."
+name = "inode_stats"
+
+[[vocabulary.term]]
+description = "A symbolic-link fixture source is one Concord refusal-test atom."
+name = "linked_source"
+
+[[vocabulary.term]]
+description = "Logical bytes is one serialized Concord import metric."
+name = "logical_bytes"
+
+[[vocabulary.term]]
+description = "Member addition is one Concord lifecycle operation."
+name = "member_add"
+
+[[vocabulary.term]]
+description = "This names one Concord concurrent-membership scenario."
+name = "member_add_allows_one_source_in_distinct_tasks_and_branches"
+
+[[vocabulary.term]]
+description = "This names one Concord branch-ownership refusal scenario."
+name = "member_add_refuses_a_branch_owned_by_another_task"
+
+[[vocabulary.term]]
+description = "Per-member agreement audit is one Concord protocol operation."
+name = "member_audit"
+
+[[vocabulary.term]]
+description = "The member checkout head is one Concord landing-proof field."
+name = "member_head"
+
+[[vocabulary.term]]
+description = "The member Git identity is one Concord agreement atom."
+name = "member_id"
+
+[[vocabulary.term]]
+description = "The member Git identity is one serialized Concord proof field."
+name = "member_identity"
+
+[[vocabulary.term]]
+description = "The task-relative member path is one Concord identity projection."
+name = "member_path"
+
+[[vocabulary.term]]
+description = "Per-member landing preflight is one Concord protocol operation."
+name = "member_preflight"
+
+[[vocabulary.term]]
+description = "Landed-member removal is one Concord lifecycle operation."
+name = "member_remove"
+
+[[vocabulary.term]]
+description = "The member checkout tree is one Concord landing-proof field."
+name = "member_tree"
+
+[[vocabulary.term]]
+description = "Task-memory dispatch is one Concord CLI operation."
+name = "memory_command"
+
+[[vocabulary.term]]
+description = "Task-memory removal is one Concord lifecycle operation."
+name = "memory_remove"
+
+[[vocabulary.term]]
+description = "The private task-memory root is one Concord resource-report atom."
+name = "memory_root"
+
+[[vocabulary.term]]
+description = "This names one Concord stdin and CAS contract scenario."
+name = "memory_stdin_preserves_cas_and_refuses_ambiguous_settle"
+
+[[vocabulary.term]]
+description = "This names one Concord explicit-stdin contract scenario."
+name = "memory_write_and_settle_accept_one_explicit_stdin_source"
+
+[[vocabulary.term]]
+description = "This names one Concord missing-task-root agreement scenario."
+name = "narrowing_the_gate_does_not_open_it_for_a_missing_task_root"
+
+[[vocabulary.term]]
+description = "The next retained-memory phase is one Concord memory operation."
+name = "next_phase"
+
+[[vocabulary.term]]
+description = "Observed inode capacity is one Concord filesystem measurement."
+name = "observed_inodes"
+
+[[vocabulary.term]]
+description = "This names one Concord single-sweep host-memory scenario."
+name = "one_sweep_reports_one_host_memory_sample"
+
+[[vocabulary.term]]
+description = "Resource-import preflight is one Concord memory operation."
+name = "preflight_import"
+
+[[vocabulary.term]]
+description = "This names one Concord unproved-member scenario."
+name = "preflight_keeps_mismatched_and_missing_members_unproved"
+
+[[vocabulary.term]]
+description = "This names one Concord preflight output scenario."
+name = "preflight_prints_replayable_member_proof_and_keeps_faults_explicit"
+
+[[vocabulary.term]]
+description = "This names one Concord landing-relation scenario."
+name = "preflight_proves_reachable_and_tree_equivalent_members"
+
+[[vocabulary.term]]
+description = "This names one Concord managed-skill lifecycle scenario."
+name = "product_skill_install_refusal_and_uninstall_close_the_loop"
+
+[[vocabulary.term]]
+description = "This names one Concord isolated skill-staging scenario."
+name = "product_skill_stage_isolated"
+
+[[vocabulary.term]]
+description = "A reachable fixture proof is one Concord test atom."
+name = "reachable_proof"
+
+[[vocabulary.term]]
+description = "The canonical task-registry path is one Concord storage projection."
+name = "registry_path"
+
+[[vocabulary.term]]
+description = "This names one Concord rehome migration scenario."
+name = "rehome_repairs_worktrees_and_makes_cross_domain_sources_explicit"
+
+[[vocabulary.term]]
+description = "Removing a member seat is one Concord registry transaction."
+name = "remove_member"
+
+[[vocabulary.term]]
+description = "This names one Concord rename and audit scenario."
+name = "rename_preserves_the_member_branch_and_audit_reports_missing_seats"
+
+[[vocabulary.term]]
+description = "Repairing all affected worktree seats is one Concord migration operation."
+name = "repair_all"
+
+[[vocabulary.term]]
+description = "Repository annotation is one Concord registry operation."
+name = "repo_annotate"
+
+[[vocabulary.term]]
+description = "This names one Concord repo-less memory scenario."
+name = "repo_less_task_memory_obeys_revisions_and_consent_boundaries"
+
+[[vocabulary.term]]
+description = "Initialized task-memory root is one Concord resource-seat precondition."
+name = "require_root"
+
+[[vocabulary.term]]
+description = "Required allocated bytes is one serialized Concord import metric."
+name = "required_bytes"
+
+[[vocabulary.term]]
+description = "Reserved filesystem bytes is one serialized Concord import metric."
+name = "reserve_bytes"
+
+[[vocabulary.term]]
+description = "Reserved inodes is one serialized Concord import metric."
+name = "reserve_inodes"
+
+[[vocabulary.term]]
+description = "Task-resource dispatch is one Concord CLI operation."
+name = "resource_command"
+
+[[vocabulary.term]]
+description = "This names one Concord resource-import refusal scenario."
+name = "resource_import_preflight_refuses_symbolic_links_without_allocating_a_seat"
+
+[[vocabulary.term]]
+description = "Task-resource removal is one Concord lifecycle operation."
+name = "resource_remove"
+
+[[vocabulary.term]]
+description = "The private task-resource root is one Concord resource-report atom."
+name = "resources_root"
+
+[[vocabulary.term]]
+description = "Failed worktree addition rollback is one Concord Git transaction."
+name = "rollback_add"
+
+[[vocabulary.term]]
+description = "Completed skill mutation is one Concord output atom."
+name = "skill_done"
+
+[[vocabulary.term]]
+description = "A classified skill failure is one Concord output atom."
+name = "skill_error"
+
+[[vocabulary.term]]
+description = "Managed skill records are one Concord output atom."
+name = "skill_records"
+
+[[vocabulary.term]]
+description = "A managed skill status report is one Concord output atom."
+name = "skill_report"
+
+[[vocabulary.term]]
+description = "The encoded fixture skill path is one Concord test atom."
+name = "skill_text"
+
+[[vocabulary.term]]
+description = "The integration checkout head is one Concord landing-proof field."
+name = "source_head"
+
+[[vocabulary.term]]
+description = "The source Git identity is one Concord agreement atom."
+name = "source_id"
+
+[[vocabulary.term]]
+description = "The source Git identity is one serialized Concord proof field."
+name = "source_identity"
+
+[[vocabulary.term]]
+description = "The registry spelling of a member source is one Concord storage atom."
+name = "source_text"
+
+[[vocabulary.term]]
+description = "The integration checkout tree is one Concord landing-proof field."
+name = "source_tree"
+
+[[vocabulary.term]]
+description = "Starting a fixture task is one Concord protocol test operation."
+name = "start_task"
+
+[[vocabulary.term]]
+description = "Total swap bytes is one serialized Concord host-memory metric."
+name = "swap_total_bytes"
+
+[[vocabulary.term]]
+description = "Used swap bytes is one serialized Concord host-memory metric."
+name = "swap_used_bytes"
+
+[[vocabulary.term]]
+description = "Task finishing is one Concord lifecycle operation."
+name = "task_finish"
+
+[[vocabulary.term]]
+description = "The whole-task footprint is one Concord resource-report field."
+name = "task_footprint"
+
+[[vocabulary.term]]
+description = "The qualified task identity is one Concord discovery concept."
+name = "task_identity"
+
+[[vocabulary.term]]
+description = "Task rehoming is one Concord migration operation."
+name = "task_rehome"
+
+[[vocabulary.term]]
+description = "Task renaming is one Concord migration operation."
+name = "task_rename"
+
+[[vocabulary.term]]
+description = "Task creation is one Concord lifecycle operation."
+name = "task_start"
+
+[[vocabulary.term]]
+description = "The canonical private task directory is one Concord storage projection."
+name = "tasks_path"
+
+[[vocabulary.term]]
+description = "Total bytes is one serialized Concord resource metric."
+name = "total_bytes"
+
+[[vocabulary.term]]
+description = "This names one Concord unmanaged-skill status scenario."
+name = "unmanaged_status_is_diagnostic_but_dry_run_refuses"
+
+[[vocabulary.term]]
+description = "The upgraded fixture configuration is one Concord test atom."
+name = "upgraded_config"
+
+[[vocabulary.term]]
+description = "The upgraded fixture release authority is one Concord test atom."
+name = "upgraded_releases"
+
+[[vocabulary.term]]
+description = "Used capacity percent is one serialized Concord resource metric."
+name = "used_percent"
+
+[[vocabulary.term]]
+description = "Filesystem-use status is one Concord resource decision."
+name = "used_status"
+
+[[vocabulary.term]]
+description = "Recursive private-resource visitation is one Concord permission audit operation."
+name = "visit_resources"
+
+[[vocabulary.term]]
+description = "Writing under a held memory lock is one Concord CAS operation."
+name = "write_held"
+
+[[vocabulary.term]]
+description = "The immutable memory-phase CLI family is one command grammar atom."
+name = "MemoryPhaseCommand"
+
+[[vocabulary.term]]
+description = "A memory mutation result with its change bit is one protocol result atom."
+name = "MemoryChange"
+
+[[vocabulary.term]]
+description = "One validated immutable phase listing is one protocol result atom."
+name = "PhaseEntry"
+
+[[vocabulary.term]]
+description = "The canonical ordered MAIN section table is one memory-schema constant."
+name = "MAIN_HEADINGS"
+
+[[vocabulary.term]]
+description = "The v1 MAIN envelope marker is one memory-schema constant."
+name = "MAIN_MARKER"
+
+[[vocabulary.term]]
+description = "The canonical ordered PHASE section table is one memory-schema constant."
+name = "PHASE_HEADINGS"
+
+[[vocabulary.term]]
+description = "The v1 PHASE envelope marker is one memory-schema constant."
+name = "PHASE_MARKER"
+
+[[vocabulary.term]]
+description = "The v1 sparse-patch marker prefix is one memory-schema constant."
+name = "PATCH_MARKER_PREFIX"
+
+[[vocabulary.term]]
+description = "The MAIN byte ceiling is one memory-policy constant."
+name = "MAX_MAIN_BYTES"
+
+[[vocabulary.term]]
+description = "The MAIN line ceiling is one memory-policy constant."
+name = "MAX_MAIN_LINES"
+
+[[vocabulary.term]]
+description = "The PHASE byte ceiling is one memory-policy constant."
+name = "MAX_PHASE_BYTES"
+
+[[vocabulary.term]]
+description = "The PHASE line ceiling is one memory-policy constant."
+name = "MAX_PHASE_LINES"
+
+[[vocabulary.term]]
+description = "The diagnostic raw-read byte ceiling is one memory-policy constant."
+name = "MAX_RAW_READ_BYTES"
+
+[[vocabulary.term]]
+description = "Applying parsed sparse edits is one structured-memory operation."
+name = "apply_patch"
+
+[[vocabulary.term]]
+description = "A typed cleanup-after-apply failure is one memory input outcome."
+name = "cleanup_error"
+
+[[vocabulary.term]]
+description = "The current format held under CAS is one memory transition atom."
+name = "current_kind"
+
+[[vocabulary.term]]
+description = "The revision observed after a partial settle is one recovery field."
+name = "current_revision"
+
+[[vocabulary.term]]
+description = "Serializing one typed CLI error is one output operation."
+name = "error_json"
+
+[[vocabulary.term]]
+description = "Proving retained phases compatible with v1 is one format-transition operation."
+name = "ensure_structured_transition"
+
+[[vocabulary.term]]
+description = "Extracting a fixed Markdown heading title is one parser operation."
+name = "heading_title"
+
+[[vocabulary.term]]
+description = "The held MAIN format is one memory transition atom."
+name = "held_kind"
+
+[[vocabulary.term]]
+description = "The end offset of one source heading line is one parser field."
+name = "line_end"
+
+[[vocabulary.term]]
+description = "The prior canonical section index is one sparse-patch validation field."
+name = "last_index"
+
+[[vocabulary.term]]
+description = "The marker terminus is one sparse-patch source offset."
+name = "marker_end"
+
+[[vocabulary.term]]
+description = "Classifying a recognized marker family is one memory parser operation."
+name = "marker_kind"
+
+[[vocabulary.term]]
+description = "Validating MAIN format during audit is one memory-hygiene operation."
+name = "main_format"
+
+[[vocabulary.term]]
+description = "Classifying a MAIN envelope is one memory-format operation."
+name = "main_kind"
+
+[[vocabulary.term]]
+description = "The next MAIN format is one memory transition atom."
+name = "next_kind"
+
+[[vocabulary.term]]
+description = "Parsing a sparse memory document is one structured-memory operation."
+name = "parse_patch"
+
+[[vocabulary.term]]
+description = "Dispatching immutable phase commands is one CLI operation."
+name = "phase_command"
+
+[[vocabulary.term]]
+description = "Validating PHASE format during audit is one memory-hygiene operation."
+name = "phase_format"
+
+[[vocabulary.term]]
+description = "Classifying a PHASE envelope is one memory-format operation."
+name = "phase_kind"
+
+[[vocabulary.term]]
+description = "Decoding the canonical phase filename is one memory-directory operation."
+name = "phase_number"
+
+[[vocabulary.term]]
+description = "Reading selected MAIN sections is one sparse memory projection operation."
+name = "read_sections"
+
+[[vocabulary.term]]
+description = "Constructing a typed revision conflict is one memory CAS operation."
+name = "revision_error"
+
+[[vocabulary.term]]
+description = "Proving two settle inputs resolve to one file is one input refusal operation."
+name = "same_file"
+
+[[vocabulary.term]]
+description = "Recognizing explicit stdin is one memory input operation."
+name = "is_stdin"
+
+[[vocabulary.term]]
+description = "Validating a structured MAIN is one memory-schema operation."
+name = "validate_main"
+
+[[vocabulary.term]]
+description = "Validating a structured PHASE is one memory-schema operation."
+name = "validate_phase"
+
+[[vocabulary.term]]
+description = "Rechecking a consumed file before removal is one input safety operation."
+name = "verify_cleanup"
+
+[[vocabulary.term]]
+description = "Attaching machine-readable recovery evidence is one typed-error operation."
+name = "with_details"
+
+[[vocabulary.term]]
+description = "The first source line is one envelope-parser operation."
+name = "first_line"
+
+[[vocabulary.term]]
+description = "Strict structured-memory text validation is one parser operation."
+name = "strict_text"
+
+[[vocabulary.term]]
+description = "Selecting canonical sparse section spans is one parser operation."
+name = "subset_sections"
+
+[[vocabulary.term]]
+description = "The memory-input integration-test module is one contract-test atom."
+name = "memory_input"
+
+[[vocabulary.term]]
+description = "The structured-memory integration-test module is one contract-test atom."
+name = "memory_v1"
+
+[[vocabulary.term]]
+description = "The structured-memory parser integration-test module is one contract-test atom."
+name = "memory_format"
+
+[[vocabulary.term]]
+description = "The structured-memory reference filename is one shipped skill asset."
+name = "memory-v1"
+
+[[vocabulary.term]]
+description = "This names the default file consumption and explicit retention scenario."
+name = "file_inputs_are_consumed_by_default_and_keep_file_is_explicit"
+
+[[vocabulary.term]]
+description = "This names the stdin memory initialization scenario."
+name = "memory_init_accepts_explicit_stdin"
+
+[[vocabulary.term]]
+description = "This names pre-mutation file-input refusal and retention scenarios."
+name = "rejected_file_inputs_are_retained_and_managed_memory_is_never_consumed"
+
+[[vocabulary.term]]
+description = "This names typed cleanup failure with an applied memory result."
+name = "cleanup_failure_is_typed_and_does_not_roll_back_the_memory_write"
+
+[[vocabulary.term]]
+description = "This names the sparse projection, patch, and no-op CAS scenario."
+name = "projection_patch_and_noop_form_one_sparse_cas_loop"
+
+[[vocabulary.term]]
+description = "This names structured settle, immutable phase reading, and no-change refusal."
+name = "structured_settle_lists_phases_and_refuses_an_unchanged_main"
+
+[[vocabulary.term]]
+description = "This names the CommonMark container boundary scenario for structured sections."
+name = "commonmark_containers_keep_nested_h2_text_inside_section_bodies"
+
+[[vocabulary.term]]
+description = "This names strict text and closed H2 schema refusals before memory initialization."
+name = "structured_text_and_closed_h2_schema_quick_fail_before_init"
+
+[[vocabulary.term]]
+description = "This names the absolute raw-read ceiling and streaming audit evidence scenario."
+name = "raw_read_ceiling_quick_fails_without_hiding_audit_evidence"
+
+[[vocabulary.term]]
+description = "This names the separate memory hygiene and phase advisory audit contract."
+name = "memory_hygiene_and_phase_count_keep_distinct_audit_semantics"
+
+[[vocabulary.term]]
+description = "Restoring private fixture directory modes is one test operation."
+name = "private_directory"
+
+[[vocabulary.term]]
+description = "Restoring private fixture file modes is one test operation."
+name = "private_file"
+
 [word]
 single = true
-
-[[grant]]
-syntax = "test"
-paths = ["crates/*/tests/**/*.rs"]
-
-[[grant]]
-syntax = "environment"
-paths = ["crates/*/tests/**/*.rs"]
-
-[[grant]]
-syntax = "environment"
-paths = ["crates/lib/src/config.rs"]
-
-[[boundary]]
-paths = [".forgejo/**"]
-note = "release infrastructure is guarded by its native format and syntax checks"
-allow = ["path", "comment"]
-
-[[boundary]]
-paths = [".runseal/**"]
-note = "operator glue is guarded by deno format and type checks"
-allow = ["path", "comment", "word"]
-
-[vocabulary]
-term = [
-  { name = "AuditArgs", description = "The Concord audit command argument bundle is one CLI grammar atom." },
-  { name = "ConfigArgs", description = "The Concord configuration command argument bundle is one CLI grammar atom." },
-  { name = "ConfigCommand", description = "The Concord configuration command family is one CLI grammar atom." },
-  { name = "DomainArgs", description = "The Concord domain command argument bundle is one CLI grammar atom." },
-  { name = "DomainCommand", description = "The Concord domain command family is one CLI grammar atom." },
-  { name = "HostMemory", description = "The host-memory observation is one Concord resource-report atom." },
-  { name = "ImportPreflight", description = "The resource-import preflight proof is one Concord protocol atom." },
-  { name = "ImportSize", description = "The measured resource-import size is one Concord implementation atom." },
-  { name = "LandingProof", description = "The landing proof is one Concord protocol result atom." },
-  { name = "MEMORY_CRIT", description = "The memory critical threshold is one Concord resource-policy constant." },
-  { name = "MEMORY_WARN", description = "The memory warning threshold is one Concord resource-policy constant." },
-  { name = "MINIMUM_RESERVE", description = "The minimum filesystem reserve is one Concord resource-policy constant." },
-  { name = "MemberArgs", description = "The Concord member command argument bundle is one CLI grammar atom." },
-  { name = "MemberCommand", description = "The Concord member command family is one CLI grammar atom." },
-  { name = "MemberPreflight", description = "The per-member landing preflight is one Concord protocol atom." },
-  { name = "MemberProof", description = "The per-member landing proof is one Concord protocol atom." },
-  { name = "MemoryArgs", description = "The Concord memory command argument bundle is one CLI grammar atom." },
-  { name = "MemoryCommand", description = "The Concord memory command family is one CLI grammar atom." },
-  { name = "MemoryRead", description = "A revision-bound task-memory reading is one Concord protocol atom." },
-  { name = "PermissionArgs", description = "The Concord permission command argument bundle is one CLI grammar atom." },
-  { name = "PermissionCommand", description = "The Concord permission command family is one CLI grammar atom." },
-  { name = "RemoveLanded", description = "The landed-member removal command is one Concord lifecycle atom." },
-  { name = "RepoArgs", description = "The Concord repository command argument bundle is one CLI grammar atom." },
-  { name = "RepoCommand", description = "The Concord repository command family is one CLI grammar atom." },
-  { name = "ResourceArgs", description = "The Concord resource command argument bundle is one CLI grammar atom." },
-  { name = "ResourceCommand", description = "The Concord resource command family is one CLI grammar atom." },
-  { name = "SEAT_CRIT", description = "The resource-seat critical threshold is one Concord resource-policy constant." },
-  { name = "SEAT_WARN", description = "The resource-seat warning threshold is one Concord resource-policy constant." },
-  { name = "SkillArgs", description = "The Concord skill command argument bundle is one CLI grammar atom." },
-  { name = "SkillCommand", description = "The Concord skill command family is one CLI grammar atom." },
-  { name = "TASK_CRIT", description = "The task-footprint critical threshold is one Concord resource-policy constant." },
-  { name = "TASK_WARN", description = "The task-footprint warning threshold is one Concord resource-policy constant." },
-  { name = "TaskArgs", description = "The Concord task command argument bundle is one CLI grammar atom." },
-  { name = "TaskCommand", description = "The Concord task command family is one CLI grammar atom." },
-  { name = "TaskRef", description = "A resolved task reference is one Concord protocol identity atom." },
-  { name = "TaskResources", description = "The resource report for one task is one Concord protocol atom." },
-  { name = "TreeEquivalent", description = "Tree equivalence is one named Concord landing relation." },
-  { name = "USED_CRIT", description = "The filesystem-use critical threshold is one Concord resource-policy constant." },
-  { name = "USED_WARN", description = "The filesystem-use warning threshold is one Concord resource-policy constant." },
-  { name = "a_task_that_holds_nothing_stays_ok_whatever_the_host_reports", description = "This names one Concord empty-task resource-report scenario." },
-  { name = "add_member", description = "Adding a member seat is one Concord registry transaction." },
-  { name = "an_out_of_band_symlink_does_not_strand_its_resource_seat", description = "This names one Concord resource-seat recovery scenario." },
-  { name = "argument_home", description = "The argument-layer home is one Concord configuration test atom." },
-  { name = "argument_home_text", description = "The encoded argument-layer home is one Concord configuration test atom." },
-  { name = "audit_keeps_agreement_and_resource_findings_separate", description = "This names one Concord audit contract scenario." },
-  { name = "audit_report", description = "The human audit report is one Concord output atom." },
-  { name = "audit_with_resources", description = "Resource-inclusive audit is one Concord audit mode." },
-  { name = "available_bytes", description = "Available bytes is one serialized Concord resource metric." },
-  { name = "available_inodes", description = "Available inodes is one serialized Concord resource metric." },
-  { name = "available_percent", description = "Available memory percent is one serialized Concord resource metric." },
-  { name = "branch_exists", description = "Branch-existence inspection is one Concord Git test operation." },
-  { name = "changed_or_same", description = "Changed-or-unchanged skill state is one Concord skill decision." },
-  { name = "checked_add", description = "Overflow-checked resource arithmetic is one Concord safety operation." },
-  { name = "child_directories", description = "Direct child directories are one Concord resource-measurement input." },
-  { name = "child_paths", description = "Direct child paths are one Concord resource traversal input." },
-  { name = "config_path", description = "The fixture configuration path is one Concord test atom." },
-  { name = "containing_domain", description = "The domain containing the current path is one Concord discovery concept." },
-  { name = "copy_install", description = "Atomic installation from a copied file is one Concord filesystem operation." },
-  { name = "count_allocation", description = "Allocation counting is one Concord footprint operation." },
-  { name = "current_dir", description = "The inherited current directory is one typed Concord configuration field." },
-  { name = "default_config_uses_only_the_product_seat", description = "This names one Concord configuration contract scenario." },
-  { name = "default_path", description = "The canonical Concord configuration path is one configuration concept." },
-  { name = "domain_init", description = "Domain initialization is one Concord lifecycle operation." },
-  { name = "domain_space_root", description = "The domain-space root is one canonical Concord configuration field." },
-  { name = "dry_run", description = "Dry run is one established Concord mutation mode and CLI field." },
-  { name = "ensure_branch_absent", description = "Target-branch absence is one Concord member-creation invariant." },
-  { name = "ensure_exact", description = "Exact four-surface agreement is one Concord mutation precondition." },
-  { name = "ensure_expansion_headroom", description = "Expansion headroom is one Concord resource-safety precondition." },
-  { name = "equivalent_proof", description = "A tree-equivalent fixture proof is one Concord test atom." },
-  { name = "expected_branch", description = "The registry-derived expected branch is one Concord proof field." },
-  { name = "failed_member_add_rolls_back_the_created_branch", description = "This names one Concord failed-member-add rollback scenario." },
-  { name = "git_command", description = "The environment-isolated Git test command is one Concord test helper." },
-  { name = "git_path", description = "Native Git path normalization is one Concord runtime operation." },
-  { name = "held_owner_execute", description = "The retained owner-execute bit is one Concord resource-copy property." },
-  { name = "high_status", description = "Threshold-derived resource status is one Concord resource decision." },
-  { name = "host_memory", description = "Host memory is one serialized Concord task-resource field." },
-  { name = "human_landing", description = "The human landing proof rendering is one Concord output atom." },
-  { name = "human_preflight", description = "The human preflight rendering is one Concord output atom." },
-  { name = "init_task", description = "An initialized fixture task is one Concord protocol test operation." },
-  { name = "inode_headroom", description = "Inode headroom is one Concord resource-safety calculation." },
-  { name = "inode_note", description = "The inode availability note is one serialized Concord resource field." },
-  { name = "inode_stats", description = "Inode statistics are one Concord filesystem observation." },
-  { name = "linked_source", description = "A symbolic-link fixture source is one Concord refusal-test atom." },
-  { name = "logical_bytes", description = "Logical bytes is one serialized Concord import metric." },
-  { name = "member_add", description = "Member addition is one Concord lifecycle operation." },
-  { name = "member_add_allows_one_source_in_distinct_tasks_and_branches", description = "This names one Concord concurrent-membership scenario." },
-  { name = "member_add_refuses_a_branch_owned_by_another_task", description = "This names one Concord branch-ownership refusal scenario." },
-  { name = "member_audit", description = "Per-member agreement audit is one Concord protocol operation." },
-  { name = "member_head", description = "The member checkout head is one Concord landing-proof field." },
-  { name = "member_id", description = "The member Git identity is one Concord agreement atom." },
-  { name = "member_identity", description = "The member Git identity is one serialized Concord proof field." },
-  { name = "member_path", description = "The task-relative member path is one Concord identity projection." },
-  { name = "member_preflight", description = "Per-member landing preflight is one Concord protocol operation." },
-  { name = "member_remove", description = "Landed-member removal is one Concord lifecycle operation." },
-  { name = "member_tree", description = "The member checkout tree is one Concord landing-proof field." },
-  { name = "memory_command", description = "Task-memory dispatch is one Concord CLI operation." },
-  { name = "memory_remove", description = "Task-memory removal is one Concord lifecycle operation." },
-  { name = "memory_root", description = "The private task-memory root is one Concord resource-report atom." },
-  { name = "memory_stdin_preserves_cas_and_refuses_ambiguous_settle", description = "This names one Concord stdin and CAS contract scenario." },
-  { name = "memory_write_and_settle_accept_one_explicit_stdin_source", description = "This names one Concord explicit-stdin contract scenario." },
-  { name = "narrowing_the_gate_does_not_open_it_for_a_missing_task_root", description = "This names one Concord missing-task-root agreement scenario." },
-  { name = "next_phase", description = "The next retained-memory phase is one Concord memory operation." },
-  { name = "observed_inodes", description = "Observed inode capacity is one Concord filesystem measurement." },
-  { name = "one_sweep_reports_one_host_memory_sample", description = "This names one Concord single-sweep host-memory scenario." },
-  { name = "preflight_import", description = "Resource-import preflight is one Concord memory operation." },
-  { name = "preflight_keeps_mismatched_and_missing_members_unproved", description = "This names one Concord unproved-member scenario." },
-  { name = "preflight_prints_replayable_member_proof_and_keeps_faults_explicit", description = "This names one Concord preflight output scenario." },
-  { name = "preflight_proves_reachable_and_tree_equivalent_members", description = "This names one Concord landing-relation scenario." },
-  { name = "product_skill_install_refusal_and_uninstall_close_the_loop", description = "This names one Concord managed-skill lifecycle scenario." },
-  { name = "product_skill_stage_isolated", description = "This names one Concord isolated skill-staging scenario." },
-  { name = "reachable_proof", description = "A reachable fixture proof is one Concord test atom." },
-  { name = "registry_path", description = "The canonical task-registry path is one Concord storage projection." },
-  { name = "rehome_repairs_worktrees_and_makes_cross_domain_sources_explicit", description = "This names one Concord rehome migration scenario." },
-  { name = "remove_member", description = "Removing a member seat is one Concord registry transaction." },
-  { name = "rename_preserves_the_member_branch_and_audit_reports_missing_seats", description = "This names one Concord rename and audit scenario." },
-  { name = "repair_all", description = "Repairing all affected worktree seats is one Concord migration operation." },
-  { name = "repo_annotate", description = "Repository annotation is one Concord registry operation." },
-  { name = "repo_less_task_memory_obeys_revisions_and_consent_boundaries", description = "This names one Concord repo-less memory scenario." },
-  { name = "require_root", description = "Initialized task-memory root is one Concord resource-seat precondition." },
-  { name = "required_bytes", description = "Required allocated bytes is one serialized Concord import metric." },
-  { name = "reserve_bytes", description = "Reserved filesystem bytes is one serialized Concord import metric." },
-  { name = "reserve_inodes", description = "Reserved inodes is one serialized Concord import metric." },
-  { name = "resource_command", description = "Task-resource dispatch is one Concord CLI operation." },
-  { name = "resource_import_preflight_refuses_symbolic_links_without_allocating_a_seat", description = "This names one Concord resource-import refusal scenario." },
-  { name = "resource_remove", description = "Task-resource removal is one Concord lifecycle operation." },
-  { name = "resources_root", description = "The private task-resource root is one Concord resource-report atom." },
-  { name = "rollback_add", description = "Failed worktree addition rollback is one Concord Git transaction." },
-  { name = "skill_done", description = "Completed skill mutation is one Concord output atom." },
-  { name = "skill_error", description = "A classified skill failure is one Concord output atom." },
-  { name = "skill_records", description = "Managed skill records are one Concord output atom." },
-  { name = "skill_report", description = "A managed skill status report is one Concord output atom." },
-  { name = "skill_text", description = "The encoded fixture skill path is one Concord test atom." },
-  { name = "source_head", description = "The integration checkout head is one Concord landing-proof field." },
-  { name = "source_id", description = "The source Git identity is one Concord agreement atom." },
-  { name = "source_identity", description = "The source Git identity is one serialized Concord proof field." },
-  { name = "source_text", description = "The registry spelling of a member source is one Concord storage atom." },
-  { name = "source_tree", description = "The integration checkout tree is one Concord landing-proof field." },
-  { name = "start_task", description = "Starting a fixture task is one Concord protocol test operation." },
-  { name = "swap_total_bytes", description = "Total swap bytes is one serialized Concord host-memory metric." },
-  { name = "swap_used_bytes", description = "Used swap bytes is one serialized Concord host-memory metric." },
-  { name = "task_finish", description = "Task finishing is one Concord lifecycle operation." },
-  { name = "task_footprint", description = "The whole-task footprint is one Concord resource-report field." },
-  { name = "task_identity", description = "The qualified task identity is one Concord discovery concept." },
-  { name = "task_rehome", description = "Task rehoming is one Concord migration operation." },
-  { name = "task_rename", description = "Task renaming is one Concord migration operation." },
-  { name = "task_start", description = "Task creation is one Concord lifecycle operation." },
-  { name = "tasks_path", description = "The canonical private task directory is one Concord storage projection." },
-  { name = "total_bytes", description = "Total bytes is one serialized Concord resource metric." },
-  { name = "unmanaged_status_is_diagnostic_but_dry_run_refuses", description = "This names one Concord unmanaged-skill status scenario." },
-  { name = "upgraded_config", description = "The upgraded fixture configuration is one Concord test atom." },
-  { name = "upgraded_releases", description = "The upgraded fixture release authority is one Concord test atom." },
-  { name = "used_percent", description = "Used capacity percent is one serialized Concord resource metric." },
-  { name = "used_status", description = "Filesystem-use status is one Concord resource decision." },
-  { name = "visit_resources", description = "Recursive private-resource visitation is one Concord permission audit operation." },
-  { name = "write_held", description = "Writing under a held memory lock is one Concord CAS operation." },
-]

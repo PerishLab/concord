@@ -256,6 +256,21 @@ superseded.
 Move settled milestones and rationale that no longer steer execution into the
 next phase with `concord memory settle`. Keep still-active constraints in
 `MAIN.md`, regardless of age. Use whole-file revision CAS for every write.
+Concord owns a recognized versioned envelope and its fixed top-level section
+boundaries; content inside those sections remains opaque Markdown.
+
+New memory should use `concord-memory:v1`. Use `memory read --section` plus
+`memory patch` for small current-state changes, and whole-file write or settle
+when the envelope itself must change. Prefer `--file -` for generated content.
+A regular-file input is consumed only after the complete mutation succeeds;
+use `--keep-file` or `--keep-files` when retention is deliberate. A cleanup
+failure reports that the mutation remains applied and never rolls it back.
+
+MAIN is limited to 400 lines and 64 KiB; each PHASE is limited to 800 lines and
+128 KiB. Retained phase names are contiguous and immutable. Schema and limit
+violations are non-gating memory hygiene faults, while 16 retained phases emit
+one non-failing advisory. Read
+[memory-v1.md](memory-v1.md) before structured mutation or diagnosis.
 
 `resources/` holds opaque support material such as raw outputs or fetched
 documentation. Initialize memory before allocating resources. Import through

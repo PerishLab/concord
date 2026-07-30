@@ -35,6 +35,7 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
     );
     assert!(skill.join("SKILL.md").is_file());
     assert!(skill.join("references/protocol.md").is_file());
+    assert!(skill.join("references/memory-v1.md").is_file());
     let marker = fs::read_to_string(skill.join("metadata.json")).expect("marker");
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(&marker).expect("marker json")["keeper"],
@@ -213,5 +214,6 @@ fn product_skill_stage_isolated() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(staged.join("SKILL.md").is_file());
+    assert!(staged.join("references/memory-v1.md").is_file());
     assert!(!home.join("state/skills.json").exists());
 }

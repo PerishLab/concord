@@ -20,8 +20,8 @@ authorship is never protocol truth.
   available.
 - Gate footprint-expanding operations on current headroom. Do not infer task
   ownership for arbitrary processes or silently clean retained state.
-- Memory is opaque Markdown. Concord owns revisions and whole-file writes, not
-  the meaning of headings.
+- Versioned memory envelopes and their top-level section boundaries belong to
+  Concord; section bodies remain opaque Markdown.
 - Git owns member payload and repository-specific landing. Concord owns the
   member seat and verifies the four protocol surfaces.
 

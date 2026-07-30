@@ -1,97 +1,152 @@
-use crate::args::{MemoryCommand, ResourceCommand};
+use crate::args::{MemoryCommand, MemoryPhaseCommand, ResourceCommand};
 use crate::dispatch::guarded;
+use crate::dispatch::input::{Input, is_stdin};
 use crate::output;
-use concord_core::{Memory, Plan, Result, Space};
+use concord_core::{Error, MAX_MAIN_BYTES, MAX_PHASE_BYTES, Memory, Plan, Result, Space};
 use serde_json::json;
-use std::io::Read;
-use std::path::Path;
 
 pub fn memory_command(space: &Space, command: MemoryCommand, json_output: bool) -> Result<()> {
     match command {
         MemoryCommand::Init {
             task,
             file,
+            keep_file,
             dry_run,
         } => {
             let task = space.resolve(&task)?;
             let memory = Memory::new(&task);
-            let content = read(&file)?;
+            let input = Input::load(&file, MAX_MAIN_BYTES, &memory.root())?;
             let mut plan = Plan::single("memory.init", "write", &memory.main(), "initial MAIN.md");
             if dry_run {
                 return output::mutation(&plan, None, json_output);
             }
-            memory.init(&content)?;
+            memory.init(input.content())?;
+            let read = memory.read()?;
             plan.applied = true;
-            output::mutation(&plan, None, json_output)
+            let result = json!({
+                "path": read.path,
+                "revision": read.revision,
+                "changed": true,
+            });
+            consume(&[&input], keep_file, &result)?;
+            output::mutation(&plan, Some(result), json_output)
         }
-        MemoryCommand::Read { task } => {
+        MemoryCommand::Read { task, section } => {
             let task = space.resolve(&task)?;
-            let read = Memory::new(&task).read()?;
+            let memory = Memory::new(&task);
+            let projected = !section.is_empty();
+            let read = if projected {
+                memory.read_sections(&section)?
+            } else {
+                memory.read()?
+            };
             if json_output {
                 output::value(
                     serde_json::to_value(read).expect("memory read should encode"),
                     true,
                 );
+            } else if projected {
+                print!("{}", read.content);
             } else {
                 println!("revision: {}\n{}", read.revision, read.content);
             }
             Ok(())
         }
-        MemoryCommand::Write {
+        MemoryCommand::Patch {
             task,
             expect,
             file,
+            keep_file,
             dry_run,
         } => {
             let task = space.resolve(&task)?;
             let memory = Memory::new(&task);
-            let content = read(&file)?;
-            let plan = Plan::single(
+            let input = Input::load(&file, MAX_MAIN_BYTES, &memory.root())?;
+            let mut plan = Plan::single(
+                "memory.patch",
+                "patch",
+                &memory.main(),
+                "sparse concord-memory:v1 section update",
+            );
+            if dry_run {
+                return output::mutation(&plan, None, json_output);
+            }
+            let change = memory.patch(expect.as_deref(), input.content())?;
+            plan.applied = true;
+            let result = serde_json::to_value(change).expect("memory change should encode");
+            consume(&[&input], keep_file, &result)?;
+            output::mutation(&plan, Some(result), json_output)
+        }
+        MemoryCommand::Write {
+            task,
+            expect,
+            file,
+            keep_file,
+            dry_run,
+        } => {
+            let task = space.resolve(&task)?;
+            let memory = Memory::new(&task);
+            let input = Input::load(&file, MAX_MAIN_BYTES, &memory.root())?;
+            let mut plan = Plan::single(
                 "memory.write",
                 "replace",
                 &memory.main(),
                 format!("expected revision {expect}"),
             );
-            Mutation {
-                plan,
-                memory: &memory,
-                expect: &expect,
-                dry: dry_run,
-                json: json_output,
+            if dry_run {
+                return output::mutation(&plan, None, json_output);
             }
-            .write(&content)
+            let change = memory.write(&expect, input.content())?;
+            plan.applied = true;
+            let result = serde_json::to_value(change).expect("memory change should encode");
+            consume(&[&input], keep_file, &result)?;
+            output::mutation(&plan, Some(result), json_output)
         }
         MemoryCommand::Settle {
             task,
             expect,
             phase_file,
             main_file,
+            keep_files,
             dry_run,
         } => {
             let task = space.resolve(&task)?;
             let memory = Memory::new(&task);
-            if stdin(&phase_file) && stdin(&main_file) {
-                return Err(concord_core::Error::new(
+            if is_stdin(&phase_file) && is_stdin(&main_file) {
+                return Err(Error::typed(
+                    "memory.input_ambiguous",
                     "memory settle accepts stdin for only one input",
                 ));
             }
-            let plan = Plan::single(
+            let phase = Input::load(&phase_file, MAX_PHASE_BYTES, &memory.root())?;
+            let main = Input::load(&main_file, MAX_MAIN_BYTES, &memory.root())?;
+            if phase.same_file(&main) {
+                return Err(Error::typed(
+                    "memory.input_duplicate",
+                    "memory settle requires distinct explicit input paths",
+                ));
+            }
+            let mut plan = Plan::single(
                 "memory.settle",
                 "settle",
                 &memory.root(),
                 format!("phase plus MAIN.md at expected revision {expect}"),
             );
-            let phase = read(&phase_file)?;
-            let main = read(&main_file)?;
-            Mutation {
-                plan,
-                memory: &memory,
-                expect: &expect,
-                dry: dry_run,
-                json: json_output,
+            if dry_run {
+                return output::mutation(&plan, None, json_output);
             }
-            .settle(&phase, &main)
+            let (change, phase_path) = memory.settle(&expect, phase.content(), main.content())?;
+            plan.applied = true;
+            let result = json!({
+                "phase": phase_path.display().to_string(),
+                "path": change.path,
+                "revision": change.revision,
+                "changed": change.changed,
+            });
+            consume(&[&phase, &main], keep_files, &result)?;
+            output::mutation(&plan, Some(result), json_output)
         }
+        MemoryCommand::Phase { command } => phase_command(space, command, json_output),
         MemoryCommand::Remove { task, apply } => guarded(
             space.memory_remove(&task, false)?,
             apply,
@@ -101,39 +156,30 @@ pub fn memory_command(space: &Space, command: MemoryCommand, json_output: bool) 
     }
 }
 
-struct Mutation<'a, 'b> {
-    plan: Plan,
-    memory: &'a Memory<'b>,
-    expect: &'a str,
-    dry: bool,
-    json: bool,
-}
-
-impl Mutation<'_, '_> {
-    fn write(mut self, content: &str) -> Result<()> {
-        if self.dry {
-            return output::mutation(&self.plan, None, self.json);
+fn phase_command(space: &Space, command: MemoryPhaseCommand, json_output: bool) -> Result<()> {
+    match command {
+        MemoryPhaseCommand::List { task } => {
+            let task = space.resolve(&task)?;
+            let phases = Memory::new(&task).phases()?;
+            output::value(
+                serde_json::to_value(phases).expect("phase list should encode"),
+                json_output,
+            );
+            Ok(())
         }
-        let read = self.memory.write(self.expect, content)?;
-        self.plan.applied = true;
-        output::mutation(
-            &self.plan,
-            Some(json!({"path": read.path, "revision": read.revision})),
-            self.json,
-        )
-    }
-
-    fn settle(mut self, phase: &str, main: &str) -> Result<()> {
-        if self.dry {
-            return output::mutation(&self.plan, None, self.json);
+        MemoryPhaseCommand::Read { task, number } => {
+            let task = space.resolve(&task)?;
+            let phase = Memory::new(&task).phase(number)?;
+            if json_output {
+                output::value(
+                    serde_json::to_value(phase).expect("phase read should encode"),
+                    true,
+                );
+            } else {
+                println!("revision: {}\n{}", phase.revision, phase.content);
+            }
+            Ok(())
         }
-        let (read, phase) = self.memory.settle(self.expect, phase, main)?;
-        self.plan.applied = true;
-        output::mutation(
-            &self.plan,
-            Some(json!({"phase": phase.display().to_string(), "revision": read.revision})),
-            self.json,
-        )
     }
 }
 
@@ -215,19 +261,30 @@ pub fn resource_command(space: &Space, command: ResourceCommand, json_output: bo
     }
 }
 
-fn read(path: &Path) -> Result<String> {
-    if stdin(path) {
-        let mut content = String::new();
-        std::io::stdin()
-            .read_to_string(&mut content)
-            .map_err(|error| concord_core::Error::new(format!("cannot read stdin: {error}")))?;
-        return Ok(content);
+fn consume(inputs: &[&Input], keep: bool, result: &serde_json::Value) -> Result<()> {
+    if keep {
+        return Ok(());
     }
-    std::fs::read_to_string(path).map_err(|error| {
-        concord_core::Error::new(format!("cannot read input {}: {error}", path.display()))
-    })
+    for input in inputs {
+        if let Err(error) = input.verify_cleanup() {
+            return Err(cleanup_error(error, input, result));
+        }
+    }
+    for input in inputs {
+        if let Err(error) = input.remove() {
+            return Err(cleanup_error(error, input, result));
+        }
+    }
+    Ok(())
 }
 
-fn stdin(path: &Path) -> bool {
-    path == Path::new("-")
+fn cleanup_error(error: Error, input: &Input, result: &serde_json::Value) -> Error {
+    let mut details = result.as_object().cloned().unwrap_or_default();
+    details.insert("applied".to_string(), json!(true));
+    details.insert("input_path".to_string(), json!(input.path()));
+    Error::typed(
+        "memory.cleanup_after_apply",
+        format!("{error}; memory mutation remains applied and input was retained"),
+    )
+    .with_details(serde_json::Value::Object(details))
 }

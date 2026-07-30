@@ -18,11 +18,19 @@ pub use resource::{
 pub struct Audit {
     pub target: String,
     pub faults: Vec<Fault>,
+    pub observations: Vec<Advisory>,
     pub resources: Vec<TaskResources>,
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Fault {
+    pub kind: String,
+    pub path: String,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Advisory {
     pub kind: String,
     pub path: String,
     pub message: String,
@@ -52,6 +60,14 @@ impl Audit {
             message: message.into(),
         });
     }
+
+    fn observe(&mut self, kind: &str, path: &Path, message: impl Into<String>) {
+        self.observations.push(Advisory {
+            kind: kind.to_string(),
+            path: path.display().to_string(),
+            message: message.into(),
+        });
+    }
 }
 
 impl Space {
@@ -63,6 +79,7 @@ impl Space {
         let mut audit = Audit {
             target: self.path().display().to_string(),
             faults: Vec::new(),
+            observations: Vec::new(),
             resources: Vec::new(),
         };
         for domain in self.domains()? {
@@ -81,6 +98,7 @@ impl Domain {
         let mut audit = Audit {
             target: self.name().to_string(),
             faults: Vec::new(),
+            observations: Vec::new(),
             resources: Vec::new(),
         };
         permission(&mut audit, &self.tasks_path(), 0o700)?;
@@ -125,6 +143,7 @@ impl TaskRef {
         let mut audit = Audit {
             target: self.identity(),
             faults: Vec::new(),
+            observations: Vec::new(),
             resources: Vec::new(),
         };
         let root = self.path();
@@ -252,5 +271,6 @@ fn permission(audit: &mut Audit, path: &Path, wanted: u32) -> Result<()> {
 
 fn merge(target: &mut Audit, source: Audit) {
     target.faults.extend(source.faults);
+    target.observations.extend(source.observations);
     target.resources.extend(source.resources);
 }

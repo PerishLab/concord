@@ -1,3 +1,5 @@
+mod integrity;
+
 use super::{Audit, permission};
 use crate::Result;
 use crate::path::at;
@@ -18,16 +20,20 @@ pub(super) fn permissions(audit: &mut Audit, root: &Path) -> Result<()> {
     for entry in std::fs::read_dir(root)? {
         let entry = entry?;
         let path = entry.path();
-        if entry.file_name() == "resources" && entry.file_type()?.is_dir() {
+        let kind = entry.file_type()?;
+        if kind.is_symlink() {
+            audit.fault("memory", &path, "symbolic links are not managed memory");
+        } else if entry.file_name() == "resources" && kind.is_dir() {
             permission(audit, &path, 0o700)?;
             visit_resources(audit, &path)?;
-        } else if entry.file_type()?.is_dir() {
+        } else if kind.is_dir() {
             permission(audit, &path, 0o700)?;
             visit(audit, &path)?;
         } else {
             permission(audit, &path, 0o600)?;
         }
     }
+    integrity::inspect(audit, root)?;
     Ok(())
 }
 

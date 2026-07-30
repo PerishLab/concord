@@ -1,9 +1,17 @@
 mod copy;
+pub(crate) mod format;
+mod phase;
+mod resource;
 
 use crate::path::{at, revision};
-use crate::{Error, ImportPreflight, Result, TaskRef};
+use crate::{Error, Result, TaskRef};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
+
+pub use format::{
+    MAX_MAIN_BYTES, MAX_MAIN_LINES, MAX_PHASE_BYTES, MAX_PHASE_LINES, MAX_RAW_READ_BYTES,
+};
+pub use phase::PhaseEntry;
 
 pub struct Memory<'a> {
     task: &'a TaskRef,
@@ -16,12 +24,20 @@ pub struct MemoryRead {
     pub content: String,
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub struct MemoryChange {
+    pub path: String,
+    pub revision: String,
+    pub changed: bool,
+}
+
 impl<'a> Memory<'a> {
     pub fn new(task: &'a TaskRef) -> Self {
         Self { task }
     }
 
     pub fn init(&self, content: &str) -> Result<()> {
+        format::validate_main(content)?;
         let _lock = self.task.lock()?;
         self.task.ensure_exact()?;
         let root = self.root();
@@ -31,148 +47,85 @@ impl<'a> Memory<'a> {
                 root.display()
             )));
         }
-        at(&root).directory()?;
-        at(&self.main()).file(content)
+        let result = (|| {
+            at(&root).directory()?;
+            at(&self.main()).file(content)
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_dir(&root);
+        }
+        result
     }
 
     pub fn read(&self) -> Result<MemoryRead> {
         read(&self.main())
     }
 
-    pub fn write(&self, expected: &str, content: &str) -> Result<MemoryRead> {
+    pub fn read_sections(&self, keys: &[String]) -> Result<MemoryRead> {
+        let mut held = self.read()?;
+        held.content = format::project(&held.content, &held.revision, keys)?;
+        Ok(held)
+    }
+
+    pub fn write(&self, expected: &str, content: &str) -> Result<MemoryChange> {
+        format::validate_main(content)?;
         let _lock = self.task.lock()?;
         self.task.ensure_exact()?;
         self.write_held(expected, content)
     }
 
-    fn write_held(&self, expected: &str, content: &str) -> Result<MemoryRead> {
+    fn write_held(&self, expected: &str, content: &str) -> Result<MemoryChange> {
         let current = self.read()?;
         if current.revision != expected {
-            return Err(Error::new(format!(
-                "memory revision changed: expected {expected}, found {}",
-                current.revision
-            )));
+            return Err(revision_error(expected, &current.revision));
+        }
+        let held_kind = format::main_kind(&current.content)?;
+        let next_kind = format::main_kind(content)?;
+        if held_kind == format::Kind::V1 && next_kind != format::Kind::V1 {
+            return Err(Error::typed(
+                "memory.downgrade",
+                "ordinary memory write cannot downgrade concord-memory:v1",
+            ));
+        }
+        if held_kind == format::Kind::Legacy && next_kind == format::Kind::V1 {
+            self.ensure_structured_transition()?;
+        }
+        if current.content == content {
+            return Ok(MemoryChange {
+                path: current.path,
+                revision: current.revision,
+                changed: false,
+            });
         }
         at(&self.main()).file(content)?;
-        self.read()
+        Ok(change(self.read()?, true))
     }
 
-    pub fn settle(
-        &self,
-        expected: &str,
-        phase: &str,
-        current: &str,
-    ) -> Result<(MemoryRead, PathBuf)> {
+    pub fn patch(&self, expected: Option<&str>, content: &str) -> Result<MemoryChange> {
+        let patch = format::parse_patch(content)?;
+        if let Some(expected) = expected
+            && expected != patch.revision
+        {
+            return Err(Error::typed(
+                "memory.patch_expect",
+                format!(
+                    "--expect {expected} differs from patch revision {}",
+                    patch.revision
+                ),
+            ));
+        }
         let _lock = self.task.lock()?;
         self.task.ensure_exact()?;
         let held = self.read()?;
-        if held.revision != expected {
-            return Err(Error::new(format!(
-                "memory revision changed: expected {expected}, found {}",
-                held.revision
-            )));
+        if held.revision != patch.revision {
+            return Err(revision_error(&patch.revision, &held.revision));
         }
-        let phases = self.root().join("phases");
-        at(&phases).directory()?;
-        let path = phases.join(self.next_phase(&phases)?);
-        at(&path).file(phase)?;
-        match self.write_held(expected, current) {
-            Ok(read) => Ok((read, path)),
-            Err(error) => Err(Error::new(format!(
-                "{error}; complete phase remains at {}",
-                path.display()
-            ))),
+        let updated = format::apply_patch(&held.content, content, &patch)?;
+        if updated == held.content {
+            return Ok(change(held, false));
         }
-    }
-
-    pub fn allocate(&self, name: &str) -> Result<PathBuf> {
-        crate::model::component("resource seat", name)?;
-        let _lock = self.task.lock()?;
-        self.task.ensure_exact()?;
-        self.require_root()?;
-        let root = self.root().join("resources");
-        at(&root).directory()?;
-        let seat = root.join(name);
-        if seat.exists() {
-            return Err(Error::new(format!(
-                "resource seat already exists: {}",
-                seat.display()
-            )));
-        }
-        at(&seat).directory()?;
-        Ok(seat)
-    }
-
-    pub fn import(&self, name: &str, source: &Path) -> Result<PathBuf> {
-        crate::model::component("resource seat", name)?;
-        let _lock = self.task.lock()?;
-        self.task.ensure_exact()?;
-        self.require_root()?;
-        let root = self.root().join("resources");
-        let seat = root.join(name);
-        if seat.exists() {
-            return Err(Error::new(format!(
-                "resource seat already exists: {}",
-                seat.display()
-            )));
-        }
-        let preflight = crate::audit::resource::import_preflight(source, &seat, &self.root())?;
-        let source = PathBuf::from(preflight.source);
-        at(&root).directory()?;
-        at(&seat).directory()?;
-        let result = if source.is_dir() {
-            copy::tree(&source, &seat)
-        } else {
-            let filename = source
-                .file_name()
-                .ok_or_else(|| Error::new("resource source has no filename"))?;
-            copy::file(&source, &seat.join(filename))
-        };
-        if let Err(error) = result {
-            let _ = std::fs::remove_dir_all(&seat);
-            return Err(error);
-        }
-        Ok(seat)
-    }
-
-    pub fn preflight_import(&self, name: &str, source: &Path) -> Result<ImportPreflight> {
-        crate::model::component("resource seat", name)?;
-        self.task.ensure_exact()?;
-        self.require_root()?;
-        let seat = self.root().join("resources").join(name);
-        if seat.exists() {
-            return Err(Error::new(format!(
-                "resource seat already exists: {}",
-                seat.display()
-            )));
-        }
-        crate::audit::resource::import_preflight(source, &seat, &self.root())
-    }
-
-    pub fn resources(&self) -> Result<Vec<PathBuf>> {
-        let root = self.root().join("resources");
-        if !root.exists() {
-            return Ok(Vec::new());
-        }
-        let mut seats = std::fs::read_dir(root)?
-            .filter_map(|entry| entry.ok())
-            .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
-            .map(|entry| entry.path())
-            .collect::<Vec<_>>();
-        seats.sort();
-        Ok(seats)
-    }
-
-    pub fn resource(&self, name: &str) -> Result<PathBuf> {
-        crate::model::component("resource seat", name)?;
-        let seat = self.root().join("resources").join(name);
-        if !seat.is_dir() {
-            return Err(Error::new(format!(
-                "resource seat does not exist: {}",
-                seat.display()
-            )));
-        }
-        Ok(seat)
+        at(&self.main()).file(&updated)?;
+        Ok(change(self.read()?, true))
     }
 
     pub fn links(&self) -> Result<Vec<PathBuf>> {
@@ -201,37 +154,28 @@ impl<'a> Memory<'a> {
     pub fn main(&self) -> PathBuf {
         self.root().join("MAIN.md")
     }
-
-    fn next_phase(&self, root: &Path) -> Result<String> {
-        let mut highest = None;
-        for entry in std::fs::read_dir(root)? {
-            let entry = entry?;
-            let name = entry.file_name();
-            let name = name.to_string_lossy();
-            let number = name
-                .strip_prefix("PHASE-")
-                .and_then(|value| value.strip_suffix(".md"))
-                .and_then(|value| value.parse::<u32>().ok());
-            if let Some(number) = number {
-                highest = Some(highest.map_or(number, |held: u32| held.max(number)));
-            }
-        }
-        Ok(format!(
-            "PHASE-{:02}.md",
-            highest.map_or(0, |value| value + 1)
-        ))
-    }
-
-    fn require_root(&self) -> Result<()> {
-        if self.main().is_file() {
-            Ok(())
-        } else {
-            Err(Error::new("resource seats require initialized task memory"))
-        }
-    }
 }
 
 fn read(path: &Path) -> Result<MemoryRead> {
+    let metadata = std::fs::symlink_metadata(path)
+        .map_err(|error| Error::new(format!("cannot read memory {}: {error}", path.display())))?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(Error::typed(
+            "memory.read_type",
+            format!("memory is not a regular file: {}", path.display()),
+        ));
+    }
+    if metadata.len() > MAX_RAW_READ_BYTES as u64 {
+        return Err(Error::typed(
+            "memory.read_limit",
+            format!(
+                "memory {} is {} bytes; raw read maximum is {}",
+                path.display(),
+                metadata.len(),
+                MAX_RAW_READ_BYTES
+            ),
+        ));
+    }
     let bytes = std::fs::read(path)
         .map_err(|error| Error::new(format!("cannot read memory {}: {error}", path.display())))?;
     let content = String::from_utf8(bytes.clone())
@@ -241,6 +185,25 @@ fn read(path: &Path) -> Result<MemoryRead> {
         revision: revision(&bytes),
         content,
     })
+}
+
+fn change(read: MemoryRead, changed: bool) -> MemoryChange {
+    MemoryChange {
+        path: read.path,
+        revision: read.revision,
+        changed,
+    }
+}
+
+fn revision_error(expected: &str, found: &str) -> Error {
+    Error::typed(
+        "memory.revision_changed",
+        format!("memory revision changed: expected {expected}, found {found}"),
+    )
+    .with_details(serde_json::json!({
+        "expected_revision": expected,
+        "current_revision": found,
+    }))
 }
 
 fn links(root: &Path, found: &mut Vec<PathBuf>) -> Result<()> {

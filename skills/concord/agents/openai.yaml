@@ -1,4 +1,4 @@
 interface:
   display_name: "Concord"
   short_description: "Operate private tasks through Concord"
-  default_prompt: "Use $concord to start, resume, audit, or finish this managed task safely."
+  default_prompt: "Use $concord to start, resume, audit, or finish this managed task safely; prefer stdin for generated memory mutations."

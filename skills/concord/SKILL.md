@@ -1,6 +1,6 @@
 ---
 name: concord
-description: Operate the private Concord `.tasks` + `.task` control plane. Use when starting, locating, resuming, auditing, renaming, rehoming, landing, retaining, or finishing managed tasks; adding or removing repository worktree members; reading or settling task memory; managing task resources or permissions; or replacing any proposed raw mutation of `.tasks/`, `.task/`, task worktrees, or `tasks.toml`.
+description: Operate the private Concord `.tasks` + `.task` control plane, including stdin-first structured task memory. Use when starting, locating, resuming, auditing, renaming, rehoming, landing, retaining, or finishing managed tasks; adding or removing repository worktree members; reading, patching, or settling task memory; managing task resources or permissions; or replacing any proposed raw mutation of `.tasks/`, `.task/`, task worktrees, or `tasks.toml`.
 ---
 
 # Concord
@@ -22,6 +22,11 @@ it before preserving compatibility with an older managed installation.
 Before any stateful task operation, read
 [references/protocol.md](references/protocol.md) completely. For pure command
 discovery, prefer `concord <command> --help`.
+
+Before initializing, projecting, patching, settling, or diagnosing structured
+memory, also read
+[references/memory-v1.md](references/memory-v1.md) completely. Do not load that
+grammar for an ordinary task entry or raw memory read.
 
 ## Principles
 
@@ -58,10 +63,15 @@ building or operating a repository rather than restating its clauses here.
    member payload and repository landing; Concord owns member seats and
    agreement.
 5. Re-audit after structural mutation. Keep `MAIN.md` current when the task is
-   long-running; settle completed history into the next phase.
+   long-running; settle completed history into the next phase. Prefer stdin for
+   generated memory mutation input. Explicit files are consumed after success
+   unless `--keep-file` or `--keep-files` is intentional.
 6. Land through the repository's own process, verify reachability and
    cleanliness, then remove only the landed member seat. Finish a repo-less task
    only after retained state is absent or its exact deletion is authorized.
+
+When durable memory is first needed, initialize the v1 envelope from
+`references/memory-v1.md` through `--file -` by default.
 
 ## Laws
 
@@ -81,6 +91,9 @@ building or operating a repository rather than restating its clauses here.
   flag.
 - Registry and memory writes lock, re-read, compare, and atomically replace.
   Memory writes require the expected whole-file revision.
+- Versioned memory envelopes and fixed top-level section boundaries belong to
+  Concord. Section bodies remain opaque Markdown. Sparse patches carry the
+  expected whole-file revision and preserve untouched source bytes.
 - `.task/` exists only for durable multi-round memory or artifacts. `MAIN.md`
   carries live execution state; settled rationale moves into numbered phases.
 - Existing memory and retained task artifacts require exact-target deletion
@@ -111,6 +124,12 @@ Concord currently enforces:
 - clean source checkout and an absent target branch before member creation;
 - clean and reachable or tree-equivalent member state before landed removal;
 - locking, registry compare-before-replace, and memory revision CAS;
+- bounded stdin or regular-file memory input, default post-success file
+  consumption, explicit retention, and typed cleanup-after-apply errors;
+- v1 memory schema, raw-byte sparse patching, no-op detection, fixed MAIN and
+  PHASE limits, immutable phase listing and reading, and raw-read ceiling;
+- memory schema and limit hygiene in audit, plus a non-failing phase-count
+  advisory after 16 retained phases;
 - explicit plans, default-on creation, and execution gates for destructive or
   migratory commands;
 - task finish only when no members or retained filesystem state remain;
@@ -152,9 +171,13 @@ concord audit <domain>/<task>
 concord member preflight <domain>/<task>
 concord member remove-landed <domain>/<task> <member> --apply
 concord memory read <domain>/<task> --json
-concord memory write <domain>/<task> --expect <sha256> --file <MAIN.md>
+concord memory read <domain>/<task> --section focus --section next
+concord memory patch <domain>/<task> --file -
+concord memory write <domain>/<task> --expect <sha256> --file -
 concord memory settle <domain>/<task> --expect <sha256> \
-  --phase-file <phase.md> --main-file <MAIN.md>
+  --phase-file - --main-file <MAIN.md>
+concord memory phase list <domain>/<task>
+concord memory phase read <domain>/<task> 0
 concord resource import <domain>/<task> <name> --source <path>
 concord permissions normalize <domain>/<task> --apply
 concord task finish <domain>/<task> --apply

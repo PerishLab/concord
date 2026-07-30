@@ -1,6 +1,10 @@
+mod memory;
+
 use crate::skill::SkillArgs;
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
+
+pub use memory::{MemoryArgs, MemoryCommand, MemoryPhaseCommand};
 
 #[derive(Parser)]
 #[command(version = plumb::version!("CONCORD"), about)]
@@ -165,66 +169,6 @@ pub enum MemberCommand {
     RemoveLanded {
         task: String,
         name: String,
-        #[arg(long)]
-        apply: bool,
-    },
-}
-
-#[derive(Args)]
-pub struct MemoryArgs {
-    #[command(subcommand)]
-    pub command: MemoryCommand,
-}
-
-#[derive(Subcommand)]
-pub enum MemoryCommand {
-    #[command(about = "Create .task/ and its initial MAIN.md")]
-    Init {
-        task: String,
-        #[arg(long)]
-        file: PathBuf,
-        #[arg(long)]
-        dry_run: bool,
-    },
-    #[command(about = "Read MAIN.md with its content revision")]
-    Read { task: String },
-    #[command(about = "Replace MAIN.md at an expected revision")]
-    Write {
-        task: String,
-        #[arg(long)]
-        expect: String,
-        #[arg(
-            long,
-            value_name = "PATH|-",
-            help = "Read MAIN.md from PATH or stdin (-)"
-        )]
-        file: PathBuf,
-        #[arg(long)]
-        dry_run: bool,
-    },
-    #[command(about = "Allocate a phase and replace MAIN.md")]
-    Settle {
-        task: String,
-        #[arg(long)]
-        expect: String,
-        #[arg(
-            long,
-            value_name = "PATH|-",
-            help = "Read the phase from PATH or stdin (-)"
-        )]
-        phase_file: PathBuf,
-        #[arg(
-            long,
-            value_name = "PATH|-",
-            help = "Read MAIN.md from PATH or stdin (-)"
-        )]
-        main_file: PathBuf,
-        #[arg(long)]
-        dry_run: bool,
-    },
-    #[command(about = "Remove the exact .task/ tree")]
-    Remove {
-        task: String,
         #[arg(long)]
         apply: bool,
     },

@@ -1,4 +1,5 @@
 mod artifact;
+mod input;
 mod mutation;
 
 use crate::args::{
