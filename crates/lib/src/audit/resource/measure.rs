@@ -153,7 +153,7 @@ fn count_allocation(metadata: &Metadata, links: &mut BTreeSet<(u64, u64)>) -> bo
 }
 
 #[cfg(not(unix))]
-fn count_allocation(_metadata: &Metadata, _links: &mut BTreeSet<(u64, u64)>) -> bool {
+fn count_allocation(_: &Metadata, _: &mut BTreeSet<(u64, u64)>) -> bool {
     true
 }
 
@@ -173,6 +173,6 @@ fn inode_stats(path: &Path) -> Result<Option<Inodes>> {
 }
 
 #[cfg(not(unix))]
-fn inode_stats(_path: &Path) -> Result<Option<Inodes>> {
+fn inode_stats(_: &Path) -> Result<Option<Inodes>> {
     Ok(None)
 }

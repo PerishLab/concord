@@ -45,14 +45,24 @@ authorship is never protocol truth.
 
 ## Release
 
-- `manage.sh` and `manage.ps1` leave exactly one version under the install root.
-  Earlier versions are removed once the new binary is linked and answers
-  `--version`, and each removal is named. `--retain` keeps what is there. The
-  default was the opposite, protecting a rollback path that does not exist:
-  `install --version <older>` refetches, so nothing ever read what accumulated.
-- A stable release refuses to publish without
+- Stable Plumb owns the complete binary release mechanism. This repository
+  declares the product and skill in `plumb.toml`; its exact/stable workflows
+  are thin Actions callers.
+- Every release produces immutable content-addressed objects and one exact seal
+  at `v1/releases/<channel>/<version>/seal.json`.
+- Non-stable releases stop at their exact seal and install only through its
+  generated manager into explicit isolated paths.
+- Stable promotion proves an exact non-stable seal from the same commit. Only
+  stable activation updates `v1/channels/stable.json` and the canonical root
+  managers.
+- Release jobs bind build, publication, smoke, and stable tagging to one
+  resolved commit. Publication and activation use separate credentials.
+- Generated managers and capsules are release outputs, not repository files.
+- Managed skill install, status, and upgrade are stable-only. Exact non-stable
+  briefs use `skill stage` at a new explicit path and never enter the ledger.
+- A stable release requires
   `docs/CHANGELOG/v<version>/{en,zh}/{INDEX.md,MIGRATION.md}`, enforced by the
-  `Changelog` step in `release-stable.yml` before anything irreversible.
+  stable capsule compiler before anything irreversible.
   `plumb doctor` does not check this: a changelog is owed by a release, not by a
   working tree. A release requiring nothing of anyone still writes MIGRATION.md
   saying so. See `plumb/docs/changelog.md`.

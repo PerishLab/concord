@@ -3,7 +3,7 @@ use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(version, about)]
+#[command(version = plumb::version!("CONCORD"), about)]
 pub struct Cli {
     #[arg(long, global = true)]
     pub config: Option<PathBuf>,

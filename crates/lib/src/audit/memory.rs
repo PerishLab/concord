@@ -1,6 +1,6 @@
 use super::{Audit, permission};
 use crate::Result;
-use crate::path::held_mode;
+use crate::path::at;
 use std::path::Path;
 
 pub(super) fn permissions(audit: &mut Audit, root: &Path) -> Result<()> {
@@ -62,7 +62,7 @@ fn visit_resources(audit: &mut Audit, root: &Path) -> Result<()> {
         } else if kind.is_dir() {
             permission(audit, &path, 0o700)?;
             visit_resources(audit, &path)?;
-        } else if let Some(held) = held_mode(&path)?
+        } else if let Some(held) = at(&path).held()?
             && held & 0o077 != 0
         {
             audit.fault(

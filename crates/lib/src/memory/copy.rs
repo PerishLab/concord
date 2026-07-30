@@ -1,4 +1,4 @@
-use crate::path::private_dir;
+use crate::path::at;
 use crate::{Error, Result};
 use std::path::Path;
 
@@ -14,7 +14,7 @@ pub(super) fn tree(source: &Path, target: &Path) -> Result<()> {
             )));
         }
         if kind.is_dir() {
-            private_dir(&to)?;
+            at(&to).directory()?;
             tree(&entry.path(), &to)?;
         } else if kind.is_file() {
             file(&entry.path(), &to)?;
@@ -29,9 +29,8 @@ pub(super) fn tree(source: &Path, target: &Path) -> Result<()> {
 }
 
 pub(super) fn file(source: &Path, target: &Path) -> Result<()> {
-    crate::path::copy_private(
+    at(target).copy(
         source,
-        target,
         if super::held_owner_execute(source)? {
             0o700
         } else {

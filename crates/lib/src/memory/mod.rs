@@ -1,6 +1,6 @@
 mod copy;
 
-use crate::path::{mode, private_dir, private_file, revision};
+use crate::path::{at, revision};
 use crate::{Error, ImportPreflight, Result, TaskRef};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -31,8 +31,8 @@ impl<'a> Memory<'a> {
                 root.display()
             )));
         }
-        private_dir(&root)?;
-        private_file(&self.main(), content)
+        at(&root).directory()?;
+        at(&self.main()).file(content)
     }
 
     pub fn read(&self) -> Result<MemoryRead> {
@@ -53,7 +53,7 @@ impl<'a> Memory<'a> {
                 current.revision
             )));
         }
-        private_file(&self.main(), content)?;
+        at(&self.main()).file(content)?;
         self.read()
     }
 
@@ -73,9 +73,9 @@ impl<'a> Memory<'a> {
             )));
         }
         let phases = self.root().join("phases");
-        private_dir(&phases)?;
+        at(&phases).directory()?;
         let path = phases.join(self.next_phase(&phases)?);
-        private_file(&path, phase)?;
+        at(&path).file(phase)?;
         match self.write_held(expected, current) {
             Ok(read) => Ok((read, path)),
             Err(error) => Err(Error::new(format!(
@@ -91,7 +91,7 @@ impl<'a> Memory<'a> {
         self.task.ensure_exact()?;
         self.require_root()?;
         let root = self.root().join("resources");
-        private_dir(&root)?;
+        at(&root).directory()?;
         let seat = root.join(name);
         if seat.exists() {
             return Err(Error::new(format!(
@@ -99,7 +99,7 @@ impl<'a> Memory<'a> {
                 seat.display()
             )));
         }
-        private_dir(&seat)?;
+        at(&seat).directory()?;
         Ok(seat)
     }
 
@@ -118,8 +118,8 @@ impl<'a> Memory<'a> {
         }
         let preflight = crate::audit::resource::import_preflight(source, &seat, &self.root())?;
         let source = PathBuf::from(preflight.source);
-        private_dir(&root)?;
-        private_dir(&seat)?;
+        at(&root).directory()?;
+        at(&seat).directory()?;
         let result = if source.is_dir() {
             copy::tree(&source, &seat)
         } else {
@@ -257,7 +257,7 @@ fn links(root: &Path, found: &mut Vec<PathBuf>) -> Result<()> {
 }
 
 fn normalize(root: &Path, resources: bool) -> Result<()> {
-    mode(root, 0o700)?;
+    at(root).mode(0o700)?;
     for entry in std::fs::read_dir(root)? {
         let entry = entry?;
         let path = entry.path();
@@ -269,7 +269,7 @@ fn normalize(root: &Path, resources: bool) -> Result<()> {
             normalize(&path, resources || entry.file_name() == "resources")?;
         } else {
             let executable = resources && held_owner_execute(&path)?;
-            mode(&path, if executable { 0o700 } else { 0o600 })?;
+            at(&path).mode(if executable { 0o700 } else { 0o600 })?;
         }
     }
     Ok(())

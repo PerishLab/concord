@@ -1,90 +1,8 @@
-use flate2::Compression;
-use flate2::write::GzEncoder;
+#[path = "skill/fixture.rs"]
+mod fixture;
+
+use fixture::{archive, config, run, serve};
 use std::fs;
-use std::io::{Read, Write};
-use std::net::TcpListener;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
-
-fn archive() -> Vec<u8> {
-    let mut builder = tar::Builder::new(Vec::new());
-    append(
-        &mut builder,
-        "concord/SKILL.md",
-        b"---\nname: concord\ndescription: fixture\n---\n# Concord\n",
-    );
-    append(
-        &mut builder,
-        "concord/references/protocol.md",
-        b"# Protocol\n",
-    );
-    let tar = builder.into_inner().expect("tar");
-    let mut zip = GzEncoder::new(Vec::new(), Compression::default());
-    zip.write_all(&tar).expect("compress");
-    zip.finish().expect("finish")
-}
-
-fn append(builder: &mut tar::Builder<Vec<u8>>, path: &str, body: &[u8]) {
-    let mut header = tar::Header::new_gnu();
-    header.set_size(body.len() as u64);
-    header.set_mode(0o644);
-    header.set_cksum();
-    builder
-        .append_data(&mut header, path, body)
-        .expect("append");
-}
-
-fn serve(archive: Vec<u8>) -> String {
-    let digest = plumb::skill::stamp(&archive);
-    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
-    let port = listener.local_addr().expect("address").port();
-    std::thread::spawn(move || {
-        for stream in listener.incoming().take(8) {
-            let mut stream = stream.expect("stream");
-            let mut request = [0u8; 2048];
-            let read = stream.read(&mut request).expect("request");
-            let request = String::from_utf8_lossy(&request[..read]);
-            let body = if request.contains("metadata.json") {
-                format!(
-                    r#"{{"releaseVersion":"0.3.0","artifacts":{{"skillTarGz":{{"name":"concord-skill.tar.gz","url":"http://127.0.0.1:{port}/concord-skill.tar.gz","sha256":"{digest}"}}}}}}"#
-                )
-                .into_bytes()
-            } else {
-                archive.clone()
-            };
-            let head = format!(
-                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                body.len()
-            );
-            stream.write_all(head.as_bytes()).expect("head");
-            stream.write_all(&body).expect("body");
-        }
-    });
-    format!("http://127.0.0.1:{port}")
-}
-
-fn run(config: &Path, arguments: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_concord"))
-        .arg("--config")
-        .arg(config)
-        .args(arguments)
-        .output()
-        .expect("run concord")
-}
-
-fn config(root: &Path, releases: &str) -> PathBuf {
-    let path = root.join("concord.toml");
-    fs::write(
-        &path,
-        format!(
-            "home = {:?}\nreleases = {:?}\n",
-            root.join("home"),
-            releases
-        ),
-    )
-    .expect("config");
-    path
-}
 
 #[test]
 fn product_skill_install_refusal_and_uninstall_close_the_loop() {
@@ -105,7 +23,7 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
             "skill",
             "install",
             "--version",
-            "0.3.0",
+            "v0.3.0",
             "--path",
             &skill_text,
         ],
@@ -157,7 +75,7 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
             "skill",
             "status",
             "--version",
-            "0.3.0",
+            "v0.3.0",
         ],
     );
     assert!(status.status.success());
@@ -175,7 +93,7 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
             "skill",
             "upgrade",
             "--version",
-            "0.3.0",
+            "v0.3.0",
             "--dry-run",
         ],
     );
@@ -193,7 +111,7 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
             "skill",
             "upgrade",
             "--version",
-            "0.3.0",
+            "v0.3.0",
         ],
     );
     assert!(
@@ -263,4 +181,37 @@ fn unmanaged_status_is_diagnostic_but_dry_run_refuses() {
     );
     assert!(!dry_run.status.success());
     assert!(String::from_utf8_lossy(&dry_run.stderr).contains("not actionable"));
+}
+
+#[test]
+fn product_skill_stage_isolated() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    let releases = serve(archive());
+    let config_path = config(fixture.path(), &releases);
+    let home = fixture.path().join("argument-home");
+    let staged = fixture.path().join("candidate/skills/concord");
+
+    let output = run(
+        &config_path,
+        &[
+            "--home",
+            &home.display().to_string(),
+            "skill",
+            "stage",
+            "--channel",
+            "beta",
+            "--version",
+            "v0.5.0-beta.1",
+            "--path",
+            &staged.display().to_string(),
+        ],
+    );
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(staged.join("SKILL.md").is_file());
+    assert!(!home.join("state/skills.json").exists());
 }

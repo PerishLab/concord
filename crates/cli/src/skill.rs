@@ -40,6 +40,15 @@ pub enum SkillCommand {
         #[arg(long)]
         version: Option<String>,
     },
+    #[command(about = "Stage one exact non-stable Concord skill outside managed state")]
+    Stage {
+        #[arg(long)]
+        channel: String,
+        #[arg(long)]
+        version: String,
+        #[arg(long)]
+        path: PathBuf,
+    },
     #[command(about = "List managed Concord skill installations")]
     List,
     #[command(about = "Remove only managed Concord skill installations")]
@@ -95,6 +104,22 @@ pub fn run(config: &Config, command: SkillCommand, json_output: bool) -> Result<
                 })
                 .map_err(skill_error)?;
             output::skill_report("status", &report, json_output)
+        }
+        SkillCommand::Stage {
+            channel,
+            version,
+            path,
+        } => {
+            let done = kit
+                .stage(&Ask {
+                    channel,
+                    version: Some(version),
+                    path: Some(path),
+                    ..Ask::default()
+                })
+                .map_err(skill_error)?;
+            output::skill_done("staged", &done, json_output)?;
+            changed(&done)
         }
         SkillCommand::List => {
             let records = kit.list().map_err(skill_error)?;

@@ -89,27 +89,31 @@ filesystem and inode headroom (with a 1 GiB minimum byte reserve). Apply
 rechecks under the task lock and copies files as a stream. Member creation also
 refuses to expand a filesystem already at the critical threshold.
 
-`concord --help` is the complete command grammar. The stable binary is
-installed or updated with `manage.sh` on Linux/macOS or `manage.ps1` on
-Windows:
+`concord --help` is the complete command grammar. The canonical manager installs
+the stable consensus:
 
-```text
-manage.sh install
-manage.sh update
-manage.sh uninstall
+```sh
+curl -fsSL https://releases.concord.perish.uk/manage.sh | sh
 ```
 
-Managers verify release metadata and the staged binary before activating a
-versioned seat under `~/.local/share/concord/vX.Y.Z/`. The stable
-`~/.local/bin/concord` entrypoint points at the selected version. Existing
-entrypoints and version seats are replaced only when their ownership can be
-proven; `--retain=false` explicitly prunes older managed versions.
+Every non-stable release exists only as an exact seal. Resolve its fixed manager
+and give it an isolated seat:
+
+```sh
+seal=https://releases.concord.perish.uk/v1/releases/beta/v0.5.0-beta.1/seal.json
+manager=$(curl -fsSL "$seal" | jq -er '.managers.unix.url')
+curl -fsSL "$manager" | sh -s -- install \
+  --install-root "$HOME/.local/share/concord-beta" \
+  --bin-dir "$HOME/.local/concord-beta/bin"
+```
 
 Concord also ships its operating brief as a release-matched managed skill:
 
 ```text
 concord skill install
 concord skill install --path ~/.codex/skills/concord
+concord skill stage --channel beta --version v0.5.0-beta.1 \
+  --path ~/.local/share/concord-beta/skills/concord
 concord skill list
 concord skill upgrade
 concord skill uninstall
@@ -118,4 +122,4 @@ concord skill uninstall
 Default installation detects present Claude, Codex, shared agent, and OpenCode
 skill directories. Replacement and removal require both Concord's
 `state/skills.json` record and the target's `metadata.json` ownership marker;
-unmanaged paths are refused.
+the exact stage path is separate from managed state.

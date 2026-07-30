@@ -15,9 +15,9 @@ const paths = [
   ".runseal/wrappers/guard.ts",
   ".runseal/wrappers/init.ts",
   ".runseal/wrappers/land.ts",
-  ".runseal/wrappers/release.ts",
+  "plumb.toml",
   ".forgejo/workflows/guard.yml",
-  ".forgejo/workflows/release-beta.yml",
+  ".forgejo/workflows/release-exact.yml",
   ".forgejo/workflows/release-stable.yml",
 ];
 

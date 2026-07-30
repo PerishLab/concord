@@ -99,22 +99,23 @@ fn member_preflight(
         Err(_) => return Ok(held),
     };
     held.source = source.display().to_string();
-    let (source_identity, member_identity) = match (git::identity(&source), git::identity(&path)) {
-        (Ok(source_identity), Ok(member_identity)) => (source_identity, member_identity),
-        _ => return Ok(held),
-    };
-    let registered = match git::registered(&source, &path) {
+    let (source_identity, member_identity) =
+        match (git::at(&source).identity(), git::at(&path).identity()) {
+            (Ok(source_identity), Ok(member_identity)) => (source_identity, member_identity),
+            _ => return Ok(held),
+        };
+    let registered = match git::at(&source).registered(&path) {
         Ok(registered) => registered,
         Err(_) => return Ok(held),
     };
-    let branch = match git::branch(&path) {
+    let branch = match git::at(&path).branch() {
         Ok(branch) => branch,
         Err(_) => return Ok(held),
     };
     if source_identity != member_identity || !registered || branch != expected_branch {
         return Ok(held);
     }
-    match git::clean(&path) {
+    match git::at(&path).clean() {
         Ok(true) => {}
         Ok(false) => {
             fault(
@@ -130,7 +131,7 @@ fn member_preflight(
             return Ok(held);
         }
     }
-    let landing = match git::landing(&path, &source) {
+    let landing = match git::at(&path).landing(&source) {
         Ok(Some(landing)) => landing,
         Ok(None) => {
             fault(

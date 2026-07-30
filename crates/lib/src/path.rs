@@ -24,47 +24,87 @@ pub fn expand(value: &str, base: &Path) -> Result<PathBuf> {
     })
 }
 
-pub fn private_dir(path: &Path) -> Result<()> {
-    std::fs::create_dir_all(path)?;
-    mode(path, 0o700)
+pub struct Managed<'a> {
+    path: &'a Path,
 }
 
-pub fn private_file(path: &Path, text: &str) -> Result<()> {
-    replace(path, text.as_bytes(), 0o600)
+pub fn at(path: &Path) -> Managed<'_> {
+    Managed { path }
 }
 
-pub fn replace(path: &Path, bytes: &[u8], permissions: u32) -> Result<()> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| Error::new("managed file has no parent"))?;
-    private_dir(parent)?;
-    let name = path
-        .file_name()
-        .and_then(|value| value.to_str())
-        .ok_or_else(|| Error::new("managed filename is not utf8"))?;
-    let temporary = parent.join(format!(".{name}.concord-{}", std::process::id()));
-    let result = install(&temporary, path, bytes, permissions);
-    if result.is_err() {
-        let _ = std::fs::remove_file(&temporary);
+impl Managed<'_> {
+    pub fn directory(&self) -> Result<()> {
+        std::fs::create_dir_all(self.path)?;
+        self.mode(0o700)
     }
-    result
-}
 
-pub fn copy_private(source: &Path, target: &Path, permissions: u32) -> Result<()> {
-    let parent = target
-        .parent()
-        .ok_or_else(|| Error::new("managed file has no parent"))?;
-    private_dir(parent)?;
-    let name = target
-        .file_name()
-        .and_then(|value| value.to_str())
-        .ok_or_else(|| Error::new("managed filename is not utf8"))?;
-    let temporary = parent.join(format!(".{name}.concord-{}", std::process::id()));
-    let result = copy_install(source, &temporary, target, permissions);
-    if result.is_err() {
-        let _ = std::fs::remove_file(&temporary);
+    pub fn file(&self, text: &str) -> Result<()> {
+        self.write(text.as_bytes(), 0o600)
     }
-    result
+
+    pub fn write(&self, bytes: &[u8], permissions: u32) -> Result<()> {
+        let parent = self
+            .path
+            .parent()
+            .ok_or_else(|| Error::new("managed file has no parent"))?;
+        at(parent).directory()?;
+        let name = self
+            .path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| Error::new("managed filename is not utf8"))?;
+        let temporary = parent.join(format!(".{name}.concord-{}", std::process::id()));
+        let result = install(&temporary, self.path, bytes, permissions);
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temporary);
+        }
+        result
+    }
+
+    pub fn copy(&self, source: &Path, permissions: u32) -> Result<()> {
+        let parent = self
+            .path
+            .parent()
+            .ok_or_else(|| Error::new("managed file has no parent"))?;
+        at(parent).directory()?;
+        let name = self
+            .path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| Error::new("managed filename is not utf8"))?;
+        let temporary = parent.join(format!(".{name}.concord-{}", std::process::id()));
+        let result = copy_install(source, &temporary, self.path, permissions);
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temporary);
+        }
+        result
+    }
+
+    pub fn mode(&self, wanted: u32) -> Result<()> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(self.path, std::fs::Permissions::from_mode(wanted))?;
+        }
+        #[cfg(not(unix))]
+        let _ = (self.path, wanted);
+        Ok(())
+    }
+
+    pub fn held(&self) -> Result<Option<u32>> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            Ok(Some(
+                std::fs::metadata(self.path)?.permissions().mode() & 0o777,
+            ))
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = self.path;
+            Ok(None)
+        }
+    }
 }
 
 fn install(temporary: &Path, path: &Path, bytes: &[u8], permissions: u32) -> Result<()> {
@@ -74,7 +114,7 @@ fn install(temporary: &Path, path: &Path, bytes: &[u8], permissions: u32) -> Res
         .open(temporary)?;
     file.write_all(bytes)?;
     file.sync_all()?;
-    mode(temporary, permissions)?;
+    at(temporary).mode(permissions)?;
     std::fs::rename(temporary, path)?;
     Ok(())
 }
@@ -87,35 +127,11 @@ fn copy_install(source: &Path, temporary: &Path, target: &Path, permissions: u32
         .open(temporary)?;
     std::io::copy(&mut source, &mut file)?;
     file.sync_all()?;
-    mode(temporary, permissions)?;
+    at(temporary).mode(permissions)?;
     std::fs::rename(temporary, target)?;
     Ok(())
 }
 
 pub fn revision(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
-}
-
-pub fn mode(path: &Path, wanted: u32) -> Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(wanted))?;
-    }
-    #[cfg(not(unix))]
-    let _ = (path, wanted);
-    Ok(())
-}
-
-pub fn held_mode(path: &Path) -> Result<Option<u32>> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        Ok(Some(std::fs::metadata(path)?.permissions().mode() & 0o777))
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = path;
-        Ok(None)
-    }
 }

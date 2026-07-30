@@ -150,6 +150,6 @@ fn inode_headroom(path: &Path, required: u64) -> Result<(Option<u64>, Option<u64
 }
 
 #[cfg(not(unix))]
-fn inode_headroom(_path: &Path, _required: u64) -> Result<(Option<u64>, Option<u64>)> {
+fn inode_headroom(_: &Path, _: u64) -> Result<(Option<u64>, Option<u64>)> {
     Ok((None, None))
 }

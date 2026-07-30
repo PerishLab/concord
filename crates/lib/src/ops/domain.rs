@@ -1,6 +1,6 @@
 use super::{Plan, action};
 use crate::model::component;
-use crate::path::mode;
+use crate::path::at;
 use crate::{Domain, Error, Repo, Result, Space};
 use std::collections::BTreeMap;
 
@@ -66,9 +66,9 @@ impl Space {
         if apply {
             let _lock = self.lock()?;
             let task = self.resolve(identity)?;
-            mode(&task.domain().tasks_path(), 0o700)?;
-            mode(&task.domain().registry_path(), 0o600)?;
-            mode(&task.path(), 0o700)?;
+            at(&task.domain().tasks_path()).mode(0o700)?;
+            at(&task.domain().registry_path()).mode(0o600)?;
+            at(&task.path()).mode(0o700)?;
             crate::Memory::new(&task).normalize()?;
         }
         Ok(Plan::new("permissions.normalize", actions, apply))

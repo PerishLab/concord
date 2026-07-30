@@ -166,8 +166,9 @@ machine-readable output. Use `concord <command> --help` as the complete grammar.
 Managed skill operations are:
 
 ```bash
-concord skill install [--channel stable|beta] [--version <version>]
+concord skill install [--channel stable] [--version <stable>]
 concord skill install --path <agent-skills>/concord
+concord skill stage --channel beta --version <exact> --path <isolated>/concord
 concord skill list
 concord skill status
 concord skill upgrade --dry-run
@@ -175,9 +176,10 @@ concord skill upgrade
 concord skill uninstall
 ```
 
-Install and upgrade only replace paths proven Concord-managed by both the state
-ledger and in-path marker. `--force` applies only to an already managed install.
-Status and upgrade dry-run fetch release metadata but do not download the skill
-artifact or write managed state. Current upgrades are successful no-ops;
-implicit rollback and immutable same-version digest drift refuse, while an
-explicit older `--version` is a deliberate rollback.
+Managed install, status, and upgrade accept stable only and replace paths proven
+Concord-managed by both the state ledger and in-path marker. `--force` applies
+only to an already managed install.
+
+`skill stage` requires an exact non-stable version and a new explicit path
+ending in `concord`. It writes a staged marker without reading or writing the
+managed ledger.

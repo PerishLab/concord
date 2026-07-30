@@ -3,7 +3,7 @@ mod preflight;
 pub(crate) mod resource;
 
 use crate::git;
-use crate::path::held_mode;
+use crate::path::at;
 use crate::{Domain, Result, Space, TaskRef};
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -191,8 +191,8 @@ fn member_audit(audit: &mut Audit, task: &TaskRef, member: &crate::Member) -> Re
             return Ok(());
         }
     };
-    let source_id = git::identity(&source);
-    let member_id = git::identity(&path);
+    let source_id = git::at(&source).identity();
+    let member_id = git::at(&path).identity();
     match (source_id, member_id) {
         (Ok(source_id), Ok(member_id)) if source_id != member_id => {
             audit.fault(
@@ -209,14 +209,14 @@ fn member_audit(audit: &mut Audit, task: &TaskRef, member: &crate::Member) -> Re
         (_, Err(error)) => audit.fault("worktree", &path, error.to_string()),
         _ => {}
     }
-    if source.is_dir() && !git::registered(&source, &path)? {
+    if source.is_dir() && !git::at(&source).registered(&path)? {
         audit.fault(
             "worktree",
             &path,
             "member path is absent from source Git worktree metadata",
         );
     }
-    match git::branch(&path) {
+    match git::at(&path).branch() {
         Ok(branch) => {
             let expected = member.branch(&task.task().name);
             if branch != expected {
@@ -238,7 +238,7 @@ fn permission(audit: &mut Audit, path: &Path, wanted: u32) -> Result<()> {
     if !path.exists() {
         return Ok(());
     }
-    if let Some(held) = held_mode(path)?
+    if let Some(held) = at(path).held()?
         && held != wanted
     {
         audit.fault(

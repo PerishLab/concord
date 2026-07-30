@@ -149,7 +149,7 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
 name = "concord"
-version = "0.5.3"
+version = "0.6.0"
 dependencies = [
  "clap",
  "concord-core",
@@ -162,7 +162,7 @@ dependencies = [
 
 [[package]]
 name = "concord-core"
-version = "0.5.3"
+version = "0.6.0"
 dependencies = [
  "fs2",
  "plumb",
@@ -428,9 +428,9 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "plumb"
-version = "0.13.0"
+version = "0.16.0"
 source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
-checksum = "84a8829ceaf917a5f9eb43a3c80c228047ea3e497c1c57f1168fc111668b4505"
+checksum = "37c8bb94c450c3eb428c6b4528b72338c94793bfcd99dbacbbc840660df79549"
 dependencies = [
  "clap",
  "flate2",
@@ -447,9 +447,9 @@ dependencies = [
 
 [[package]]
 name = "plumb-macro"
-version = "0.13.0"
+version = "0.16.0"
 source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
-checksum = "2200a645ebd50651b7965d3e20920210082b818887acf37a4d3721c126b9c731"
+checksum = "63dc738de715c930059a054724cb5ba36f3246d917e08081061c9bfa5c9f25c0"
 dependencies = [
  "proc-macro2",
  "quote",

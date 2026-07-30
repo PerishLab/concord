@@ -7,6 +7,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: guard-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -16,14 +19,19 @@ jobs:
     runs-on: docker
     container: mirror.perish.lan/ci/deno
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
-      - name: Install Plumb
-        uses: PerishLab/actions/setup-plumb@main
+      - name: Install stable Plumb
+        uses: PerishLab/actions/setup-binary@main
+        env:
+          PERISH_SETUP_PRODUCT: plumb
 
-      - name: Install Ectropy
-        uses: PerishLab/actions/setup-ectropy@main
+      - name: Install stable Ectropy
+        uses: PerishLab/actions/setup-binary@main
+        env:
+          PERISH_SETUP_PRODUCT: ectropy
 
       - name: Guard
         run: |
@@ -50,6 +58,3 @@ jobs:
           cargo fmt --all --check
           cargo clippy --locked --workspace --all-targets -- -D warnings
           cargo test --locked --workspace
-
-      - name: Manager single-option smoke
-        run: pwsh -NoProfile -File manage.ps1 install --help

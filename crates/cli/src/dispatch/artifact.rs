@@ -52,7 +52,14 @@ pub fn memory_command(space: &Space, command: MemoryCommand, json_output: bool) 
                 &memory.main(),
                 format!("expected revision {expect}"),
             );
-            apply_write(plan, &memory, &expect, &content, dry_run, json_output)
+            Mutation {
+                plan,
+                memory: &memory,
+                expect: &expect,
+                dry: dry_run,
+                json: json_output,
+            }
+            .write(&content)
         }
         MemoryCommand::Settle {
             task,
@@ -76,7 +83,14 @@ pub fn memory_command(space: &Space, command: MemoryCommand, json_output: bool) 
             );
             let phase = read(&phase_file)?;
             let main = read(&main_file)?;
-            apply_settle(plan, &memory, &expect, &phase, &main, dry_run, json_output)
+            Mutation {
+                plan,
+                memory: &memory,
+                expect: &expect,
+                dry: dry_run,
+                json: json_output,
+            }
+            .settle(&phase, &main)
         }
         MemoryCommand::Remove { task, apply } => guarded(
             space.memory_remove(&task, false)?,
@@ -87,45 +101,40 @@ pub fn memory_command(space: &Space, command: MemoryCommand, json_output: bool) 
     }
 }
 
-fn apply_write(
-    mut plan: Plan,
-    memory: &Memory<'_>,
-    expect: &str,
-    content: &str,
-    dry_run: bool,
-    json_output: bool,
-) -> Result<()> {
-    if dry_run {
-        return output::mutation(&plan, None, json_output);
-    }
-    let read = memory.write(expect, content)?;
-    plan.applied = true;
-    output::mutation(
-        &plan,
-        Some(json!({"path": read.path, "revision": read.revision})),
-        json_output,
-    )
+struct Mutation<'a, 'b> {
+    plan: Plan,
+    memory: &'a Memory<'b>,
+    expect: &'a str,
+    dry: bool,
+    json: bool,
 }
 
-fn apply_settle(
-    mut plan: Plan,
-    memory: &Memory<'_>,
-    expect: &str,
-    phase: &str,
-    main: &str,
-    dry_run: bool,
-    json_output: bool,
-) -> Result<()> {
-    if dry_run {
-        return output::mutation(&plan, None, json_output);
+impl Mutation<'_, '_> {
+    fn write(mut self, content: &str) -> Result<()> {
+        if self.dry {
+            return output::mutation(&self.plan, None, self.json);
+        }
+        let read = self.memory.write(self.expect, content)?;
+        self.plan.applied = true;
+        output::mutation(
+            &self.plan,
+            Some(json!({"path": read.path, "revision": read.revision})),
+            self.json,
+        )
     }
-    let (read, phase) = memory.settle(expect, phase, main)?;
-    plan.applied = true;
-    output::mutation(
-        &plan,
-        Some(json!({"phase": phase.display().to_string(), "revision": read.revision})),
-        json_output,
-    )
+
+    fn settle(mut self, phase: &str, main: &str) -> Result<()> {
+        if self.dry {
+            return output::mutation(&self.plan, None, self.json);
+        }
+        let (read, phase) = self.memory.settle(self.expect, phase, main)?;
+        self.plan.applied = true;
+        output::mutation(
+            &self.plan,
+            Some(json!({"phase": phase.display().to_string(), "revision": read.revision})),
+            self.json,
+        )
+    }
 }
 
 pub fn resource_command(space: &Space, command: ResourceCommand, json_output: bool) -> Result<()> {

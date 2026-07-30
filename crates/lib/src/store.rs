@@ -1,5 +1,5 @@
 use crate::model::component;
-use crate::path::{expand, mode, private_dir, private_file};
+use crate::path::{at, expand};
 use crate::{Error, Registry, Result, Root, Task};
 use fs2::FileExt;
 use std::fs::File;
@@ -99,7 +99,7 @@ impl Space {
             .create(true)
             .truncate(false)
             .open(&path)?;
-        mode(&path, 0o600)?;
+        at(&path).mode(0o600)?;
         file.lock_exclusive()?;
         Ok(Lock { file })
     }
@@ -197,7 +197,7 @@ impl Domain {
             )));
         }
         let text = toml::to_string_pretty(registry)?;
-        private_file(&path, &text)
+        at(&path).file(&text)
     }
 
     pub(crate) fn bootstrap(&self) -> Result<()> {
@@ -205,11 +205,8 @@ impl Domain {
             return Err(Error::new(format!("domain already managed: {}", self.name)));
         }
         std::fs::create_dir_all(&self.root)?;
-        private_dir(&self.tasks_path())?;
-        private_file(
-            &self.registry_path(),
-            &toml::to_string_pretty(&Registry::empty())?,
-        )
+        at(&self.tasks_path()).directory()?;
+        at(&self.registry_path()).file(&toml::to_string_pretty(&Registry::empty())?)
     }
 }
 

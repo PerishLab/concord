@@ -17,7 +17,7 @@ impl Space {
                 request.source.display()
             ))
         })?;
-        if !git::clean(&source)? {
+        if !git::at(&source).clean()? {
             return Err(Error::new("integration checkout is not clean"));
         }
         let branch = request.branch.unwrap_or(&task.task().name);
@@ -40,7 +40,15 @@ impl Space {
             let task = self.resolve(request.task)?;
             task.ensure_exact()?;
             ensure_branch_absent(&source, branch)?;
-            add_member(&task, request, &source, branch, &path)?;
+            add_member(
+                &task,
+                request,
+                Seat {
+                    source: &source,
+                    branch,
+                    path: &path,
+                },
+            )?;
         }
         Ok(Plan::new("member.add", actions, apply))
     }
@@ -55,11 +63,11 @@ impl Space {
             .find(|member| member.name == name)
             .ok_or_else(|| Error::new(format!("member not found: {name}")))?;
         let path = task.member_path(name);
-        if !git::clean(&path)? {
+        if !git::at(&path).clean()? {
             return Err(Error::new("member has dirty or untracked files"));
         }
         let source = task.source(&member.source)?;
-        if git::landing(&path, &source)?.is_none() {
+        if git::at(&path).landing(&source)?.is_none() {
             return Err(Error::new(
                 "member HEAD is neither reachable nor tree-equivalent to the integration checkout HEAD",
             ));
@@ -83,7 +91,7 @@ impl Space {
 }
 
 fn ensure_branch_absent(source: &Path, branch: &str) -> Result<()> {
-    if git::branch_exists(source, branch)? {
+    if git::at(source).exists(branch)? {
         return Err(Error::new(format!(
             "target branch already exists: {branch}"
         )));
@@ -91,17 +99,17 @@ fn ensure_branch_absent(source: &Path, branch: &str) -> Result<()> {
     Ok(())
 }
 
-fn add_member(
-    task: &TaskRef,
-    request: Add<'_>,
-    source: &Path,
-    branch: &str,
-    path: &Path,
-) -> Result<()> {
-    if path.exists() {
+struct Seat<'a> {
+    source: &'a Path,
+    branch: &'a str,
+    path: &'a Path,
+}
+
+fn add_member(task: &TaskRef, request: Add<'_>, seat: Seat<'_>) -> Result<()> {
+    if seat.path.exists() {
         return Err(Error::new(format!(
             "member path already exists: {}",
-            path.display()
+            seat.path.display()
         )));
     }
     let domain = task.domain();
@@ -118,15 +126,15 @@ fn add_member(
             request.name
         )));
     }
-    git::add(source, path, branch, request.orphan)?;
+    git::at(seat.source).add(seat.path, seat.branch, request.orphan)?;
     held.repo.push(Member {
         name: request.name.to_string(),
-        source: source_text(domain, source),
-        branch: (branch != task.task().name).then(|| branch.to_string()),
+        source: source_text(domain, seat.source),
+        branch: (seat.branch != task.task().name).then(|| seat.branch.to_string()),
         extra: BTreeMap::new(),
     });
     if let Err(error) = domain.write(&snapshot.raw, &snapshot.registry) {
-        let _ = git::remove(source, path);
+        let _ = git::at(seat.source).remove(seat.path);
         return Err(error);
     }
     Ok(())
@@ -147,7 +155,7 @@ fn remove_member(task: &TaskRef, name: &str, source: &Path, path: &Path) -> Resu
         .position(|member| member.name == name)
         .ok_or_else(|| Error::new("member disappeared during removal"))?;
     held.repo.remove(index);
-    git::remove(source, path)?;
+    git::at(source).remove(path)?;
     if let Err(error) = domain.write(&snapshot.raw, &snapshot.registry) {
         return Err(Error::new(format!(
             "{error}; worktree is removed but registry still declares it"
