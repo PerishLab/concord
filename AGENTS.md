@@ -33,6 +33,10 @@ authorship is never protocol truth.
 - `crates/cli` contains clap grammar and output dispatch only.
 - Dependency direction is `cli -> lib`. Operator glue lives in `.runseal`;
   product behavior does not.
+- Concord owns one process-cycle readonly observation seat. The CLI binds its
+  explicit config, reporter, trace identity, and context; kernel functions may
+  only read that seat and append function facts through Locus. A missing seat
+  is the default muted state.
 
 ## Operating
 

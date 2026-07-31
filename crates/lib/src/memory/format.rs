@@ -103,6 +103,7 @@ pub fn project(current: &str, revision: &str, keys: &[String]) -> Result<String>
     Ok(projected)
 }
 
+#[locus::trace(with = crate::observation::view())]
 pub fn parse_patch(patch_source: &str) -> Result<Patch> {
     limits(patch_source, "memory patch", MAX_MAIN_BYTES, MAX_MAIN_LINES)?;
     strict_text(patch_source, "memory patch")?;
@@ -150,6 +151,7 @@ pub fn parse_patch(patch_source: &str) -> Result<Patch> {
     })
 }
 
+#[locus::trace(with = crate::observation::view())]
 pub fn apply_patch(current: &str, patch_content: &str, patch: &Patch) -> Result<String> {
     let parsed = validate_main(current)?.ok_or_else(|| {
         Error::typed(

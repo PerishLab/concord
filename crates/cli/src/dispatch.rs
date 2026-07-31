@@ -1,12 +1,14 @@
 mod artifact;
 mod input;
 mod mutation;
+mod resource;
 
 use crate::args::{
     AuditArgs, Cli, Command, ConfigCommand, DomainCommand, MemberCommand, PermissionCommand,
     RepoCommand, TaskCommand,
 };
 use crate::config::Config;
+use crate::observation;
 use crate::output;
 use crate::skill;
 use concord_core::{Add, Result, Space};
@@ -75,10 +77,11 @@ impl Dispatch {
             Command::Task(task) => self.task(task.command),
             Command::Member(member) => self.member(member.command),
             Command::Memory(memory) => {
+                observation::start();
                 artifact::memory_command(&self.space, memory.command, self.json)
             }
             Command::Resource(resource) => {
-                artifact::resource_command(&self.space, resource.command, self.json)
+                resource::command(&self.space, resource.command, self.json)
             }
             Command::Permissions(permission) => self.permission(permission.command),
             Command::Audit(audit) => self.audit(audit),

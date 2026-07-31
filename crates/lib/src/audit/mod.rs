@@ -135,10 +135,12 @@ impl TaskRef {
         self.audit_with_resources(Some(&resource::host()))
     }
 
+    #[locus::trace(with = crate::observation::view())]
     pub(crate) fn agreement(&self) -> Result<Audit> {
         self.audit_with_resources(None)
     }
 
+    #[locus::trace(with = crate::observation::view())]
     fn audit_with_resources(&self, host: Option<&Observation<HostMemory>>) -> Result<Audit> {
         let mut audit = Audit {
             target: self.identity(),
@@ -183,6 +185,7 @@ impl TaskRef {
         Ok(audit)
     }
 
+    #[locus::trace(with = crate::observation::view())]
     pub(crate) fn ensure_exact(&self) -> Result<()> {
         let audit = self.agreement()?;
         if audit.agrees() {
@@ -197,6 +200,7 @@ impl TaskRef {
     }
 }
 
+#[locus::trace(with = crate::observation::view())]
 fn member_audit(audit: &mut Audit, task: &TaskRef, member: &crate::Member) -> Result<()> {
     let path = task.member_path(&member.name);
     if !path.is_dir() {
@@ -211,15 +215,15 @@ fn member_audit(audit: &mut Audit, task: &TaskRef, member: &crate::Member) -> Re
         }
     };
     let source_id = git::at(&source).identity();
-    let member_id = git::at(&path).identity();
-    match (source_id, member_id) {
-        (Ok(source_id), Ok(member_id)) if source_id != member_id => {
+    let seat = git::at(&path).seat();
+    match (&source_id, &seat) {
+        (Ok(source_id), Ok(seat)) if source_id != &seat.identity => {
             audit.fault(
                 "identity",
                 &path,
                 format!(
                     "member Git identity {} differs from source {}",
-                    member_id.display(),
+                    seat.identity.display(),
                     source_id.display()
                 ),
             );
@@ -235,14 +239,17 @@ fn member_audit(audit: &mut Audit, task: &TaskRef, member: &crate::Member) -> Re
             "member path is absent from source Git worktree metadata",
         );
     }
-    match git::at(&path).branch() {
-        Ok(branch) => {
+    match seat {
+        Ok(seat) => {
             let expected = member.branch(&task.task().name);
-            if branch != expected {
+            if seat.branch != expected {
                 audit.fault(
                     "branch",
                     &path,
-                    format!("member branch {branch} differs from registry {expected}"),
+                    format!(
+                        "member branch {} differs from registry {expected}",
+                        seat.branch
+                    ),
                 );
             }
         }

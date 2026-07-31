@@ -235,6 +235,7 @@ impl TaskRef {
         format!("{}/{}", self.domain.name, self.task.name)
     }
 
+    #[locus::trace(with = crate::observation::view())]
     pub(crate) fn lock(&self) -> Result<Lock> {
         let space = self
             .domain

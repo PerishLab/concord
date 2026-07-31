@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/cli", "crates/lib"]
 
 [workspace.package]
-version = "0.7.0"
+version = "0.7.1"
 edition = "2024"
 license = "MIT"
 repository = "https://git.perish.top/PerishFire/concord"
@@ -12,6 +12,7 @@ repository = "https://git.perish.top/PerishFire/concord"
 clap = { version = "4.5", features = ["derive"] }
 fs2 = "0.4"
 flate2 = "1"
+locus = { version = "0", registry = "perish" }
 plumb = { version = "0", registry = "perish", features = ["skill"] }
 pulldown-cmark = "0.13"
 serde = { version = "1.0", features = ["derive"] }

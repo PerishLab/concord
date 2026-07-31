@@ -57,6 +57,7 @@ impl<'a> Memory<'a> {
         result
     }
 
+    #[locus::trace(with = crate::observation::view())]
     pub fn read(&self) -> Result<MemoryRead> {
         read(&self.main())
     }
@@ -101,6 +102,7 @@ impl<'a> Memory<'a> {
         Ok(change(self.read()?, true))
     }
 
+    #[locus::trace(with = crate::observation::view())]
     pub fn patch(&self, expected: Option<&str>, content: &str) -> Result<MemoryChange> {
         let patch = format::parse_patch(content)?;
         if let Some(expected) = expected

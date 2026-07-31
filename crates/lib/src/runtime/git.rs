@@ -19,11 +19,17 @@ pub struct Checkout<'a> {
     root: &'a Path,
 }
 
+pub struct Seat {
+    pub identity: PathBuf,
+    pub branch: String,
+}
+
 pub fn at(root: &Path) -> Checkout<'_> {
     Checkout { root }
 }
 
 impl Checkout<'_> {
+    #[locus::trace(with = crate::observation::view())]
     pub fn text(&self, args: &[&str]) -> Result<String> {
         let root = git_path(self.root);
         let output = command()
@@ -46,11 +52,38 @@ impl Checkout<'_> {
         self.text(args).map(|_| ())
     }
 
+    #[locus::trace(with = crate::observation::view())]
     pub fn identity(&self) -> Result<PathBuf> {
         let path = self.text(&["rev-parse", "--path-format=absolute", "--git-common-dir"])?;
         PathBuf::from(path).canonicalize().map_err(Into::into)
     }
 
+    #[locus::trace(with = crate::observation::view())]
+    pub fn seat(&self) -> Result<Seat> {
+        let text = self.text(&[
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-common-dir",
+            "--abbrev-ref",
+            "HEAD",
+        ])?;
+        let mut lines = text.lines();
+        let identity = lines
+            .next()
+            .ok_or_else(|| Error::new("git seat is missing common directory"))?;
+        let branch = lines
+            .next()
+            .ok_or_else(|| Error::new("git seat is missing branch"))?;
+        if lines.next().is_some() {
+            return Err(Error::new("git seat produced unexpected output"));
+        }
+        Ok(Seat {
+            identity: PathBuf::from(identity).canonicalize()?,
+            branch: branch.into(),
+        })
+    }
+
+    #[locus::trace(with = crate::observation::view())]
     pub fn branch(&self) -> Result<String> {
         self.text(&["symbolic-ref", "--short", "HEAD"])
     }
@@ -106,6 +139,7 @@ impl Checkout<'_> {
         }))
     }
 
+    #[locus::trace(with = crate::observation::view())]
     pub fn registered(&self, member: &Path) -> Result<bool> {
         let wanted = member.canonicalize()?;
         let list = self.text(&["worktree", "list", "--porcelain"])?;

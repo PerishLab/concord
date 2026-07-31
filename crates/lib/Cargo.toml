@@ -9,6 +9,7 @@ publish = false
 
 [dependencies]
 fs2.workspace = true
+locus.workspace = true
 plumb.workspace = true
 pulldown-cmark.workspace = true
 serde.workspace = true

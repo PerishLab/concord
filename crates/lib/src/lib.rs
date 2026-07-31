@@ -6,6 +6,8 @@ mod error;
 mod git;
 mod memory;
 mod model;
+#[path = "runtime/observation.rs"]
+pub mod observation;
 mod ops;
 mod path;
 mod store;

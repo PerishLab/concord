@@ -1,6 +1,7 @@
 mod args;
 mod config;
 mod dispatch;
+mod observation;
 mod output;
 mod skill;
 

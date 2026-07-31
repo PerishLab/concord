@@ -19,6 +19,7 @@ enum Source {
 }
 
 impl Input {
+    #[locus::trace(with = concord_core::observation::view())]
     pub fn load(path: &Path, limit: usize, managed_root: &Path) -> Result<Self> {
         if is_stdin(path) {
             let bytes = bounded(std::io::stdin().lock(), limit, "stdin")?;

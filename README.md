@@ -22,6 +22,23 @@ environment, then arguments.
 `CONCORD_HOME` or `--home` selects user state. Concord does not assume
 `~/Projects`, and skill commands do not require task-domain configuration.
 
+Function observation is a separate, environment-only control section:
+
+```text
+CONCORD_LOCUS_ENABLED=false
+CONCORD_LOCUS_REPORT_FILE=
+CONCORD_LOCUS_TRACE_FILE=
+CONCORD_LOCUS_TRACE_ID=
+```
+
+The gate defaults to false and returns before Locus bootstrap. Enabling it
+requires a report file. An optional trace file shares one generated identity
+across processes; an explicit trace ID wins over generation. Invalid
+observation config is handed to stderr after the fact and never replaces the
+command result. The cold-start surface currently covers only `memory`
+operations and records function entry plus normal return; other commands do
+not bootstrap observation.
+
 Common operations are explicit and composable:
 
 ```text
