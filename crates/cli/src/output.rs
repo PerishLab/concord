@@ -120,6 +120,13 @@ fn human_preflight(preflight: &Preflight) {
         println!("    path: {}", member.path);
         println!("    source: {}", member.source);
         println!("    expected branch: {}", member.expected_branch);
+        println!("    write: {}", member.write.join(", "));
+        if let Some(boundary) = &member.boundary {
+            println!(
+                "    boundary: {} {} {}",
+                boundary.schema, boundary.plumb, boundary.head
+            );
+        }
         if let Some(proof) = &member.proof {
             println!(
                 "    identity: {} = {}",

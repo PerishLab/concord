@@ -163,6 +163,7 @@ fn rehome_repairs_worktrees_and_makes_cross_domain_sources_explicit() {
                 source: &source,
                 branch: None,
                 orphan: false,
+                write: &[".".to_string()],
             },
             true,
         )
@@ -194,6 +195,7 @@ fn rename_preserves_the_member_branch_and_audit_reports_missing_seats() {
                 source: &source,
                 branch: None,
                 orphan: false,
+                write: &[".".to_string()],
             },
             true,
         )
@@ -237,6 +239,7 @@ fn failed_member_add_rolls_back_the_created_branch() {
                 source: &source,
                 branch: None,
                 orphan: false,
+                write: &[".".to_string()],
             },
             true,
         )

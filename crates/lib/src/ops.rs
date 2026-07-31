@@ -26,6 +26,14 @@ pub struct Add<'a> {
     pub source: &'a Path,
     pub branch: Option<&'a str>,
     pub orphan: bool,
+    pub write: &'a [String],
+}
+
+#[derive(Clone, Debug)]
+pub struct MigrationClaim {
+    pub task: String,
+    pub member: String,
+    pub write: String,
 }
 
 impl Plan {

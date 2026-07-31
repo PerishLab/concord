@@ -1,5 +1,5 @@
 use crate::git;
-use crate::{Result, TaskRef};
+use crate::{BoundaryProof, Result, TaskRef};
 use serde::Serialize;
 use std::path::Path;
 
@@ -18,6 +18,9 @@ pub struct MemberPreflight {
     pub path: String,
     pub source: String,
     pub expected_branch: String,
+    pub write: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub boundary: Option<BoundaryProof>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<MemberProof>,
 }
@@ -63,15 +66,19 @@ impl Preflight {
 impl TaskRef {
     pub fn preflight(&self) -> Result<Preflight> {
         let audit = self.agreement()?;
+        let required = self.domain().registry()?.version == 2;
         let mut preflight = Preflight {
             target: audit.target,
             members: Vec::new(),
             faults: audit.faults,
         };
         for member in &self.task().repo {
-            preflight
-                .members
-                .push(member_preflight(&mut preflight.faults, self, member)?);
+            preflight.members.push(member_preflight(
+                &mut preflight.faults,
+                self,
+                member,
+                required,
+            )?);
         }
         Ok(preflight)
     }
@@ -81,6 +88,7 @@ fn member_preflight(
     faults: &mut Vec<Fault>,
     task: &TaskRef,
     member: &crate::Member,
+    required: bool,
 ) -> Result<MemberPreflight> {
     let path = task.member_path(&member.name);
     let expected_branch = member.branch(&task.task().name).to_string();
@@ -89,6 +97,8 @@ fn member_preflight(
         path: path.display().to_string(),
         source: member.source.clone(),
         expected_branch: expected_branch.clone(),
+        write: member.write.clone(),
+        boundary: member.boundary.clone(),
         proof: None,
     };
     if !path.is_dir() {
@@ -129,6 +139,21 @@ fn member_preflight(
         Err(error) => {
             fault(faults, "worktree", &path, error.to_string());
             return Ok(held);
+        }
+    }
+    if required {
+        let head = git::at(&path).head()?;
+        if !member
+            .boundary
+            .as_ref()
+            .is_some_and(|proof| crate::boundary::valid(proof, &member.write, &head))
+        {
+            fault(
+                faults,
+                "boundary",
+                &path,
+                "member has no valid boundary proof for its current HEAD and write claim",
+            );
         }
     }
     let landing = match git::at(&path).landing(&source) {

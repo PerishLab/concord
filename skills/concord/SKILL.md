@@ -23,6 +23,9 @@ Before any stateful task operation, read
 [references/protocol.md](references/protocol.md) completely. For pure command
 discovery, prefer `concord <command> --help`.
 
+Before adding, claiming, proving, migrating, or removing a repository member,
+also read [references/claims-v2.md](references/claims-v2.md) completely.
+
 Before initializing, projecting, patching, settling, or diagnosing structured
 memory, also read
 [references/memory-v1.md](references/memory-v1.md) completely. Do not load that
@@ -66,9 +69,11 @@ building or operating a repository rather than restating its clauses here.
    long-running; settle completed history into the next phase. Prefer stdin for
    generated memory mutation input. Explicit files are consumed after success
    unless `--keep-file` or `--keep-files` is intentional.
-6. Land through the repository's own process, verify reachability and
-   cleanliness, then remove only the landed member seat. Finish a repo-less task
-   only after retained state is absent or its exact deletion is authorized.
+6. Before landing, record `concord member boundary` for the clean committed
+   member. Land through the repository's own process, verify reachability,
+   cleanliness, and the still-current proof, then remove only the landed member
+   seat. Finish a repo-less task only after retained state is absent or its
+   exact deletion is authorized.
 
 When durable memory is first needed, initialize the v1 envelope from
 `references/memory-v1.md` through `--file -` by default.
@@ -77,9 +82,10 @@ When durable memory is first needed, initialize the v1 envelope from
 
 - One task has one fixed home domain, zero or more repository members, and at
   most one task-level `.task/`. A repo-less task is valid.
-- Mutable ownership attaches to one branch in one worktree. One canonical
-  source may back several task members concurrently when their worktree paths
-  and mutable branches are distinct.
+- Mutable ownership attaches to declared path prefixes in one branch and
+  worktree. One canonical Git identity may back several active task members
+  only when their worktree paths, branches, and component-prefix claims are
+  distinct.
 - Ordinary mutation requires agreement among the registry entry, member path,
   canonical source identity, and Git worktree metadata.
 - Integration checkouts are clean landed-state mirrors. Never branch, commit,
@@ -91,6 +97,9 @@ When durable memory is first needed, initialize the v1 envelope from
   flag.
 - Registry and memory writes lock, re-read, compare, and atomically replace.
   Memory writes require the expected whole-file revision.
+- Member claims are normalized, nonempty, UTF-8 repo-relative prefixes. `.` is
+  the only whole-repository spelling. Claim expansion is union-only and clears
+  a prior boundary proof.
 - Versioned memory envelopes and fixed top-level section boundaries belong to
   Concord. Section bodies remain opaque Markdown. Sparse patches carry the
   expected whole-file revision and preserve untouched source bytes.
@@ -122,7 +131,14 @@ Concord currently enforces:
   of Concord's own storage and repaired by `permissions normalize`, but never
   gating the mutation that would clear them;
 - clean source checkout and an absent target branch before member creation;
+- explicit write claims on version 2 members, with cross-task overlap refusal
+  by canonical Git common-directory identity under the domain-space lock;
+- explicit all-member migration from registry version 1 to version 2, while
+  retaining version 1 audit, landing, and cleanup;
+- Plumb-backed committed-delta boundary proofs bound to exact base, member
+  HEAD, normalized claim digest, proof schema, and resolved Plumb version;
 - clean and reachable or tree-equivalent member state before landed removal;
+- a still-current boundary proof before version 2 landed removal;
 - locking, registry compare-before-replace, and memory revision CAS;
 - bounded stdin or regular-file memory input, default post-success file
   consumption, explicit retention, and typed cleanup-after-apply errors;
@@ -146,8 +162,7 @@ The following remain agent-held law; no machine will stop every violation:
 - recognizing foreign territory and declining adoption;
 - choosing the correct home domain and repository integration/landing
   conventions;
-- coordinating semantic overlap and landing order among concurrent task
-  branches;
+- coordinating semantics and landing order among disjoint concurrent claims;
 - discovering repository-local instructions before acting;
 - deciding whether work needs a task or durable memory;
 - proving dirty or untracked member payload is durably preserved before land;
@@ -166,7 +181,9 @@ concord config show
 concord domain list
 concord task start <domain>/<task>
 concord task show <domain>/<task>
-concord member add <domain>/<task> --source <integration-checkout>
+concord member add <domain>/<task> --source <integration-checkout> --write <path>
+concord member claim <domain>/<task> <member> --write <path>
+concord member boundary <domain>/<task> <member>
 concord audit <domain>/<task>
 concord member preflight <domain>/<task>
 concord member remove-landed <domain>/<task> <member> --apply
@@ -181,6 +198,7 @@ concord memory phase read <domain>/<task> 0
 concord resource import <domain>/<task> <name> --source <path>
 concord permissions normalize <domain>/<task> --apply
 concord task finish <domain>/<task> --apply
+concord domain migrate <domain> --claim <task>/<member>=<path> --apply
 ```
 
 Use `--dry-run` on creation to print only the plan. Use global `--json` for

@@ -1,5 +1,7 @@
 mod artifact;
+mod configuration;
 mod input;
+mod migration;
 mod mutation;
 mod resource;
 
@@ -35,7 +37,7 @@ pub fn run(cli: Cli) -> Result<()> {
     let command = match cli.command {
         Command::Skill(skill) => return skill::run(&config, skill.command, cli.json),
         Command::Config(config_command) => {
-            return configure(&config, config_command.command, cli.json);
+            return configuration::run(&config, config_command.command, cli.json);
         }
         command => command,
     };
@@ -44,23 +46,6 @@ pub fn run(cli: Cli) -> Result<()> {
         json: cli.json,
     }
     .run(command)
-}
-
-fn configure(config: &Config, command: ConfigCommand, json_output: bool) -> Result<()> {
-    match command {
-        ConfigCommand::Path => unreachable!("config path exits before loading the space"),
-        ConfigCommand::Show => {
-            output::value(
-                json!({
-                    "domain_space_root": config.domain_space_root.display().to_string(),
-                    "home": config.home.display().to_string(),
-                    "releases": config.releases,
-                }),
-                json_output,
-            );
-            Ok(())
-        }
-    }
 }
 
 struct Dispatch {
@@ -106,6 +91,19 @@ impl Dispatch {
                 self.json,
                 || self.space.domain_init(&name, true),
             ),
+            DomainCommand::Migrate {
+                domain,
+                claim,
+                apply,
+            } => {
+                let claims = migration::claims(&claim)?;
+                guarded(
+                    self.space.domain_migrate(&domain, &claims, false)?,
+                    apply,
+                    self.json,
+                    || self.space.domain_migrate(&domain, &claims, true),
+                )
+            }
         }
     }
 
@@ -205,6 +203,7 @@ impl Dispatch {
                 name,
                 branch,
                 orphan,
+                write,
                 dry_run,
             } => {
                 let name = match name {
@@ -221,6 +220,7 @@ impl Dispatch {
                     source: &source,
                     branch: branch.as_deref(),
                     orphan,
+                    write: &write,
                 };
                 create(
                     self.space.member_add(request(), false)?,
@@ -231,6 +231,25 @@ impl Dispatch {
             }
             MemberCommand::Preflight { task } => {
                 output::preflight(&self.space.resolve(&task)?.preflight()?, self.json)
+            }
+            MemberCommand::Claim {
+                task,
+                name,
+                write,
+                dry_run,
+            } => create(
+                self.space.member_claim(&task, &name, &write, false)?,
+                dry_run,
+                self.json,
+                || self.space.member_claim(&task, &name, &write, true),
+            ),
+            MemberCommand::Boundary { task, name } => {
+                let value = serde_json::to_value(self.space.member_boundary(&task, &name)?)
+                    .map_err(|error| {
+                        concord_core::Error::new(format!("cannot encode boundary proof: {error}"))
+                    })?;
+                output::value(value, self.json);
+                Ok(())
             }
             MemberCommand::RemoveLanded { task, name, apply } => guarded(
                 self.space.member_remove(&task, &name, false)?,

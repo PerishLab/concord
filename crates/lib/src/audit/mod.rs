@@ -1,3 +1,5 @@
+mod claim;
+mod member;
 mod memory;
 mod preflight;
 pub(crate) mod resource;
@@ -85,6 +87,7 @@ impl Space {
         for domain in self.domains()? {
             merge(&mut audit, domain.audit_with_resources(host)?);
         }
+        claim::conflicts(self, &mut audit)?;
         Ok(audit)
     }
 }
@@ -160,8 +163,9 @@ impl TaskRef {
             .iter()
             .map(|member| member.name.as_str())
             .collect::<BTreeSet<_>>();
+        let version = self.domain().registry()?.version;
         for member in &self.task().repo {
-            member_audit(&mut audit, self, member)?;
+            member::member_audit(&mut audit, self, member, version)?;
         }
         for entry in std::fs::read_dir(&root)? {
             let entry = entry?;
@@ -198,66 +202,6 @@ impl TaskRef {
             )))
         }
     }
-}
-
-#[locus::trace(with = crate::observation::view())]
-fn member_audit(audit: &mut Audit, task: &TaskRef, member: &crate::Member) -> Result<()> {
-    let path = task.member_path(&member.name);
-    if !path.is_dir() {
-        audit.fault("presence", &path, "declared member path is missing");
-        return Ok(());
-    }
-    let source = match task.source(&member.source) {
-        Ok(source) => source,
-        Err(error) => {
-            audit.fault("source", &path, error.to_string());
-            return Ok(());
-        }
-    };
-    let source_id = git::at(&source).identity();
-    let seat = git::at(&path).seat();
-    match (&source_id, &seat) {
-        (Ok(source_id), Ok(seat)) if source_id != &seat.identity => {
-            audit.fault(
-                "identity",
-                &path,
-                format!(
-                    "member Git identity {} differs from source {}",
-                    seat.identity.display(),
-                    source_id.display()
-                ),
-            );
-        }
-        (Err(error), _) => audit.fault("source", &source, error.to_string()),
-        (_, Err(error)) => audit.fault("worktree", &path, error.to_string()),
-        _ => {}
-    }
-    if source.is_dir() && !git::at(&source).registered(&path)? {
-        audit.fault(
-            "worktree",
-            &path,
-            "member path is absent from source Git worktree metadata",
-        );
-    }
-    match seat {
-        Ok(seat) => {
-            let expected = member.branch(&task.task().name);
-            if seat.branch != expected {
-                audit.fault(
-                    "branch",
-                    &path,
-                    format!(
-                        "member branch {} differs from registry {expected}",
-                        seat.branch
-                    ),
-                );
-            }
-        }
-        Err(error) => {
-            audit.fault("branch", &path, error.to_string());
-        }
-    }
-    Ok(())
 }
 
 fn permission(audit: &mut Audit, path: &Path, wanted: u32) -> Result<()> {

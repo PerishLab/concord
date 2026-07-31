@@ -77,6 +77,14 @@ pub enum DomainCommand {
         #[arg(long)]
         dry_run: bool,
     },
+    #[command(about = "Migrate a version 1 registry with explicit member claims")]
+    Migrate {
+        domain: String,
+        #[arg(long)]
+        claim: Vec<String>,
+        #[arg(long)]
+        apply: bool,
+    },
 }
 
 #[derive(Args)]
@@ -160,11 +168,24 @@ pub enum MemberCommand {
         branch: Option<String>,
         #[arg(long)]
         orphan: bool,
+        #[arg(long, required = true, num_args = 1..)]
+        write: Vec<String>,
         #[arg(long)]
         dry_run: bool,
     },
     #[command(about = "Prove cleanliness and landed reachability")]
     Preflight { task: String },
+    #[command(about = "Expand a member write claim")]
+    Claim {
+        task: String,
+        name: String,
+        #[arg(long, required = true, num_args = 1..)]
+        write: Vec<String>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    #[command(about = "Prove committed changes stay inside a member write claim")]
+    Boundary { task: String, name: String },
     #[command(about = "Remove a clean, reachable landed worktree")]
     RemoveLanded {
         task: String,

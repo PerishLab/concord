@@ -61,10 +61,23 @@ fn preflight_prints_replayable_member_proof_and_keeps_faults_explicit() {
                 source: &source,
                 branch: None,
                 orphan: false,
+                write: &[".".to_string()],
             },
             true,
         )
         .expect("add member");
+    let boundary = run(
+        fixture.path(),
+        &["--json", "member", "boundary", "local/proof", "repo"],
+    );
+    assert!(
+        boundary.status.success(),
+        "{}",
+        String::from_utf8_lossy(&boundary.stderr)
+    );
+    let boundary: Value = serde_json::from_slice(&boundary.stdout).expect("boundary json");
+    assert_eq!(boundary["proof"]["plumb"], "v0.18.9");
+    assert_eq!(boundary["proof"]["schema"], "plumb.precommit/v1");
 
     let output = run(
         fixture.path(),

@@ -1,5 +1,5 @@
-use crate::model::component;
 use crate::path::{at, expand};
+use crate::protocol::model::component;
 use crate::{Error, Registry, Result, Root, Task};
 use fs2::FileExt;
 use std::fs::File;

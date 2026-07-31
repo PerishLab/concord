@@ -6,6 +6,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
+build = "src/runtime/build.rs"
 
 [dependencies]
 fs2.workspace = true
@@ -23,3 +24,6 @@ rustix.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[build-dependencies]
+toml.workspace = true

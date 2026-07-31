@@ -1,6 +1,8 @@
+mod migration;
+
 use super::{Plan, action};
-use crate::model::component;
 use crate::path::at;
+use crate::protocol::model::component;
 use crate::{Domain, Error, Repo, Result, Space};
 use std::collections::BTreeMap;
 
@@ -9,7 +11,7 @@ impl Space {
         let domain = Domain::new(self.path(), name)?;
         let actions = vec![
             action("create", &domain.tasks_path(), "private task registry seat"),
-            action("write", &domain.registry_path(), "version 1 empty registry"),
+            action("write", &domain.registry_path(), "version 2 empty registry"),
         ];
         if apply {
             let _lock = self.lock()?;

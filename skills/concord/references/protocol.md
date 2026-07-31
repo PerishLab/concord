@@ -56,27 +56,9 @@ A domain is a directory of sibling clean integration checkouts:
 content. On POSIX, managed directories are `0700`; registry and Markdown memory
 are `0600`. Private executable resource payload may be `0700`.
 
-Registry version 1 is:
-
-```toml
-version = 1
-
-[[task]]
-name = "ship-feature"
-
-[[task.repo]]
-name = "repo-a"
-source = "../repo-a"
-
-[[task.repo]]
-name = "repo-b"
-source = "~/Projects/another-domain/repo-b"
-branch = "legacy/slashed-branch"
-
-[[repo]]
-name = "repo-a"
-note = "optional annotation"
-```
+Registry version 2 and its member write-claim grammar are defined in
+[claims-v2.md](claims-v2.md). Read it before adding, claiming, proving,
+migrating, or removing a repository member.
 
 Rules:
 
@@ -86,23 +68,26 @@ Rules:
 - Relative sources resolve from `.tasks/`. A leading `~` means the current
   user's home. Cross-domain sources should be explicit.
 - The branch defaults to the task name. Record `branch` only when different.
+- Every version 2 member declares a normalized nonempty write claim.
 - Top-level `[[repo]]` entries are annotations, not task members.
-- Mutable ownership attaches to one branch in one worktree. A canonical
-  repository may join several tasks concurrently when every member has a
-  distinct worktree path and mutable branch. One mutable branch has at most one
-  owner.
+- Mutable ownership attaches to claimed paths in one branch and worktree. A
+  canonical Git common-directory identity may join several tasks concurrently
+  only when every member has a distinct worktree, branch, and non-overlapping
+  component-prefix claim. One mutable branch and one mutable path have at most
+  one active owner.
 - Task rename changes the task root and registry identity together. Preserve
   member branch names through overrides unless repository policy separately
   authorizes branch rename.
 
 ## Agreement and identity
 
-For every declared member, ordinary mutation requires four surfaces to agree:
+For every declared member, ordinary mutation requires five surfaces to agree:
 
 1. its registry entry;
 2. its path and presence under the task root;
 3. canonical identity of the source repository;
-4. Git worktree metadata, including the expected branch.
+4. Git worktree metadata, including the expected branch;
+5. its write claim and every active claim for the same canonical Git identity.
 
 A missing declared member or undeclared Git worktree under the root is a
 protocol violation. `.task/` and intentional non-repository artifacts are not
@@ -143,15 +128,15 @@ read-only work without retained artifacts, and transient scratch work need no
 task. Parallel lines touching one repository use separate tasks, branches, and
 worktrees.
 
-For example, these members may coexist:
+For example, these members may coexist when their claims are disjoint:
 
 ```text
-task-a/repo-a -> source repo-a, branch task-a
-task-b/repo-a -> source repo-a, branch task-b
+task-a/repo-a -> source repo-a, branch task-a, write crates/a
+task-b/repo-a -> source repo-a, branch task-b, write crates/b
 ```
 
-Each task owns its branch and worktree seat. Semantic overlap and landing order
-remain ordinary coordination between the branches.
+Each task owns its branch, worktree seat, and declared path prefix. Semantic
+coordination inside disjoint claims and landing order remain branch concerns.
 
 Start creates one coherent registry entry and private root, then the first
 member if needed. Add `.task/` only under the memory rule below.
@@ -193,7 +178,7 @@ inference, or automatic cleanup. An unavailable observation is explicit
 
 ### Resume
 
-Re-enter the task root, load current memory, and reapply four-surface agreement.
+Re-enter the task root, load current memory, and reapply five-surface agreement.
 Block mutation on any mismatch until explicitly resolved.
 
 ### Add a repository
@@ -201,18 +186,30 @@ Block mutation on any mismatch until explicitly resolved.
 Use `concord member add` with the canonical integration checkout. Keep
 cross-domain members under the existing home task root. The source checkout
 must be clean. Resolve the mutable branch from the task name or recorded
-override, then add the member when its worktree path and branch are distinct.
+override, submit the minimum `--write` prefixes, then add the member only when
+its worktree path, branch, and claim are available. Expand an existing claim
+through `concord member claim`; expansion is union-only, rechecks conflicts
+under the global domain-space lock, and invalidates any prior boundary proof.
 
 ### Land a repository
 
-1. Run the repository's own pre-land verification and landing process.
-2. Before removing the member, verify every dirty or untracked file is durably
+1. Run the repository's own pre-land verification.
+2. While the member HEAD and clean integration checkout still describe the
+   delivery edge, run `concord member boundary <task> <member>`. Concord
+   computes their merge-base and asks the stable Plumb library to prove every
+   committed changed path lies within the member claim. The registry records
+   the exact base, member HEAD, claim digest, Plumb proof schema, and resolved
+   Plumb version.
+3. Run the repository's landing process.
+4. Before removing the member, verify every dirty or untracked file is durably
    preserved or intentionally discarded with explicit authorization.
-3. Verify each relevant commit remains reachable through landing, or that the
+5. Verify each relevant commit remains reachable through landing, or that the
    landed integration tree is equivalent.
-4. Update the clean integration checkout through the repository's process.
-5. Run `concord member preflight`.
-6. Remove only that landed member with
+6. Update the clean integration checkout through the repository's process.
+7. Run `concord member preflight`. The persisted boundary proof must still
+   match the current member HEAD, normalized claim digest, Plumb schema, and
+   resolved Plumb version.
+8. Remove only that landed member with
    `concord member remove-landed ... --apply`.
 
 If unique state remains, stop and report it. Never silently move member payload
@@ -285,6 +282,10 @@ Default toward deleting memory at task completion, but only with exact consent.
 Rehoming, renaming, adopting legacy state, and repairing mismatched state are
 explicit migrations requiring authorization. Never migrate merely because a
 layout differs.
+
+Registry version 1 remains readable for audit, landing, and cleanup, but cannot
+add or expand members. Its explicit all-member migration and version 2 failure
+semantics are defined in [claims-v2.md](claims-v2.md).
 
 Before destructive legacy cleanup, verify:
 

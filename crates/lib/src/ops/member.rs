@@ -1,7 +1,7 @@
 use super::{Add, Plan, action};
 use crate::git;
 use crate::model::component;
-use crate::{Domain, Error, Member, Result, Space, TaskRef};
+use crate::{Domain, Error, Member, Result, Space, TaskRef, claim};
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -9,6 +9,12 @@ impl Space {
     pub fn member_add(&self, request: Add<'_>, apply: bool) -> Result<Plan> {
         component("member name", request.name)?;
         let task = self.resolve(request.task)?;
+        write::version(&task)?;
+        if request.orphan {
+            return Err(Error::new(
+                "registry version 2 boundary proofs do not support orphan members",
+            ));
+        }
         task.ensure_exact()?;
         crate::audit::resource::ensure_expansion_headroom(&task.path())?;
         let source = request.source.canonicalize().map_err(|error| {
@@ -17,6 +23,16 @@ impl Space {
                 request.source.display()
             ))
         })?;
+        let write = claim::normalize(request.write)?;
+        claim::available(
+            self,
+            claim::Wanted {
+                task: &task.identity(),
+                member: request.name,
+                source: &source,
+                write: &write,
+            },
+        )?;
         if !git::at(&source).clean()? {
             return Err(Error::new("integration checkout is not clean"));
         }
@@ -38,7 +54,17 @@ impl Space {
         if apply {
             let _lock = self.lock()?;
             let task = self.resolve(request.task)?;
+            write::version(&task)?;
             task.ensure_exact()?;
+            claim::available(
+                self,
+                claim::Wanted {
+                    task: &task.identity(),
+                    member: request.name,
+                    source: &source,
+                    write: &write,
+                },
+            )?;
             ensure_branch_absent(&source, branch)?;
             add_member(
                 &task,
@@ -63,6 +89,7 @@ impl Space {
             .find(|member| member.name == name)
             .ok_or_else(|| Error::new(format!("member not found: {name}")))?;
         let path = task.member_path(name);
+        ensure_boundary(&task, member, &path)?;
         if !git::at(&path).clean()? {
             return Err(Error::new("member has dirty or untracked files"));
         }
@@ -84,6 +111,13 @@ impl Space {
             let _lock = self.lock()?;
             let task = self.resolve(identity)?;
             task.ensure_exact()?;
+            let member = task
+                .task()
+                .repo
+                .iter()
+                .find(|member| member.name == name)
+                .ok_or_else(|| Error::new(format!("member not found: {name}")))?;
+            ensure_boundary(&task, member, &path)?;
             remove_member(&task, name, &source, &path)?;
         }
         Ok(Plan::new("member.remove-landed", actions, apply))
@@ -131,6 +165,8 @@ fn add_member(task: &TaskRef, request: Add<'_>, seat: Seat<'_>) -> Result<()> {
         name: request.name.to_string(),
         source: source_text(domain, seat.source),
         branch: (seat.branch != task.task().name).then(|| seat.branch.to_string()),
+        write: claim::normalize(request.write)?,
+        boundary: None,
         extra: BTreeMap::new(),
     });
     if let Err(error) = domain.write(&snapshot.raw, &snapshot.registry) {
@@ -138,6 +174,27 @@ fn add_member(task: &TaskRef, request: Add<'_>, seat: Seat<'_>) -> Result<()> {
         return Err(error);
     }
     Ok(())
+}
+
+fn ensure_boundary(task: &TaskRef, member: &Member, path: &Path) -> Result<()> {
+    if task.domain().registry()?.version == 1 {
+        return Ok(());
+    }
+    let head = git::at(path).head()?;
+    if member
+        .boundary
+        .as_ref()
+        .is_some_and(|proof| crate::boundary::valid(proof, &member.write, &head))
+    {
+        Ok(())
+    } else {
+        Err(Error::new(format!(
+            "member {} has no valid boundary proof; run concord member boundary {} {}",
+            member.name,
+            task.identity(),
+            member.name
+        )))
+    }
 }
 
 fn remove_member(task: &TaskRef, name: &str, source: &Path, path: &Path) -> Result<()> {
@@ -172,3 +229,4 @@ fn source_text(domain: &Domain, source: &Path) -> String {
     }
     source.display().to_string()
 }
+mod write;

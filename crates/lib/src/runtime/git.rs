@@ -94,6 +94,14 @@ impl Checkout<'_> {
             .is_empty())
     }
 
+    pub fn head(&self) -> Result<String> {
+        self.text(&["rev-parse", "--verify", "HEAD^{commit}"])
+    }
+
+    pub fn merge_base(&self, left: &str, right: &str) -> Result<String> {
+        self.text(&["merge-base", left, right])
+    }
+
     pub fn exists(&self, branch: &str) -> Result<bool> {
         let reference = format!("refs/heads/{branch}");
         let root = git_path(self.root);

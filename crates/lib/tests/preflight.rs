@@ -44,10 +44,14 @@ impl Fixture {
                     source: &source,
                     branch: None,
                     orphan: false,
+                    write: &[".".to_string()],
                 },
                 true,
             )
             .expect("add member");
+        self.space
+            .member_boundary(&format!("local/{task}"), "repo")
+            .expect("prove initial boundary");
         (
             source,
             self.space
@@ -60,7 +64,7 @@ impl Fixture {
 #[test]
 fn preflight_proves_reachable_and_tree_equivalent_members() {
     let fixture = Fixture::new();
-    let (source, task) = fixture.member("member");
+    let (source, mut task) = fixture.member("member");
     let member = task.member_path("repo");
 
     let reachable = task.preflight().expect("preflight reachable member");
@@ -107,6 +111,14 @@ fn preflight_proves_reachable_and_tree_equivalent_members() {
 
     git(&source, &["merge", "--squash", "member"]);
     git(&source, &["commit", "-m", "land task work"]);
+    fixture
+        .space
+        .member_boundary("local/member", "repo")
+        .expect("refresh boundary proof");
+    task = fixture
+        .space
+        .resolve("local/member")
+        .expect("resolve refreshed task");
     let equivalent = task.preflight().expect("preflight tree-equivalent member");
     assert!(equivalent.ok());
     let equivalent_proof = equivalent.members[0]

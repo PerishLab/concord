@@ -15,6 +15,7 @@ syntax = "test"
 
 [[grant]]
 paths = [
+    "crates/lib/src/runtime/build.rs",
     "crates/*/tests/**/*.rs",
     "crates/lib/src/config.rs",
 ]
@@ -199,6 +200,66 @@ name = "USED_CRIT"
 [[vocabulary.term]]
 description = "The filesystem-use warning threshold is one Concord resource-policy constant."
 name = "USED_WARN"
+
+[[vocabulary.term]]
+description = "A persisted Plumb-backed member boundary proof is one Concord protocol atom."
+name = "BoundaryProof"
+
+[[vocabulary.term]]
+description = "A successful member boundary evaluation is one Concord protocol result atom."
+name = "BoundaryCheck"
+
+[[vocabulary.term]]
+description = "One explicit member claim supplied to registry migration is one Concord migration atom."
+name = "MigrationClaim"
+
+[[vocabulary.term]]
+description = "The exact Plumb dependency version bound into Concord boundary proofs."
+name = "PLUMB_VERSION"
+
+[[vocabulary.term]]
+description = "Registry migration is one guarded Concord domain operation."
+name = "domain_migrate"
+
+[[vocabulary.term]]
+description = "Boundary validation is one Concord landed-member removal gate."
+name = "ensure_boundary"
+
+[[vocabulary.term]]
+description = "Git merge-base resolution establishes the committed boundary proof base."
+name = "merge_base"
+
+[[vocabulary.term]]
+description = "Boundary evaluation is one Plumb-backed Concord member operation."
+name = "member_boundary"
+
+[[vocabulary.term]]
+description = "Claim expansion is one union-only Concord member operation."
+name = "member_claim"
+
+[[vocabulary.term]]
+description = "This names the disjoint-claim concurrent-member scenario."
+name = "member_add_allows_disjoint_claims_in_distinct_tasks_and_branches"
+
+[[vocabulary.term]]
+description = "This names the overlapping-claim member-add refusal scenario."
+name = "member_add_refuses_overlapping_claims_for_one_git_identity"
+
+[[vocabulary.term]]
+description = "This names the fail-closed proof then exact claim-expansion scenario."
+name = "boundary_proof_fails_closed_then_claim_expansion_opens_the_exact_path"
+
+[[vocabulary.term]]
+description = "This names the conflict-safe union claim-expansion scenario."
+name = "claim_expansion_refuses_an_active_overlap_without_mutating_the_registry"
+
+[[vocabulary.term]]
+description = "The version 2 registry claim reference is one Concord skill protocol document."
+name = "claims-v2"
+
+[[vocabulary.term]]
+description = "This names the explicit and complete version-one registry migration scenario."
+name = "version_one_migration_requires_and_normalizes_every_active_member_claim"
 
 [[vocabulary.term]]
 description = "This names one Concord empty-task resource-report scenario."
