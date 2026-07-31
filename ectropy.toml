@@ -6,15 +6,6 @@ allow = [
 note = "release infrastructure is guarded by its native format and syntax checks"
 paths = [".forgejo/**"]
 
-[[boundary]]
-allow = [
-    "path",
-    "comment",
-    "word",
-]
-note = "operator glue is guarded by deno format and type checks"
-paths = [".runseal/**"]
-
 [comment]
 allow = false
 

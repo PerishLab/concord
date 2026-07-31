@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - "release/**"
   workflow_dispatch:
 
 permissions:
@@ -36,16 +37,12 @@ jobs:
       - name: Guard
         run: |
           set -eu
-          deno run \
-            --allow-read \
-            --allow-write \
-            --allow-env \
-            --allow-net \
-            --allow-run \
-            --config .runseal/deno.json \
-            --lock .runseal/deno.lock \
-            --frozen=true \
-            .runseal/wrappers/guard.ts
+          plumb doctor .
+          cargo fmt --all --check
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          cargo check --locked --workspace --all-targets --release
+          cargo test --locked --workspace
+          ectropy .
 
   windows:
     runs-on: windows

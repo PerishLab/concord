@@ -31,8 +31,10 @@ authorship is never protocol truth.
   registry, protocol and resource audit, Git seats, memory, permissions, and
   plans.
 - `crates/cli` contains clap grammar and output dispatch only.
-- Dependency direction is `cli -> lib`. Operator glue lives in `.runseal`;
-  product behavior does not.
+- Dependency direction is `cli -> lib`.
+- `runseal.toml` and `.runseal/resources` carry env-only repository-local
+  profile material. Generic operation belongs to canonical workflows or the
+  managed task substrate; product behavior does not enter either surface.
 - Concord owns one process-cycle readonly observation seat. The CLI binds its
   explicit config, reporter, trace identity, and context; kernel functions may
   only read that seat and append function facts through Locus. A missing seat
@@ -41,9 +43,14 @@ authorship is never protocol truth.
 ## Operating
 
 - Never work or commit in the clean `main` integration checkout.
-- `runseal :guard` must pass before `runseal :land`.
-- `plumb doctor .` and `ectropy --strict .` must report no unknown or blind
-  structure before landing.
+- Validate the repository profile with `runseal profile`. Use
+  `runseal : <command> [args...]` only when a command needs its environment.
+- Before landing, run `plumb doctor .`, `cargo fmt --all --check`,
+  `cargo clippy --locked --workspace --all-targets -- -D warnings`,
+  `cargo check --locked --workspace --all-targets --release`,
+  `cargo test --locked --workspace`, and `ectropy .`.
+- Land through the managed task substrate. Do not add a repository wrapper or
+  Git hook for generic initialization, guard, landing, or release behavior.
 - Skill content ships through Plumb's shared skill mechanism. Concord owns its
   vocabulary and standing; Plumb owns packaging and managed placement.
 
