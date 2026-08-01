@@ -12,7 +12,7 @@ impl Space {
         let snapshot = domain.read()?;
         let migrated = migration(&snapshot.registry, claims)?;
         conflicts(self, &domain, &migrated)?;
-        let actions = actions(&domain, &migrated);
+        let actions = actions(&domain, snapshot.registry.version, &migrated);
         if apply {
             let _lock = self.lock()?;
             let domain = self.domain(name)?;
@@ -25,36 +25,46 @@ impl Space {
     }
 }
 
-fn actions(domain: &Domain, registry: &Registry) -> Vec<super::super::Action> {
+fn actions(domain: &Domain, from: u32, registry: &Registry) -> Vec<super::super::Action> {
     let mut actions = Vec::new();
-    for task in &registry.task {
-        for member in &task.repo {
-            actions.push(action(
-                "claim",
-                &domain.registry_path(),
-                format!(
-                    "member {}/{} write {}",
-                    task.name,
-                    member.name,
-                    member.write.join(", ")
-                ),
-            ));
+    if from == 1 {
+        for task in &registry.task {
+            for member in &task.repo {
+                actions.push(action(
+                    "claim",
+                    &domain.registry_path(),
+                    format!(
+                        "member {}/{} write {}",
+                        task.name,
+                        member.name,
+                        member.write.join(", ")
+                    ),
+                ));
+            }
         }
     }
     actions.push(action(
         "write",
         &domain.registry_path(),
-        "registry version 2",
+        "registry version 3",
     ));
     actions
 }
 
 fn migration(registry: &Registry, claims: &[MigrationClaim]) -> Result<Registry> {
-    if registry.version != 1 {
-        return Err(Error::new(format!(
-            "registry version {} does not require version 2 migration",
-            registry.version
-        )));
+    if registry.version == 3 {
+        return Err(Error::new("registry version 3 does not require migration"));
+    }
+    if registry.version == 2 {
+        if !claims.is_empty() {
+            return Err(Error::new(
+                "registry version 2 migration does not accept member claims",
+            ));
+        }
+        let mut migrated = registry.clone();
+        migrated.version = 3;
+        migrated.validate()?;
+        return Ok(migrated);
     }
     let mut supplied: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
     for held in claims {
@@ -84,7 +94,7 @@ fn migration(registry: &Registry, claims: &[MigrationClaim]) -> Result<Registry>
             "migration claim names an unknown member {task}/{member}"
         )));
     }
-    migrated.version = 2;
+    migrated.version = 3;
     migrated.validate()?;
     Ok(migrated)
 }

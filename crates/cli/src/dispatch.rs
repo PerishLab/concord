@@ -4,10 +4,11 @@ mod input;
 mod migration;
 mod mutation;
 mod resource;
+mod task;
 
 use crate::args::{
     AuditArgs, Cli, Command, ConfigCommand, DomainCommand, MemberCommand, PermissionCommand,
-    RepoCommand, TaskCommand,
+    RepoCommand,
 };
 use crate::config::Config;
 use crate::observation;
@@ -59,7 +60,7 @@ impl Dispatch {
             Command::Config(_) | Command::Skill(_) => unreachable!("handled before task config"),
             Command::Domain(domain) => self.domain(domain.command),
             Command::Repo(repo) => self.repo(repo.command),
-            Command::Task(task) => self.task(task.command),
+            Command::Task(task_args) => task::command(&self.space, task_args.command, self.json),
             Command::Member(member) => self.member(member.command),
             Command::Memory(memory) => {
                 observation::start();
@@ -125,74 +126,6 @@ impl Dispatch {
                 },
             ),
         }
-    }
-
-    fn task(&self, command: TaskCommand) -> Result<()> {
-        match command {
-            TaskCommand::List { domain } => {
-                let values = self.tasks(domain.as_deref())?;
-                output::value(serde_json::Value::Array(values), self.json);
-                Ok(())
-            }
-            TaskCommand::Show { task } => {
-                let task = self.space.resolve(&task)?;
-                output::value(
-                    json!({
-                        "identity": task.identity(),
-                        "path": task.path().display().to_string(),
-                        "task": task.task()
-                    }),
-                    self.json,
-                );
-                Ok(())
-            }
-            TaskCommand::Start { task, dry_run } => create(
-                self.space.task_start(&task, false)?,
-                dry_run,
-                self.json,
-                || self.space.task_start(&task, true),
-            ),
-            TaskCommand::Rename { task, name, apply } => guarded(
-                self.space.task_rename(&task, &name, false)?,
-                apply,
-                self.json,
-                || self.space.task_rename(&task, &name, true),
-            ),
-            TaskCommand::Rehome {
-                task,
-                domain,
-                apply,
-            } => guarded(
-                self.space.task_rehome(&task, &domain, false)?,
-                apply,
-                self.json,
-                || self.space.task_rehome(&task, &domain, true),
-            ),
-            TaskCommand::Finish { task, apply } => guarded(
-                self.space.task_finish(&task, false)?,
-                apply,
-                self.json,
-                || self.space.task_finish(&task, true),
-            ),
-        }
-    }
-
-    fn tasks(&self, selected: Option<&str>) -> Result<Vec<serde_json::Value>> {
-        let domains = match selected {
-            Some(name) => vec![self.space.domain(name)?],
-            None => self.space.domains()?,
-        };
-        let mut values = Vec::new();
-        for domain in domains {
-            let name = domain.name().to_string();
-            values.extend(domain.registry()?.task.into_iter().map(|task| {
-                json!({
-                    "identity": format!("{}/{}", name, task.name),
-                    "task": task
-                })
-            }));
-        }
-        Ok(values)
     }
 
     fn member(&self, command: MemberCommand) -> Result<()> {

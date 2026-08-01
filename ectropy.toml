@@ -950,6 +950,50 @@ description = "This names strict text and closed H2 schema refusals before memor
 name = "structured_text_and_closed_h2_schema_quick_fail_before_init"
 
 [[vocabulary.term]]
+description = "The outgoing task-todo CLI family is one Concord command grammar atom."
+name = "TaskTodoCommand"
+
+[[vocabulary.term]]
+description = "Adding an outgoing future-task relation is one Concord lifecycle operation."
+name = "task_todo_add"
+
+[[vocabulary.term]]
+description = "Removing an outgoing future-task relation is one Concord lifecycle operation."
+name = "task_todo_remove"
+
+[[vocabulary.term]]
+description = "This names the task-todo CLI projection and finish-handoff scenario."
+name = "task_todo_cli_projects_links_and_finish_handoffs"
+
+[[vocabulary.term]]
+description = "This names the version 2 to version 3 migration and old-binary refusal scenario."
+name = "version_two_migration_is_claim_free_and_old_version_range_refuses_three"
+
+[[vocabulary.term]]
+description = "This names atomic todo target creation, idempotent linking, and source handoff."
+name = "todo_create_link_is_idempotent_and_source_finish_hands_off"
+
+[[vocabulary.term]]
+description = "This names the incoming-todo target cleanup gate."
+name = "incoming_todo_blocks_target_finish_until_explicit_unlink"
+
+[[vocabulary.term]]
+description = "This names self, cross-domain, and linked-task rehome refusals."
+name = "todo_refuses_self_cross_domain_and_linked_rehome"
+
+[[vocabulary.term]]
+description = "This names atomic rewriting of incoming todo targets during task rename."
+name = "rename_rewrites_incoming_todos"
+
+[[vocabulary.term]]
+description = "This names canonical and referential validation of persisted task todos."
+name = "registry_refuses_noncanonical_or_dangling_todos"
+
+[[vocabulary.term]]
+description = "This names rollback of a newly created todo target when registry installation fails."
+name = "failed_todo_add_rolls_back_the_created_target_root"
+
+[[vocabulary.term]]
 description = "This names the absolute raw-read ceiling and streaming audit evidence scenario."
 name = "raw_read_ceiling_quick_fails_without_hiding_audit_evidence"
 
