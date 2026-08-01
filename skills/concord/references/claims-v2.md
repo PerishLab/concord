@@ -1,4 +1,4 @@
-# Concord registry claims v2
+# Concord registry claims v2+
 
 Read this reference before adding, claiming, proving, migrating, or removing a
 repository member.
@@ -6,10 +6,14 @@ repository member.
 ## Registry grammar
 
 ```toml
-version = 2
+version = 3
 
 [[task]]
 name = "ship-feature"
+todo = ["follow-up"]
+
+[[task]]
+name = "follow-up"
 
 [[task.repo]]
 name = "repo-a"
@@ -43,7 +47,9 @@ domain-space lock and clears a persisted boundary proof whenever the canonical
 claim changes. Narrowing requires a future explicit operation; never edit the
 registry to simulate it.
 
-Version 2 refuses new orphan members because the Plumb v1 boundary proof
+Registry versions 2 and 3 use this same member claim grammar. Version 3 adds
+task todo links; it does not change claim normalization or conflict detection.
+Both versions refuse new orphan members because the Plumb v1 boundary proof
 requires a commit merge-base. Existing version 1 orphan members remain
 auditable and removable through the version 1 cleanup path.
 
@@ -60,11 +66,11 @@ records:
 - SHA-256 digest of the NUL-delimited canonical claim.
 
 The proof is invalid when member HEAD, claim digest, Plumb schema, or resolved
-Plumb version changes. `member preflight` reports that state and version 2
+Plumb version changes. `member preflight` reports that state and version 2 or 3
 `remove-landed` refuses it. Reachability or tree equivalence and worktree
 cleanliness remain separate removal gates.
 
-## Version 1 migration
+## Registry migration
 
 Version 1 stays readable for audit, landing, and cleanup. It cannot add a
 member, expand a claim, or record a boundary proof. Upgrade one whole domain:
@@ -80,5 +86,14 @@ concord domain migrate perish.code \
 Every active member must be named at least once in the same guarded operation.
 Repeated entries supply multiple prefixes. Concord rejects missing or unknown
 members, malformed claims, and any proposed overlap before atomically replacing
-version 1 with version 2. A version 1 binary rejects version 2 as unsupported;
-it cannot silently ignore ownership state.
+version 1 with the current version 3 registry.
+
+Version 2 already carries complete member claims and migrates without claim
+arguments:
+
+```bash
+concord domain migrate perish.code --apply
+```
+
+Older binaries reject version 3 as unsupported; they cannot silently ignore
+task todo state.

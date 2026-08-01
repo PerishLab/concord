@@ -12,7 +12,7 @@ impl Space {
         write::version(&task)?;
         if request.orphan {
             return Err(Error::new(
-                "registry version 2 boundary proofs do not support orphan members",
+                "claimed registry boundary proofs do not support orphan members",
             ));
         }
         task.ensure_exact()?;

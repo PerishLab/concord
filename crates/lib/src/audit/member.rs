@@ -99,7 +99,7 @@ impl Inspection<'_, '_> {
     }
 
     fn boundary(&mut self, version: u32) {
-        if version != 2 {
+        if version < 2 {
             return;
         }
         let head = git::at(self.check.path).head();

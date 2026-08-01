@@ -1,6 +1,6 @@
 ---
 name: concord
-description: Operate the private Concord `.tasks` + `.task` control plane, including stdin-first structured task memory. Use when starting, locating, resuming, auditing, renaming, rehoming, landing, retaining, or finishing managed tasks; adding or removing repository worktree members; reading, patching, or settling task memory; managing task resources or permissions; or replacing any proposed raw mutation of `.tasks/`, `.task/`, task worktrees, or `tasks.toml`.
+description: Operate the private Concord `.tasks` + `.task` control plane, including task todo links and stdin-first structured task memory. Use when starting, locating, resuming, auditing, renaming, rehoming, landing, retaining, or finishing managed tasks; declaring future task work; adding or removing repository worktree members; reading, patching, or settling task memory; managing task resources or permissions; or replacing any proposed raw mutation of `.tasks/`, `.task/`, task worktrees, or `tasks.toml`.
 ---
 
 # Concord
@@ -72,7 +72,8 @@ building or operating a repository rather than restating its clauses here.
 6. Before landing, record `concord member boundary` for the clean committed
    member. Land through the repository's own process, verify reachability,
    cleanliness, and the still-current proof, then remove only the landed member
-   seat. Finish a repo-less task only after retained state is absent or its
+   seat. Before task finish, inspect outgoing todos and make their handoff
+   explicit. Finish a repo-less task only after retained state is absent or its
    exact deletion is authorized.
 
 When durable memory is first needed, initialize the v1 envelope from
@@ -82,6 +83,11 @@ When durable memory is first needed, initialize the v1 envelope from
 
 - One task has one fixed home domain, zero or more repository members, and at
   most one task-level `.task/`. A repo-less task is valid.
+- A task todo is a same-domain link to another real task, not a scheduler,
+  issue, or backlog state. Todo links are sorted, unique, and never self-links.
+- Todo add creates an absent repo-less target and records the link atomically.
+  Todo removal is explicit; finishing a source reports handoffs and leaves each
+  target alive, while incoming links prevent target finish.
 - Mutable ownership attaches to declared path prefixes in one branch and
   worktree. One canonical Git identity may back several active task members
   only when their worktree paths, branches, and component-prefix claims are
@@ -114,7 +120,8 @@ When durable memory is first needed, initialize the v1 envelope from
   Operations that expand the managed footprint may refuse when their current
   preflight cannot preserve conservative headroom.
 - Renaming, rehoming, legacy adoption, and mismatch repair are explicit
-  migrations. Never perform one merely because a layout differs.
+  migrations. Rename rewrites incoming todo links atomically; a task with any
+  todo link cannot rehome. Never perform one merely because a layout differs.
 
 Read [references/protocol.md](references/protocol.md) for registry grammar,
 entry resolution, lifecycle preconditions, memory layout, foreign-territory
@@ -131,14 +138,18 @@ Concord currently enforces:
   of Concord's own storage and repaired by `permissions normalize`, but never
   gating the mutation that would clear them;
 - clean source checkout and an absent target branch before member creation;
-- explicit write claims on version 2 members, with cross-task overlap refusal
+- explicit write claims on version 2 and 3 members, with cross-task overlap refusal
   by canonical Git common-directory identity under the domain-space lock;
-- explicit all-member migration from registry version 1 to version 2, while
-  retaining version 1 audit, landing, and cleanup;
+- explicit all-member migration from registry version 1 to current version 3,
+  claim-free migration from version 2 to version 3, and retained version 1
+  audit, landing, and cleanup;
+- version 3 same-domain task todo links, including atomic target creation,
+  idempotent add, explicit unlink, rename rewrite, guarded rehome and target
+  finish, and source-finish handoff reporting;
 - Plumb-backed committed-delta boundary proofs bound to exact base, member
   HEAD, normalized claim digest, proof schema, and resolved Plumb version;
 - clean and reachable or tree-equivalent member state before landed removal;
-- a still-current boundary proof before version 2 landed removal;
+- a still-current boundary proof before version 2 or 3 landed removal;
 - locking, registry compare-before-replace, and memory revision CAS;
 - bounded stdin or regular-file memory input, default post-success file
   consumption, explicit retention, and typed cleanup-after-apply errors;
@@ -181,6 +192,8 @@ concord config show
 concord domain list
 concord task start <domain>/<task>
 concord task show <domain>/<task>
+concord task todo add <domain>/<task> <target>
+concord task todo remove <domain>/<task> <target> --apply
 concord member add <domain>/<task> --source <integration-checkout> --write <path>
 concord member claim <domain>/<task> <member> --write <path>
 concord member boundary <domain>/<task> <member>
@@ -198,7 +211,7 @@ concord memory phase read <domain>/<task> 0
 concord resource import <domain>/<task> <name> --source <path>
 concord permissions normalize <domain>/<task> --apply
 concord task finish <domain>/<task> --apply
-concord domain migrate <domain> --claim <task>/<member>=<path> --apply
+concord domain migrate <domain> [--claim <task>/<member>=<path>] --apply
 ```
 
 Use `--dry-run` on creation to print only the plan. Use global `--json` for

@@ -1,10 +1,12 @@
 mod memory;
+mod task;
 
 use crate::skill::SkillArgs;
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
 pub use memory::{MemoryArgs, MemoryCommand, MemoryPhaseCommand};
+pub use task::{TaskArgs, TaskCommand, TaskTodoCommand};
 
 #[derive(Parser)]
 #[command(version = plumb::version!("CONCORD"), about)]
@@ -77,7 +79,7 @@ pub enum DomainCommand {
         #[arg(long)]
         dry_run: bool,
     },
-    #[command(about = "Migrate a version 1 registry with explicit member claims")]
+    #[command(about = "Migrate a registry to the current protocol version")]
     Migrate {
         domain: String,
         #[arg(long)]
@@ -103,49 +105,6 @@ pub enum RepoCommand {
         note: Option<String>,
         #[arg(long)]
         dry_run: bool,
-    },
-}
-
-#[derive(Args)]
-pub struct TaskArgs {
-    #[command(subcommand)]
-    pub command: TaskCommand,
-}
-
-#[derive(Subcommand)]
-pub enum TaskCommand {
-    #[command(about = "List registered tasks")]
-    List {
-        #[arg(long)]
-        domain: Option<String>,
-    },
-    #[command(about = "Show one resolved task")]
-    Show { task: String },
-    #[command(about = "Start a repo-less task")]
-    Start {
-        task: String,
-        #[arg(long)]
-        dry_run: bool,
-    },
-    #[command(about = "Rename a task through an explicit migration")]
-    Rename {
-        task: String,
-        name: String,
-        #[arg(long)]
-        apply: bool,
-    },
-    #[command(about = "Move a task to another home domain")]
-    Rehome {
-        task: String,
-        domain: String,
-        #[arg(long)]
-        apply: bool,
-    },
-    #[command(about = "Remove an empty task and registry entry")]
-    Finish {
-        task: String,
-        #[arg(long)]
-        apply: bool,
     },
 }
 

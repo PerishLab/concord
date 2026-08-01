@@ -44,11 +44,29 @@ Common operations are explicit and composable:
 ```text
 concord domain list
 concord task start perish.code/ship-feature
+concord task todo add perish.code/ship-feature follow-up
 concord member add perish.code/ship-feature --source /srv/projects/perish.code/repo
 concord audit perish.code/ship-feature
 concord member preflight perish.code/ship-feature
 concord memory read perish.code/ship-feature --json
 ```
+
+A task todo is an outgoing reference to another ordinary task in the same
+domain. It records a concrete future obligation before that task needs a
+member, assignee, priority, or any other execution resource. Adding a missing
+target creates its private repo-less task root and links it atomically;
+repeating the add is a no-op. Removing the relation requires `--apply`:
+
+```text
+concord task todo add perish.code/ship-feature follow-up
+concord task todo remove perish.code/ship-feature follow-up --apply
+```
+
+Finishing the source prints every target as a handoff and leaves those tasks
+alive. A target cannot finish while another task still references it. Rename
+rewrites incoming references; linked tasks refuse rehome until the relation is
+removed or handed off. Todos carry identities only: issue text and execution
+state remain with the target task and their owning systems.
 
 `audit` keeps protocol agreement and local resource health separate. Protocol
 faults still fail the command; resource findings are advisory `OK`, `WARN`,

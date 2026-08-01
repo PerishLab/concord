@@ -1,5 +1,7 @@
+mod seat;
+mod todo;
+
 use super::{Plan, action};
-use crate::git;
 use crate::model::component;
 use crate::path::at;
 use crate::{Domain, Error, Registry, Result, Space, Task, TaskRef};
@@ -52,7 +54,8 @@ impl Space {
         task.ensure_exact()?;
         let from = task.path();
         let to = task.domain().tasks_path().join(name);
-        let actions = vec![
+        let registry = task.domain().registry()?;
+        let mut actions = vec![
             action("move", &from, format!("task root -> {}", to.display())),
             action(
                 "replace",
@@ -60,6 +63,13 @@ impl Space {
                 format!("task identity {} -> {name}", task.task().name),
             ),
         ];
+        for source in todo::Todos::new(&registry).incoming(&task.task().name) {
+            actions.push(action(
+                "rewrite",
+                &task.domain().registry_path(),
+                format!("task {source} todo {} -> {name}", task.task().name),
+            ));
+        }
         if apply {
             let _lock = self.lock()?;
             let task = self.resolve(identity)?;
@@ -72,6 +82,7 @@ impl Space {
     pub fn task_rehome(&self, identity: &str, target: &str, apply: bool) -> Result<Plan> {
         let task = self.resolve(identity)?;
         task.ensure_exact()?;
+        todo::Todos::new(&task.domain().registry()?).unlinked(&task.task().name)?;
         let domain = self.domain(target)?;
         let from = task.path();
         let to = domain.tasks_path().join(&task.task().name);
@@ -98,20 +109,29 @@ impl Space {
         if !task.task().repo.is_empty() {
             return Err(Error::new("task finish requires zero repository members"));
         }
+        let registry = task.domain().registry()?;
+        let incoming = todo::Todos::new(&registry).incoming(&task.task().name);
+        if !incoming.is_empty() {
+            return Err(Error::new(format!(
+                "task is still referenced as a todo by {}",
+                incoming.join(", ")
+            )));
+        }
         let mut entries = std::fs::read_dir(task.path())?;
         if entries.next().is_some() {
             return Err(Error::new(
                 "task root retains memory or artifacts; remove exact targets first",
             ));
         }
-        let actions = vec![
+        let mut actions = todo::handoffs(task.domain(), task.task());
+        actions.extend([
             action("remove", &task.path(), "empty task root"),
             action(
                 "remove",
                 &task.domain().registry_path(),
                 format!("task entry {}", task.task().name),
             ),
-        ];
+        ]);
         if apply {
             let _lock = self.lock()?;
             let task = self.resolve(identity)?;
@@ -135,29 +155,33 @@ impl TaskRef {
         if snapshot.registry.task.iter().any(|held| held.name == name) {
             return Err(Error::new(format!("target task already exists: {name}")));
         }
-        let held = snapshot
-            .registry
-            .task
-            .iter_mut()
-            .find(|held| held.name == self.task().name)
-            .ok_or_else(|| Error::new("task disappeared during rename"))?;
-        let old = held.name.clone();
-        held.name = name.to_string();
-        for member in &mut held.repo {
-            if member.branch.is_none() {
-                member.branch = Some(old.clone());
+        let old = {
+            let held = snapshot
+                .registry
+                .task
+                .iter_mut()
+                .find(|held| held.name == self.task().name)
+                .ok_or_else(|| Error::new("task disappeared during rename"))?;
+            let old = held.name.clone();
+            held.name = name.to_string();
+            for member in &mut held.repo {
+                if member.branch.is_none() {
+                    member.branch = Some(old.clone());
+                }
             }
-        }
-        let repairs = self.repairs(to)?;
+            old
+        };
+        todo::rewrite(&mut snapshot.registry, &old, name);
+        let repairs = seat::repairs(self, to)?;
         std::fs::rename(self.path(), to)?;
-        if let Err(error) = repair_all(&repairs, true) {
+        if let Err(error) = seat::apply(&repairs, true) {
             let _ = std::fs::rename(to, self.path());
-            let _ = repair_all(&repairs, false);
+            let _ = seat::apply(&repairs, false);
             return Err(error);
         }
         if let Err(error) = domain.write(&snapshot.raw, &snapshot.registry) {
             let _ = std::fs::rename(to, self.path());
-            let _ = repair_all(&repairs, false);
+            let _ = seat::apply(&repairs, false);
             return Err(error);
         }
         Ok(())
@@ -175,6 +199,7 @@ impl TaskRef {
         }
         let source = self.domain();
         let mut before = source.read()?;
+        todo::Todos::new(&before.registry).unlinked(&self.task().name)?;
         let mut after = target.read()?;
         if after
             .registry
@@ -194,17 +219,17 @@ impl TaskRef {
         for member in &mut moved.repo {
             member.source = self.source(&member.source)?.display().to_string();
         }
-        let repairs = self.repairs(to)?;
+        let repairs = seat::repairs(self, to)?;
         after.registry.task.push(moved);
         std::fs::rename(self.path(), to)?;
-        if let Err(error) = repair_all(&repairs, true) {
+        if let Err(error) = seat::apply(&repairs, true) {
             let _ = std::fs::rename(to, self.path());
-            let _ = repair_all(&repairs, false);
+            let _ = seat::apply(&repairs, false);
             return Err(error);
         }
         if let Err(error) = target.write(&after.raw, &after.registry) {
             let _ = std::fs::rename(to, self.path());
-            let _ = repair_all(&repairs, false);
+            let _ = seat::apply(&repairs, false);
             return Err(error);
         }
         if let Err(error) = source.write(&before.raw, &before.registry) {
@@ -215,7 +240,7 @@ impl TaskRef {
                 let _ = target.write(&now.raw, &original);
             }
             let _ = std::fs::rename(to, self.path());
-            let _ = repair_all(&repairs, false);
+            let _ = seat::apply(&repairs, false);
             return Err(error);
         }
         Ok(())
@@ -224,6 +249,13 @@ impl TaskRef {
     fn finish(&self) -> Result<()> {
         let domain = self.domain();
         let mut snapshot = domain.read()?;
+        let incoming = todo::Todos::new(&snapshot.registry).incoming(&self.task().name);
+        if !incoming.is_empty() {
+            return Err(Error::new(format!(
+                "task is still referenced as a todo by {}",
+                incoming.join(", ")
+            )));
+        }
         let index = snapshot
             .registry
             .task
@@ -238,29 +270,6 @@ impl TaskRef {
         }
         Ok(())
     }
-
-    fn repairs(&self, to: &Path) -> Result<Vec<Repair>> {
-        self.task()
-            .repo
-            .iter()
-            .map(|member| {
-                Ok((
-                    self.source(&member.source)?,
-                    self.member_path(&member.name),
-                    to.join(&member.name),
-                ))
-            })
-            .collect()
-    }
-}
-
-type Repair = (std::path::PathBuf, std::path::PathBuf, std::path::PathBuf);
-
-fn repair_all(repairs: &[Repair], forward: bool) -> Result<()> {
-    for (source, from, to) in repairs {
-        git::at(source).repair(if forward { to } else { from })?;
-    }
-    Ok(())
 }
 
 fn qualified(identity: &str) -> Result<(&str, &str)> {

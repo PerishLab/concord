@@ -15,10 +15,11 @@ impl Space {
     pub fn member_boundary(&self, identity: &str, name: &str) -> Result<BoundaryCheck> {
         let _lock = self.lock()?;
         let task = self.resolve(identity)?;
-        if task.domain().registry()?.version != 2 {
+        let version = task.domain().registry()?.version;
+        if version == 1 {
             return Err(Error::new(format!(
-                "domain {} uses registry version 1; migrate it before proving boundaries",
-                task.domain().name()
+                "domain {} uses registry version {version}; migrate it before proving boundaries",
+                task.domain().name(),
             )));
         }
         task.ensure_exact()?;

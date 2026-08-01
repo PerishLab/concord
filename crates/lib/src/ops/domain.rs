@@ -11,7 +11,7 @@ impl Space {
         let domain = Domain::new(self.path(), name)?;
         let actions = vec![
             action("create", &domain.tasks_path(), "private task registry seat"),
-            action("write", &domain.registry_path(), "version 2 empty registry"),
+            action("write", &domain.registry_path(), "version 3 empty registry"),
         ];
         if apply {
             let _lock = self.lock()?;

@@ -1,28 +1,19 @@
 # Concord task protocol
 
-## Contents
-
-- [Territory and task model](#territory-and-task-model)
-- [Domain and registry](#domain-and-registry)
-- [Agreement and identity](#agreement-and-identity)
-- [Entering and starting](#entering-and-starting)
-- [Resource health](#resource-health)
-- [Lifecycle](#lifecycle)
-- [Long-running memory](#long-running-memory)
-- [Recovery and migration](#recovery-and-migration)
-
 ## Territory and task model
 
-A task is the authoritative unit of work:
-
-```text
-task(home domain, task name)
-  -> {0..N repository worktree members, 0..1 task-level .task/}
-```
+A task is the authoritative unit of work: one home domain and task name, zero
+or more repository worktree members, at most one task-level `.task/`, and zero
+or more same-domain future task todos.
 
 A member is one repository's task-scoped worktree under the task root and is
 declared by that task's registry entry. Zero-member tasks are valid for non-Git
 work and for retained memory or artifacts after repositories land.
+
+A todo is an outgoing reference to another ordinary task in the same domain.
+It records a future obligation without creating a backlog lifecycle, scheduler,
+or issue mirror. The target may remain repo-less until execution pressure gives
+it members, memory, issues, releases, or other resources.
 
 Treat a repository or tree as foreign when the user says so, its governing
 instructions conflict with this protocol, or its metadata shows another system
@@ -37,26 +28,15 @@ explicitly. Never relocate an integration checkout for co-location.
 
 ## Domain and registry
 
-A domain is a directory of sibling clean integration checkouts:
-
-```text
-<domain-space-root>/
-└── <domain>/
-    ├── repo-a/
-    ├── repo-b/
-    └── .tasks/
-        ├── tasks.toml
-        └── <task>/
-            ├── .task/
-            ├── repo-a/
-            └── repo-b/
-```
+A domain is a directory of sibling clean integration checkouts. Its private
+`.tasks/tasks.toml` registry and `.tasks/<task>/` roots sit beside them.
 
 `.tasks/`, task roots, and task memory are private local state, never repository
 content. On POSIX, managed directories are `0700`; registry and Markdown memory
 are `0600`. Private executable resource payload may be `0700`.
 
-Registry version 2 and its member write-claim grammar are defined in
+Registry version 3 is current. It retains the version 2 member write-claim
+grammar defined in
 [claims-v2.md](claims-v2.md). Read it before adding, claiming, proving,
 migrating, or removing a repository member.
 
@@ -68,7 +48,9 @@ Rules:
 - Relative sources resolve from `.tasks/`. A leading `~` means the current
   user's home. Cross-domain sources should be explicit.
 - The branch defaults to the task name. Record `branch` only when different.
-- Every version 2 member declares a normalized nonempty write claim.
+- Every version 2 or 3 member declares a normalized nonempty write claim.
+- A version 3 task's `todo` list is sorted, unique, non-self, and names only
+  tasks in the same registry. Version 1 and 2 tasks carry no todo state.
 - Top-level `[[repo]]` entries are annotations, not task members.
 - Mutable ownership attaches to claimed paths in one branch and worktree. A
   canonical Git common-directory identity may join several tasks concurrently
@@ -128,18 +110,25 @@ read-only work without retained artifacts, and transient scratch work need no
 task. Parallel lines touching one repository use separate tasks, branches, and
 worktrees.
 
-For example, these members may coexist when their claims are disjoint:
-
-```text
-task-a/repo-a -> source repo-a, branch task-a, write crates/a
-task-b/repo-a -> source repo-a, branch task-b, write crates/b
-```
-
-Each task owns its branch, worktree seat, and declared path prefix. Semantic
-coordination inside disjoint claims and landing order remain branch concerns.
+Members for one canonical repository may coexist when each task owns a distinct
+branch, worktree seat, and disjoint declared path prefix. Semantic coordination
+inside those claims and landing order remain branch concerns.
 
 Start creates one coherent registry entry and private root, then the first
 member if needed. Add `.task/` only under the memory rule below.
+
+### Declare a future task
+
+Use `concord task todo add <source> <target>` when a concrete follow-up exists
+but does not yet need execution resources. The target may be an existing
+same-domain task or a missing task name. A missing target is created repo-less
+and linked in the same locked operation; failure to install the registry rolls
+back its new root. Repeating the same add preserves the registry bytes.
+
+The relation contains only the target task identity. Do not copy issue prose,
+priority, assignment, status, or scheduling into it. Remove one relation with
+`concord task todo remove ... --apply` only when the future obligation was
+handed off, fulfilled elsewhere, or explicitly withdrawn.
 
 ## Resource health
 
@@ -152,16 +141,10 @@ Task entry runs one low-frequency resource observation through the existing
   `UNKNOWN` and remain advisory.
 
 Concord measures allocated bytes for the whole task, each member, `.task/`, and
-each resource seat. It also observes the task filesystem, inode capacity where
-the platform exposes it, and current host available memory and swap. Thresholds
-are deliberately conservative:
-
-| Observation | WARN | CRIT |
-| --- | ---: | ---: |
-| task or member footprint | 2 GiB | 8 GiB |
-| memory or resource seat | 512 MiB | 2 GiB |
-| filesystem or inode use | 60% | 75% |
-| host memory available | 40% | 25% |
+each resource seat. It also observes filesystem and inode use plus host memory.
+WARN/CRIT thresholds are 2/8 GiB for a task or member, 512 MiB/2 GiB for memory
+or a resource seat, 60%/75% filesystem or inode use, and 40%/25% host memory
+available.
 
 Resource status never blocks read-only diagnosis, audit, landing, or cleanup.
 Only an operation that expands the managed footprint may refuse on current
@@ -222,6 +205,12 @@ Landing the final member leaves a valid repo-less task. Retain it while memory
 or non-Git artifacts remain useful. If nothing remains, or exact deletion has
 been authorized:
 
+- A task still referenced by another task's todo cannot finish. Remove the
+  incoming relations explicitly or finish their source tasks first.
+- A source may finish with outgoing todos. Its finish plan prints every target
+  as a handoff, removes the outgoing relations with the source, and leaves all
+  targets in their normal task lifecycle.
+
 1. remove exact resource seats through Concord;
 2. remove `.task/` through `concord memory remove ... --apply`;
 3. finish the now-empty task through `concord task finish ... --apply`.
@@ -233,17 +222,8 @@ do not imply one another.
 
 ## Long-running memory
 
-Create `.task/` only for complex work spanning rounds or phases. There is at
-most one, at the task root:
-
-```text
-.task/
-├── MAIN.md
-├── phases/
-│   ├── PHASE-00.md
-│   └── PHASE-01.md
-└── resources/
-```
+Create at most one `.task/` for complex work spanning rounds or phases. It may
+contain `MAIN.md`, contiguous `phases/PHASE-NN.md`, and `resources/`.
 
 `MAIN.md` is the concise current operating brief: goals, active constraints,
 decisions still in force, current focus, open questions, and next step. It is
@@ -284,8 +264,16 @@ explicit migrations requiring authorization. Never migrate merely because a
 layout differs.
 
 Registry version 1 remains readable for audit, landing, and cleanup, but cannot
-add or expand members. Its explicit all-member migration and version 2 failure
-semantics are defined in [claims-v2.md](claims-v2.md).
+add or expand members. Its explicit all-member claim migration goes directly
+to version 3 and is defined in [claims-v2.md](claims-v2.md). Version 2 migration
+requires no claims and changes only the registry protocol version. Both use
+`concord domain migrate ... --apply`; pre-v0.9.0 binaries reject version 3.
+
+Renaming a version 3 task rewrites every same-registry incoming todo in the
+same atomic registry replacement. Rehoming a task with incoming or outgoing
+todo relations refuses until those links are removed or handed off; cross-domain
+todo semantics are intentionally absent until demonstrated pressure requires
+them.
 
 Before destructive legacy cleanup, verify:
 

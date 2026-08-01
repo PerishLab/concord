@@ -14,6 +14,8 @@ pub struct Registry {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Task {
     pub name: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub todo: Vec<String>,
     #[serde(default)]
     pub repo: Vec<Member>,
     #[serde(flatten)]
@@ -53,14 +55,14 @@ pub struct Repo {
 impl Registry {
     pub fn empty() -> Self {
         Self {
-            version: 2,
+            version: 3,
             task: Vec::new(),
             repo: Vec::new(),
         }
     }
 
     pub fn validate(&self) -> Result<()> {
-        if !matches!(self.version, 1 | 2) {
+        if !matches!(self.version, 1..=3) {
             return Err(Error::new(format!(
                 "unsupported registry version {}",
                 self.version
@@ -68,7 +70,13 @@ impl Registry {
         }
         let mut tasks = std::collections::BTreeSet::new();
         for task in &self.task {
-            task.validate(self.version, &mut tasks)?;
+            component("task name", &task.name)?;
+            if !tasks.insert(task.name.as_str()) {
+                return Err(Error::new(format!("duplicate task {}", task.name)));
+            }
+        }
+        for task in &self.task {
+            task.validate(self.version, &tasks)?;
         }
         Ok(())
     }
@@ -78,23 +86,53 @@ impl Task {
     pub fn new(name: String) -> Self {
         Self {
             name,
+            todo: Vec::new(),
             repo: Vec::new(),
             extra: BTreeMap::new(),
         }
     }
 
-    fn validate<'a>(
-        &'a self,
-        version: u32,
-        tasks: &mut std::collections::BTreeSet<&'a String>,
-    ) -> Result<()> {
-        component("task name", &self.name)?;
-        if !tasks.insert(&self.name) {
-            return Err(Error::new(format!("duplicate task {}", self.name)));
-        }
+    fn validate(&self, version: u32, tasks: &std::collections::BTreeSet<&str>) -> Result<()> {
+        self.todos(version, tasks)?;
         let mut members = std::collections::BTreeSet::new();
         for member in &self.repo {
             member.validate(&self.name, version, &mut members)?;
+        }
+        Ok(())
+    }
+
+    fn todos(&self, version: u32, tasks: &std::collections::BTreeSet<&str>) -> Result<()> {
+        if version < 3 {
+            if self.todo.is_empty() {
+                return Ok(());
+            }
+            return Err(Error::new(format!(
+                "registry version {version} task {} contains version 3 todo state",
+                self.name
+            )));
+        }
+        let mut previous = None;
+        for target in &self.todo {
+            component("todo task name", target)?;
+            if target == &self.name {
+                return Err(Error::new(format!(
+                    "task {} cannot reference itself as a todo",
+                    self.name
+                )));
+            }
+            if previous.is_some_and(|held: &String| held >= target) {
+                return Err(Error::new(format!(
+                    "task {} todo entries are not normalized",
+                    self.name
+                )));
+            }
+            if !tasks.contains(target.as_str()) {
+                return Err(Error::new(format!(
+                    "task {} todo target does not exist: {target}",
+                    self.name
+                )));
+            }
+            previous = Some(target);
         }
         Ok(())
     }

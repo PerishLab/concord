@@ -66,7 +66,7 @@ impl Preflight {
 impl TaskRef {
     pub fn preflight(&self) -> Result<Preflight> {
         let audit = self.agreement()?;
-        let required = self.domain().registry()?.version == 2;
+        let required = self.domain().registry()?.version >= 2;
         let mut preflight = Preflight {
             target: audit.target,
             members: Vec::new(),

@@ -45,12 +45,13 @@ impl Space {
 }
 
 pub(super) fn version(task: &TaskRef) -> Result<()> {
-    if task.domain().registry()?.version == 2 {
+    let version = task.domain().registry()?.version;
+    if version >= 2 {
         return Ok(());
     }
     Err(Error::new(format!(
-        "domain {} uses registry version 1; migrate it before adding or expanding members",
-        task.domain().name()
+        "domain {} uses registry version {version}; migrate it before adding or expanding members",
+        task.domain().name(),
     )))
 }
 
