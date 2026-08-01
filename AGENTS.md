@@ -24,6 +24,8 @@ authorship is never protocol truth.
   Concord; section bodies remain opaque Markdown.
 - Git owns member payload and repository-specific landing. Concord owns the
   member seat and verifies the four protocol surfaces.
+- Optional Locus observation is one-way. Context and report outcomes never
+  enter protocol state, command output, authorization, or control flow.
 
 ## Architecture
 
@@ -36,9 +38,9 @@ authorship is never protocol truth.
   profile material. Generic operation belongs to canonical workflows or the
   managed task substrate; product behavior does not enter either surface.
 - Concord owns one process-cycle readonly observation seat. The CLI binds its
-  explicit config, reporter, trace identity, and context; kernel functions may
-  only read that seat and append function facts through Locus. A missing seat
-  is the default muted state.
+  explicit config, reporter, exact `CODEX_THREAD_ID` collection, trace identity,
+  and context; kernel functions may only read that seat and append function
+  facts through Locus. A missing seat is the default muted state.
 
 ## Operating
 

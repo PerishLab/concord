@@ -1,3 +1,4 @@
+use locus::collector;
 use locus::generator;
 use locus::reporter;
 use locus::{Candidate, Config, Context, Engine, Key, Policy, Role};
@@ -61,12 +62,19 @@ fn load() -> Option<(Engine, Context)> {
 
 fn build(settings: Settings) -> Result<(Engine, Context), locus::Error> {
     let trace = Role::trace();
-    let mut policy = Policy::default().reporter(reporter::Spec::file(settings.report.file));
+    let mut policy = Policy::default()
+        .collector(
+            "codex.thread",
+            collector::Spec::environment("CODEX_THREAD_ID", 512),
+        )
+        .reporter(reporter::Spec::file(settings.report.file));
     if !settings.trace.file.as_os_str().is_empty() {
         policy = policy.generator(trace.clone(), generator::Spec::shared(settings.trace.file));
     }
     let engine = Engine::bootstrap(Config::new(policy))?;
-    let mut candidate = Candidate::context().ensure(trace.clone());
+    let mut candidate = Candidate::context()
+        .collect(trace.clone(), "codex.thread")
+        .ensure(trace.clone());
     if !settings.trace.id.is_empty() {
         candidate = candidate.explicit(trace, Key::new(settings.trace.id)?);
     }
