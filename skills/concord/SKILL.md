@@ -47,6 +47,12 @@ stop ordinary mutation until recovery is explicitly authorized.
 artifacts outside repositories and private. Never copy them into product Git
 history.
 
+**Observation is one-way.** Optional Locus collection may bind an exact
+`CODEX_THREAD_ID` to the current trace, but Context and report outcomes never
+enter protocol state, authorization, command output, or control flow. An
+explicit trace ID overrides collection; a muted gate performs no observation
+work.
+
 **The right to amend travels with the layer.** Concord owns task protocol law.
 Repository shape and release law belong to Plumb; load the `plumb` skill when
 building or operating a repository rather than restating its clauses here.
@@ -166,6 +172,9 @@ Concord currently enforces:
   available-memory observations with explicit `UNKNOWN`;
 - resource-import whole-tree size and headroom preflight, streaming private
   copy, plus refusal of links and special files;
+- default-muted memory observation, exact `CODEX_THREAD_ID` trace collection,
+  explicit trace override, and unchanged business output when observation is
+  enabled;
 - refusal to add a member when the target filesystem is already critical.
 
 The following remain agent-held law; no machine will stop every violation:

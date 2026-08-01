@@ -33,11 +33,13 @@ CONCORD_LOCUS_TRACE_ID=
 
 The gate defaults to false and returns before Locus bootstrap. Enabling it
 requires a report file. An optional trace file shares one generated identity
-across processes; an explicit trace ID wins over generation. Invalid
-observation config is handed to stderr after the fact and never replaces the
-command result. The cold-start surface currently covers only `memory`
-operations and records function entry plus normal return; other commands do
-not bootstrap observation.
+across processes. When present, `CODEX_THREAD_ID` is collected exactly and
+bound to `locus.trace`; an explicit trace ID wins over that collection, which
+in turn wins over shared or random generation. Collection provenance remains
+in the accepted Atom. Invalid observation config is handed to stderr after the
+fact and never replaces the command result. The cold-start surface currently
+covers only `memory` operations and records function entry plus normal return;
+other commands do not bootstrap observation.
 
 Common operations are explicit and composable:
 

@@ -63,6 +63,8 @@ fn observation() {
         "{}",
         String::from_utf8_lossy(&observed.stderr)
     );
+    assert_eq!(observed.stdout, muted.stdout);
+    assert_eq!(observed.stderr, muted.stderr);
 
     let trace: Value =
         serde_json::from_slice(&std::fs::read(&trace).expect("read trace")).expect("trace json");
@@ -98,6 +100,67 @@ fn observation() {
             enter["context"]["locus.span"]
         );
     }
+
+    let report = fixture.path().join("collected.jsonl");
+    let collected = run(
+        fixture.path(),
+        &["memory", "read", "local/observed"],
+        &[
+            ("CONCORD_LOCUS_ENABLED", "true"),
+            (
+                "CONCORD_LOCUS_REPORT_FILE",
+                report.to_str().expect("collected path"),
+            ),
+            ("CODEX_THREAD_ID", "codex-thread"),
+        ],
+    );
+    assert_eq!(collected.status, muted.status);
+    assert_eq!(collected.stdout, muted.stdout);
+    assert_eq!(collected.stderr, muted.stderr);
+
+    let atoms = std::fs::read_to_string(report)
+        .expect("read collected atoms")
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("collected atom"))
+        .collect::<Vec<_>>();
+    assert!(
+        atoms
+            .iter()
+            .all(|atom| atom["context"]["locus.trace"] == "codex-thread")
+    );
+    let collection = &atoms[0]["collections"][0];
+    assert_eq!(collection["role"], "locus.trace");
+    assert_eq!(collection["binding"], "codex.thread");
+    assert_eq!(collection["collector"], "environment");
+    assert_eq!(collection["selector"], "CODEX_THREAD_ID");
+
+    let report = fixture.path().join("explicit.jsonl");
+    let explicit = run(
+        fixture.path(),
+        &["memory", "read", "local/observed"],
+        &[
+            ("CONCORD_LOCUS_ENABLED", "true"),
+            (
+                "CONCORD_LOCUS_REPORT_FILE",
+                report.to_str().expect("explicit path"),
+            ),
+            ("CONCORD_LOCUS_TRACE_ID", "explicit-trace"),
+            ("CODEX_THREAD_ID", "ignored-thread"),
+        ],
+    );
+    assert_eq!(explicit.status, muted.status);
+    assert_eq!(explicit.stdout, muted.stdout);
+    let atoms = std::fs::read_to_string(report)
+        .expect("read explicit atoms")
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("explicit atom"))
+        .collect::<Vec<_>>();
+    assert!(
+        atoms
+            .iter()
+            .all(|atom| atom["context"]["locus.trace"] == "explicit-trace")
+    );
+    assert!(atoms[0]["collections"].is_null());
 }
 
 #[test]
@@ -138,7 +201,8 @@ fn run(root: &Path, arguments: &[&str], environment: &[(&str, &str)]) -> Output 
         .env_remove("CONCORD_LOCUS_ENABLED")
         .env_remove("CONCORD_LOCUS_REPORT_FILE")
         .env_remove("CONCORD_LOCUS_TRACE_FILE")
-        .env_remove("CONCORD_LOCUS_TRACE_ID");
+        .env_remove("CONCORD_LOCUS_TRACE_ID")
+        .env_remove("CODEX_THREAD_ID");
     for (name, value) in environment {
         command.env(name, value);
     }
