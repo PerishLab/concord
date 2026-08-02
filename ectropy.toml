@@ -1,4 +1,9 @@
 [[boundary]]
+allow = ["fanout"]
+note = "stable changelog history is append-only and its version directories are fixed by release law"
+paths = ["docs/CHANGELOG"]
+
+[[boundary]]
 allow = [
     "path",
     "comment",
