@@ -39,7 +39,9 @@ authorship is never protocol truth.
   managed task substrate; product behavior does not enter either surface.
 - Concord owns one process-cycle readonly observation seat. The CLI binds its
   explicit config, reporter, exact `CODEX_THREAD_ID` collection, trace identity,
-  and context; kernel functions may only read that seat and append function
+  and context. When enabled, every parsed command appends product-owned start
+  and finish facts around dispatch; the finish code is a post-command fact.
+  Kernel functions may only read that seat and append independent function
   facts through Locus. A missing seat is the default muted state.
 
 ## Operating

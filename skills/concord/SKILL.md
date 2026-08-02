@@ -172,9 +172,9 @@ Concord currently enforces:
   available-memory observations with explicit `UNKNOWN`;
 - resource-import whole-tree size and headroom preflight, streaming private
   copy, plus refusal of links and special files;
-- default-muted memory observation, exact `CODEX_THREAD_ID` trace collection,
-  explicit trace override, and unchanged business output when observation is
-  enabled;
+- default-muted process-cycle observation, exact `CODEX_THREAD_ID` trace
+  collection, explicit trace override, command start/finish facts, and
+  unchanged business output when observation is enabled;
 - refusal to add a member when the target filesystem is already critical.
 
 The following remain agent-held law; no machine will stop every violation:

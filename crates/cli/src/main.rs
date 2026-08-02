@@ -11,7 +11,12 @@ use clap::Parser;
 fn main() {
     let cli = Cli::parse();
     let json = cli.json;
-    if let Err(error) = dispatch::run(cli) {
+    let observation = observation::Run::start(cli.command.name());
+    let result = dispatch::run(cli);
+    if let Some(observation) = observation {
+        observation.finish(i32::from(result.is_err()));
+    }
+    if let Err(error) = result {
         if json {
             eprintln!("{}", error_json(&error));
         } else {

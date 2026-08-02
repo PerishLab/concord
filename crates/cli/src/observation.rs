@@ -3,6 +3,7 @@ use locus::generator;
 use locus::reporter;
 use locus::{Candidate, Config, Context, Engine, Key, Policy, Role};
 use plumb::config::Cascade;
+use serde_json::json;
 use std::path::PathBuf;
 
 #[derive(Debug, Default, PartialEq, Cascade)]
@@ -27,9 +28,40 @@ struct Trace {
     id: String,
 }
 
-pub(crate) fn start() {
-    if let Some((engine, context)) = load() {
+pub(crate) struct Run {
+    command: &'static str,
+    context: Context,
+}
+
+impl Run {
+    pub(crate) fn start(command: &'static str) -> Option<Self> {
+        let (engine, context) = load()?;
+        let candidate = Candidate::event(json!({
+            "event": "cli.start",
+            "command": command,
+        }))
+        .ensure(Role::trace())
+        .ensure(Role::span());
+        let cycle = engine.append(&context, candidate).ok()?.context();
         concord_core::observation::install(engine, context);
+        Some(Self {
+            command,
+            context: cycle,
+        })
+    }
+
+    pub(crate) fn finish(self, code: i32) {
+        let Some((engine, _)) = concord_core::observation::view() else {
+            return;
+        };
+        let candidate = Candidate::event(json!({
+            "event": "cli.finish",
+            "command": self.command,
+            "code": code,
+        }))
+        .ensure(Role::trace())
+        .ensure(Role::span());
+        let _ = engine.append(&self.context, candidate);
     }
 }
 

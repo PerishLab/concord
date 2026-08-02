@@ -49,6 +49,23 @@ pub enum Command {
     Audit(AuditArgs),
 }
 
+impl Command {
+    pub(crate) fn name(&self) -> &'static str {
+        match self {
+            Self::Config(_) => "config",
+            Self::Domain(_) => "domain",
+            Self::Repo(_) => "repo",
+            Self::Task(_) => "task",
+            Self::Member(_) => "member",
+            Self::Memory(_) => "memory",
+            Self::Resource(_) => "resource",
+            Self::Permissions(_) => "permissions",
+            Self::Skill(_) => "skill",
+            Self::Audit(_) => "audit",
+        }
+    }
+}
+
 #[derive(Args)]
 pub struct ConfigArgs {
     #[command(subcommand)]

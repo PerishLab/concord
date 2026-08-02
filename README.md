@@ -22,7 +22,7 @@ environment, then arguments.
 `CONCORD_HOME` or `--home` selects user state. Concord does not assume
 `~/Projects`, and skill commands do not require task-domain configuration.
 
-Function observation is a separate, environment-only control section:
+Process-cycle observation is a separate, environment-only control section:
 
 ```text
 CONCORD_LOCUS_ENABLED=false
@@ -37,9 +37,10 @@ across processes. When present, `CODEX_THREAD_ID` is collected exactly and
 bound to `locus.trace`; an explicit trace ID wins over that collection, which
 in turn wins over shared or random generation. Collection provenance remains
 in the accepted Atom. Invalid observation config is handed to stderr after the
-fact and never replaces the command result. The cold-start surface currently
-covers only `memory` operations and records function entry plus normal return;
-other commands do not bootstrap observation.
+fact and never replaces the command result. Every successfully parsed CLI
+command emits product-owned `cli.start` and `cli.finish` facts with one shared
+span; the finish fact records the command's exit code only after dispatch has
+returned. Existing traced kernel functions remain independent nested facts.
 
 Common operations are explicit and composable:
 

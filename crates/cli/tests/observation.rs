@@ -49,9 +49,19 @@ fn observation() {
             trace.to_str().expect("trace path"),
         ),
     ];
+    let plain = run(
+        fixture.path(),
+        &["domain", "list"],
+        &[("CONCORD_LOCUS_ENABLED", "false")],
+    );
     let outside = run(fixture.path(), &["domain", "list"], &settings);
     assert!(outside.status.success());
-    assert!(!report.exists());
+    assert_eq!(outside.status, plain.status);
+    assert_eq!(outside.stdout, plain.stdout);
+    assert_eq!(outside.stderr, plain.stderr);
+    let atoms = read(&report);
+    cycle(&atoms, "domain", 0);
+    std::fs::remove_file(&report).expect("remove domain report");
 
     let observed = run(
         fixture.path(),
@@ -69,16 +79,23 @@ fn observation() {
     let trace: Value =
         serde_json::from_slice(&std::fs::read(&trace).expect("read trace")).expect("trace json");
     let trace = trace["key"].as_str().expect("trace key");
-    let atoms = std::fs::read_to_string(report)
-        .expect("read atoms")
-        .lines()
-        .map(|line| serde_json::from_str::<Value>(line).expect("atom json"))
-        .collect::<Vec<_>>();
+    let atoms = read(&report);
+    cycle(&atoms, "memory", 0);
     let functions = atoms
         .iter()
         .filter(|atom| atom["source"]["function"].is_string())
         .collect::<Vec<_>>();
     assert!(functions.len() >= 4);
+    let process = atoms
+        .iter()
+        .find(|atom| atom["payload"]["event"] == "cli.start")
+        .expect("cli start")["context"]["locus.span"]
+        .clone();
+    assert!(
+        functions
+            .iter()
+            .all(|atom| atom["context"]["locus.span"] != process)
+    );
     assert!(
         functions
             .iter()
@@ -118,11 +135,7 @@ fn observation() {
     assert_eq!(collected.stdout, muted.stdout);
     assert_eq!(collected.stderr, muted.stderr);
 
-    let atoms = std::fs::read_to_string(report)
-        .expect("read collected atoms")
-        .lines()
-        .map(|line| serde_json::from_str::<Value>(line).expect("collected atom"))
-        .collect::<Vec<_>>();
+    let atoms = read(&report);
     assert!(
         atoms
             .iter()
@@ -150,17 +163,36 @@ fn observation() {
     );
     assert_eq!(explicit.status, muted.status);
     assert_eq!(explicit.stdout, muted.stdout);
-    let atoms = std::fs::read_to_string(report)
-        .expect("read explicit atoms")
-        .lines()
-        .map(|line| serde_json::from_str::<Value>(line).expect("explicit atom"))
-        .collect::<Vec<_>>();
+    let atoms = read(&report);
     assert!(
         atoms
             .iter()
             .all(|atom| atom["context"]["locus.trace"] == "explicit-trace")
     );
     assert!(atoms[0]["collections"].is_null());
+
+    let report = fixture.path().join("failed.jsonl");
+    let baseline = run(
+        fixture.path(),
+        &["task", "show", "local/missing"],
+        &[("CONCORD_LOCUS_ENABLED", "false")],
+    );
+    let failed = run(
+        fixture.path(),
+        &["task", "show", "local/missing"],
+        &[
+            ("CONCORD_LOCUS_ENABLED", "true"),
+            (
+                "CONCORD_LOCUS_REPORT_FILE",
+                report.to_str().expect("failed path"),
+            ),
+            ("CODEX_THREAD_ID", "codex-thread"),
+        ],
+    );
+    assert_eq!(failed.status, baseline.status);
+    assert_eq!(failed.stdout, baseline.stdout);
+    assert_eq!(failed.stderr, baseline.stderr);
+    cycle(&read(&report), "task", 1);
 }
 
 #[test]
@@ -207,4 +239,34 @@ fn run(root: &Path, arguments: &[&str], environment: &[(&str, &str)]) -> Output 
         command.env(name, value);
     }
     command.output().expect("run concord")
+}
+
+fn read(path: &Path) -> Vec<Value> {
+    std::fs::read_to_string(path)
+        .expect("read atoms")
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("atom json"))
+        .collect()
+}
+
+fn cycle(atoms: &[Value], command: &str, code: i64) {
+    let start = atoms
+        .iter()
+        .find(|atom| atom["payload"]["event"] == "cli.start")
+        .expect("cli start");
+    let finish = atoms
+        .iter()
+        .find(|atom| atom["payload"]["event"] == "cli.finish")
+        .expect("cli finish");
+    assert_eq!(start["payload"]["command"], command);
+    assert_eq!(finish["payload"]["command"], command);
+    assert_eq!(finish["payload"]["code"], code);
+    assert_eq!(
+        start["context"]["locus.trace"],
+        finish["context"]["locus.trace"]
+    );
+    assert_eq!(
+        start["context"]["locus.span"],
+        finish["context"]["locus.span"]
+    );
 }

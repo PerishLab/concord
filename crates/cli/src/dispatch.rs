@@ -11,7 +11,6 @@ use crate::args::{
     RepoCommand,
 };
 use crate::config::Config;
-use crate::observation;
 use crate::output;
 use crate::skill;
 use concord_core::{Add, Result, Space};
@@ -63,7 +62,6 @@ impl Dispatch {
             Command::Task(task_args) => task::command(&self.space, task_args.command, self.json),
             Command::Member(member) => self.member(member.command),
             Command::Memory(memory) => {
-                observation::start();
                 artifact::memory_command(&self.space, memory.command, self.json)
             }
             Command::Resource(resource) => {
