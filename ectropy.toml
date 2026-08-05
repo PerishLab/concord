@@ -1014,5 +1014,65 @@ name = "private_directory"
 description = "Restoring private fixture file modes is one test operation."
 name = "private_file"
 
+[[vocabulary.term]]
+description = "The fixed task count for one bounded portfolio projection page."
+name = "TASK_BRIEF_LIMIT"
+
+[[vocabulary.term]]
+description = "The fixed UTF-8 byte ceiling for one projected task-memory section."
+name = "TASK_BRIEF_SECTION_BYTES"
+
+[[vocabulary.term]]
+description = "One bounded domain task projection is one Concord protocol result atom."
+name = "TaskBriefPage"
+
+[[vocabulary.term]]
+description = "The explicit ceilings carried by one task projection result."
+name = "TaskBriefLimits"
+
+[[vocabulary.term]]
+description = "One task and its memory evidence form one portfolio projection entry."
+name = "TaskBriefEntry"
+
+[[vocabulary.term]]
+description = "The byte ceiling for each memory section in a task projection."
+name = "section_bytes"
+
+[[vocabulary.term]]
+description = "The explicit memory state carried by a task projection entry."
+name = "MemoryBrief"
+
+[[vocabulary.term]]
+description = "One bounded UTF-8 memory section preview is one protocol value atom."
+name = "TextPreview"
+
+[[vocabulary.term]]
+description = "Projecting bounded bodies from selected memory sections is one memory read operation."
+name = "brief_sections"
+
+[[vocabulary.term]]
+description = "Extracting selected structured-memory bodies is one parser operation."
+name = "section_bodies"
+
+[[vocabulary.term]]
+description = "Binding one already-validated registry task avoids a second registry read."
+name = "bind_task"
+
+[[vocabulary.term]]
+description = "The bounded portfolio projection command and integration-test module are one product atom."
+name = "task_brief"
+
+[[vocabulary.term]]
+description = "This names registry-order projection across structured, absent, legacy, and unavailable memory."
+name = "brief_projects_registry_order_and_bounded_memory_evidence"
+
+[[vocabulary.term]]
+description = "This names fixed task-page limits and exact cursor refusal."
+name = "brief_pages_at_a_fixed_limit_and_refuses_unknown_cursors"
+
+[[vocabulary.term]]
+description = "This names the task brief JSON, human, and cursor CLI contract."
+name = "task_brief_cli_preserves_the_json_contract_and_human_cue"
+
 [word]
 single = true

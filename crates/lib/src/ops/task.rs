@@ -1,5 +1,10 @@
+mod brief;
 mod seat;
 mod todo;
+
+pub use brief::{
+    TASK_BRIEF_LIMIT, TASK_BRIEF_SECTION_BYTES, TaskBriefEntry, TaskBriefLimits, TaskBriefPage,
+};
 
 use super::{Plan, action};
 use crate::model::component;

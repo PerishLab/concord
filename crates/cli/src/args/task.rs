@@ -13,6 +13,13 @@ pub enum TaskCommand {
         #[arg(long)]
         domain: Option<String>,
     },
+    #[command(about = "Project bounded task and memory evidence for one domain")]
+    Brief {
+        #[arg(long)]
+        domain: String,
+        #[arg(long)]
+        after: Option<String>,
+    },
     #[command(about = "Show one resolved task")]
     Show { task: String },
     #[command(about = "Start a repo-less task")]

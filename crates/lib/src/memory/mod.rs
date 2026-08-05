@@ -1,3 +1,4 @@
+mod brief;
 mod copy;
 pub(crate) mod format;
 mod phase;
@@ -8,6 +9,7 @@ use crate::{Error, Result, TaskRef};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
+pub use brief::{MemoryBrief, TextPreview};
 pub use format::{
     MAX_MAIN_BYTES, MAX_MAIN_LINES, MAX_PHASE_BYTES, MAX_PHASE_LINES, MAX_RAW_READ_BYTES,
 };

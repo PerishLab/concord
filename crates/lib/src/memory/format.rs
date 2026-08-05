@@ -103,6 +103,31 @@ pub fn project(current: &str, revision: &str, keys: &[String]) -> Result<String>
     Ok(projected)
 }
 
+pub fn section_bodies<'a>(
+    current: &'a str,
+    keys: &[String],
+) -> Result<Vec<(&'static str, &'a str)>> {
+    let parsed = validate_main(current)?.ok_or_else(|| {
+        Error::typed(
+            "memory.unstructured",
+            "section preview requires concord-memory:v1",
+        )
+    })?;
+    selected(&parsed, keys)?
+        .into_iter()
+        .map(|section| {
+            let source = &current[section.range.clone()];
+            let (_, body) = source.split_once('\n').ok_or_else(|| {
+                Error::typed(
+                    "memory.schema",
+                    "fixed memory section heading must end with a newline",
+                )
+            })?;
+            Ok((section.key, body.trim()))
+        })
+        .collect()
+}
+
 #[locus::trace(with = crate::observation::view())]
 pub fn parse_patch(patch_source: &str) -> Result<Patch> {
     limits(patch_source, "memory patch", MAX_MAIN_BYTES, MAX_MAIN_LINES)?;

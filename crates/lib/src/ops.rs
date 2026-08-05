@@ -3,6 +3,10 @@ mod domain;
 mod member;
 mod task;
 
+pub use task::{
+    TASK_BRIEF_LIMIT, TASK_BRIEF_SECTION_BYTES, TaskBriefEntry, TaskBriefLimits, TaskBriefPage,
+};
+
 use serde::Serialize;
 use std::path::Path;
 

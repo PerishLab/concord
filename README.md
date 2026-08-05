@@ -47,12 +47,27 @@ Common operations are explicit and composable:
 ```text
 concord domain list
 concord task start perish.code/ship-feature
+concord task brief --domain perish.code
 concord task todo add perish.code/ship-feature follow-up
 concord member add perish.code/ship-feature --source /srv/projects/perish.code/repo
 concord audit perish.code/ship-feature
 concord member preflight perish.code/ship-feature
 concord memory read perish.code/ship-feature --json
 ```
+
+`task brief` is a bounded, read-only portfolio projection. It keeps registry
+order and reports each task's existing registry state plus `focus` and `next`
+memory evidence; it does not rank, schedule, or infer readiness. One page
+contains at most 64 tasks and at most 512 UTF-8 bytes from each projected
+section. Missing, legacy, and unreadable memory remain explicit. Continue a
+large domain with the exact cursor returned as `next`:
+
+```text
+concord task brief --domain perish.code --after TASK
+```
+
+JSON output uses the versioned `concord.task-brief:v1` envelope. An unknown
+cursor fails with `task.brief_cursor` instead of silently changing the page.
 
 A task todo is an outgoing reference to another ordinary task in the same
 domain. It records a concrete future obligation before that task needs a

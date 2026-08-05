@@ -1,8 +1,11 @@
 mod audit_report;
+mod task;
 
 use concord_core::{Audit, Error, LandingProof, Plan, Preflight, Result};
 use plumb::skill::{Done, Record, Report};
 use serde_json::json;
+
+pub use task::brief as task_brief;
 
 pub fn plan(plan: &Plan, json_output: bool) -> Result<()> {
     if json_output {

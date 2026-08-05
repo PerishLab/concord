@@ -23,8 +23,11 @@ pub use config::Root;
 pub use error::{Error, Result};
 pub use memory::{
     MAX_MAIN_BYTES, MAX_MAIN_LINES, MAX_PHASE_BYTES, MAX_PHASE_LINES, MAX_RAW_READ_BYTES, Memory,
-    MemoryChange, MemoryRead, PhaseEntry,
+    MemoryBrief, MemoryChange, MemoryRead, PhaseEntry, TextPreview,
 };
-pub use ops::{Action, Add, MigrationClaim, Plan};
+pub use ops::{
+    Action, Add, MigrationClaim, Plan, TASK_BRIEF_LIMIT, TASK_BRIEF_SECTION_BYTES, TaskBriefEntry,
+    TaskBriefLimits, TaskBriefPage,
+};
 pub use protocol::{BoundaryCheck, BoundaryProof, Member, PLUMB_VERSION, Registry, Repo, Task};
 pub use store::{Domain, Space, TaskRef};

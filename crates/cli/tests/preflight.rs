@@ -1,4 +1,4 @@
-use concord_core::{Add, Root, Space};
+use concord_core::{Add, PLUMB_VERSION, Root, Space};
 use serde_json::Value;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -76,7 +76,7 @@ fn preflight_prints_replayable_member_proof_and_keeps_faults_explicit() {
         String::from_utf8_lossy(&boundary.stderr)
     );
     let boundary: Value = serde_json::from_slice(&boundary.stdout).expect("boundary json");
-    assert_eq!(boundary["proof"]["plumb"], "v0.18.13");
+    assert_eq!(boundary["proof"]["plumb"], PLUMB_VERSION);
     assert_eq!(boundary["proof"]["schema"], "plumb.precommit/v1");
 
     let output = run(

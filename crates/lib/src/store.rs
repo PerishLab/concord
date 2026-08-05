@@ -165,10 +165,14 @@ impl Domain {
             .into_iter()
             .find(|task| task.name == name)
             .ok_or_else(|| Error::new(format!("task not found: {}/{}", self.name, name)))?;
-        Ok(TaskRef {
+        Ok(self.bind_task(task))
+    }
+
+    pub(crate) fn bind_task(&self, task: Task) -> TaskRef {
+        TaskRef {
             domain: self.clone(),
             task,
-        })
+        }
     }
 
     pub fn registry(&self) -> Result<Registry> {

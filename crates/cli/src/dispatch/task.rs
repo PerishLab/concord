@@ -12,6 +12,10 @@ pub(crate) fn command(space: &Space, command: TaskCommand, json_output: bool) ->
             output::value(serde_json::Value::Array(values), json_output);
             Ok(())
         }
+        TaskCommand::Brief { domain, after } => {
+            let brief = space.task_brief(&domain, after.as_deref())?;
+            output::task_brief(&brief, json_output)
+        }
         TaskCommand::Show { task } => {
             let task = space.resolve(&task)?;
             output::value(
