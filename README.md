@@ -125,6 +125,12 @@ to 400 lines/64 KiB and each immutable PHASE to 800 lines/128 KiB. Audit
 reports schema and limit violations as non-gating memory hygiene, while 16
 retained phases emit a non-failing advisory.
 
+Once `memory settle` creates a phase, that immutable lineage is also a
+lifecycle boundary: `concord memory remove` refuses the whole `.task/` tree.
+Keep the repo-less task as retained history and put later work in a follow-up
+task. Exact removal remains available for unphased memory, so mistaken or
+never-settled task setup can still be cleaned up before `task finish`.
+
 Resource payload remains opaque after Concord allocates or imports its private
 seat:
 

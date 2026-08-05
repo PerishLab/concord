@@ -86,6 +86,14 @@ fn repo_less_task_memory_obeys_revisions_and_consent_boundaries() {
         .expect("replace memory");
     assert_ne!(first.revision, second.revision);
     assert!(memory.write(&first.revision, "stale").is_err());
+    fixture
+        .space
+        .memory_remove("local/memory", true)
+        .expect("remove exact unphased memory target");
+    memory
+        .init("# Current objective\n\nShip Concord.\n")
+        .expect("reinitialize task memory");
+    let second = memory.read().expect("read reinitialized memory");
 
     let (current, phase) = memory
         .settle(
@@ -99,14 +107,17 @@ fn repo_less_task_memory_obeys_revisions_and_consent_boundaries() {
     assert!(task.audit().expect("audit task").ok());
     assert!(fixture.space.task_finish("local/memory", false).is_err());
 
-    fixture
+    let error = fixture
         .space
         .memory_remove("local/memory", true)
-        .expect("remove exact memory target");
-    fixture
-        .space
-        .task_finish("local/memory", true)
-        .expect("finish empty task");
+        .expect_err("retained phases must refuse memory removal");
+    assert!(
+        error
+            .to_string()
+            .contains("memory remove refuses task lineage with 1 retained phase(s)")
+    );
+    assert!(phase.is_file());
+    assert!(memory.read().is_ok());
 }
 
 #[cfg(unix)]

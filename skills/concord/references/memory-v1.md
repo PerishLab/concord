@@ -89,6 +89,10 @@ It has exactly these document-root H2 sections in order:
 MAIN and all retained phases use the same format. A created phase is immutable.
 `memory phase list` validates names, continuity, format, and limits before
 listing. `memory phase read TASK NUMBER` reads one validated phase.
+Immutability also holds at task cleanup: once any phase exists, `memory remove`
+refuses to delete the `.task/` tree. Retain that repo-less task as lineage and
+start a follow-up task for later work. Unphased memory remains exactly
+removable.
 
 Settle requires the replacement MAIN to differ from the held MAIN before it
 allocates the next `PHASE-NN.md`. If phase creation succeeds but MAIN

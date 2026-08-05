@@ -202,8 +202,10 @@ implied by task cleanup.
 ### Finish
 
 Landing the final member leaves a valid repo-less task. Retain it while memory
-or non-Git artifacts remain useful. If nothing remains, or exact deletion has
-been authorized:
+or non-Git artifacts remain useful. A task with any settled phase remains as
+lineage: Concord refuses whole-memory removal, so record later work in a
+follow-up task instead of erasing the settled task. For an unphased task where
+nothing remains, or exact deletion has been authorized:
 
 - A task still referenced by another task's todo cannot finish. Remove the
   incoming relations explicitly or finish their source tasks first.
@@ -212,13 +214,14 @@ been authorized:
   targets in their normal task lifecycle.
 
 1. remove exact resource seats through Concord;
-2. remove `.task/` through `concord memory remove ... --apply`;
+2. remove the unphased `.task/` through `concord memory remove ... --apply`;
 3. finish the now-empty task through `concord task finish ... --apply`.
 
-Existing `.task/` and retained task artifacts follow exact-target consent.
-Unsuperseded consent recorded as live state remains valid across sessions.
-Landing authorization to discard member files and task-memory deletion consent
-do not imply one another.
+Existing unphased `.task/` and retained task artifacts follow exact-target
+consent. Unsuperseded consent recorded as live state remains valid across
+sessions. A settled phase is not deletable through Concord. Landing
+authorization to discard member files and task-memory deletion consent do not
+imply one another.
 
 ## Long-running memory
 

@@ -6,9 +6,20 @@ impl Space {
     pub fn memory_remove(&self, identity: &str, apply: bool) -> Result<Plan> {
         let task = self.resolve(identity)?;
         task.ensure_exact()?;
-        let root = crate::Memory::new(&task).root();
+        let memory = crate::Memory::new(&task);
+        let root = memory.root();
         if !root.is_dir() {
             return Err(Error::new("task memory does not exist"));
+        }
+        let phases = memory.phases()?;
+        if !phases.is_empty() {
+            return Err(Error::typed(
+                "memory.remove_retained_phases",
+                format!(
+                    "memory remove refuses task lineage with {} retained phase(s)",
+                    phases.len()
+                ),
+            ));
         }
         let actions = vec![action("remove-tree", &root, "exact task memory target")];
         if apply {

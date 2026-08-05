@@ -79,8 +79,9 @@ building or operating a repository rather than restating its clauses here.
    member. Land through the repository's own process, verify reachability,
    cleanliness, and the still-current proof, then remove only the landed member
    seat. Before task finish, inspect outgoing todos and make their handoff
-   explicit. Finish a repo-less task only after retained state is absent or its
-   exact deletion is authorized.
+   explicit. A task with settled phases remains as lineage; start a follow-up
+   task rather than deleting it. Finish a repo-less task only after all
+   unphased retained state is absent or its exact deletion is authorized.
 
 When durable memory is first needed, initialize the v1 envelope from
 `references/memory-v1.md` through `--file -` by default.
@@ -117,8 +118,9 @@ When durable memory is first needed, initialize the v1 envelope from
   expected whole-file revision and preserve untouched source bytes.
 - `.task/` exists only for durable multi-round memory or artifacts. `MAIN.md`
   carries live execution state; settled rationale moves into numbered phases.
-- Existing memory and retained task artifacts require exact-target deletion
-  consent. Landing permission to discard member files is separate.
+- Existing unphased memory and retained task artifacts require exact-target
+  deletion consent. Settled phases cannot be removed through Concord. Landing
+  permission to discard member files is separate.
 - Resource health is a low-frequency task-entry audit surface. It has no
   history database, does not attribute arbitrary processes, and never
   authorizes automatic cleanup.
@@ -166,6 +168,7 @@ Concord currently enforces:
 - explicit plans, default-on creation, and execution gates for destructive or
   migratory commands;
 - task finish only when no members or retained filesystem state remain;
+- refusal to remove a `.task/` tree once any immutable phase is retained;
 - task, member, memory, and resource-seat allocated-footprint observations in
   every task audit;
 - filesystem capacity, inode capacity where available, and host
