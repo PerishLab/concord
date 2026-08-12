@@ -4,6 +4,11 @@ Concord is the executable control plane for the private `.tasks` + `.task`
 protocol. Its filesystem and Git checks are protocol mechanics; agent or human
 authorship is never protocol truth.
 
+One Keel SQLite estate owns the structured state of one configured Space;
+worktrees and direct Artifact directories remain external payload. Keel
+bootstrap is the only estate genesis path, and ordinary open only replays the
+exact sealed model.
+
 ## Laws
 
 - Fail closed when the exact estate, Task coordinates, external seats, source
@@ -84,7 +89,7 @@ authorship is never protocol truth.
   stable capsule compiler before anything irreversible.
   `plumb doctor` does not check this: a changelog is owed by a release, not by a
   working tree. A release requiring nothing of anyone still writes MIGRATION.md
-  saying so. See `plumb/docs/changelog.md`.
+  saying so. Follow the release-local contract under `docs/CHANGELOG`.
 - A version-owned migration entrypoint is a closed Concord contract under
   `docs/CHANGELOG/v<version>/artifacts/`. Plumb preserves its opaque bytes;
   Concord tests the script pair, historical engine identity, help surface and

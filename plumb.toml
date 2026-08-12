@@ -9,5 +9,13 @@ targets = [
 ]
 skill = true
 
-[skill]
+[[document]]
+strategy = "agent"
+source = [{ path = ".", seal = "2b381e1366c3d0ec3c0c15c412d1e92c79f1457e0356190e5cf76247c3547e6c" }]
+target-seal = "e019fe21d644837c1bb440cb5781bcc7d3d9713344b584cec4aca4944a864531"
+
+[[document]]
 strategy = "brief"
+name = "concord"
+source = [{ path = ".", seal = "2b381e1366c3d0ec3c0c15c412d1e92c79f1457e0356190e5cf76247c3547e6c" }]
+target-seal = "fd009b86f4cdcd1ad4df2c502ebb389ab4714c7018c01595540832e5df9beee5"
