@@ -2,7 +2,7 @@ mod preflight;
 
 use super::super::World;
 use super::{Estate, active};
-use crate::model::component;
+use crate::component;
 use crate::path::at;
 use crate::{Error, Result};
 pub use preflight::Survey;
@@ -102,12 +102,12 @@ impl Estate {
         at(&root).directory()?;
         at(&target).directory()?;
         let copied = if source.is_dir() {
-            crate::memory::copy::tree(&source, &target)
+            super::copy::tree(&source, &target)
         } else {
             let name = source
                 .file_name()
                 .ok_or_else(|| Error::new("Artifact source has no filename"))?;
-            crate::memory::copy::file(&source, &target.join(name))
+            super::copy::file(&source, &target.join(name))
         };
         if let Err(error) = copied {
             let _ = std::fs::remove_dir_all(&target);

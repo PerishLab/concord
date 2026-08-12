@@ -85,3 +85,7 @@ authorship is never protocol truth.
   `plumb doctor` does not check this: a changelog is owed by a release, not by a
   working tree. A release requiring nothing of anyone still writes MIGRATION.md
   saying so. See `plumb/docs/changelog.md`.
+- A version-owned migration entrypoint is a closed Concord contract under
+  `docs/CHANGELOG/v<version>/artifacts/`. Plumb preserves its opaque bytes;
+  Concord tests the script pair, historical engine identity, help surface and
+  product-specific safety law.

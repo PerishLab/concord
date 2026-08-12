@@ -48,15 +48,3 @@ impl From<std::io::Error> for Error {
         Self::new(error.to_string())
     }
 }
-
-impl From<toml::de::Error> for Error {
-    fn from(error: toml::de::Error) -> Self {
-        Self::new(error.to_string())
-    }
-}
-
-impl From<toml::ser::Error> for Error {
-    fn from(error: toml::ser::Error) -> Self {
-        Self::new(error.to_string())
-    }
-}

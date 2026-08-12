@@ -3,9 +3,9 @@
 ## Existing state needs migration
 
 On `concord.estate.absent` or `concord.estate.upgrade_required`, follow the exact
-[English v0.10.0 migration contract](https://git.perish.top/PerishFire/concord/src/tag/v0.10.0/docs/CHANGELOG/v0.10.0/en/MIGRATION.md)
-or [Chinese contract](https://git.perish.top/PerishFire/concord/src/tag/v0.10.0/docs/CHANGELOG/v0.10.0/zh/MIGRATION.md).
-Do not invent compatibility steps.
+[English v0.11.0 migration contract](https://git.perish.top/PerishFire/concord/src/tag/v0.11.0/docs/CHANGELOG/v0.11.0/en/MIGRATION.md)
+or [Chinese contract](https://git.perish.top/PerishFire/concord/src/tag/v0.11.0/docs/CHANGELOG/v0.11.0/zh/MIGRATION.md).
+Use the release-sealed script named there; do not invent compatibility steps.
 
 ## Related work is surprising
 

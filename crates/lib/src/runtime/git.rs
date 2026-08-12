@@ -6,11 +6,6 @@ pub struct Checkout<'a> {
     root: &'a Path,
 }
 
-pub struct Seat {
-    pub identity: PathBuf,
-    pub branch: String,
-}
-
 pub fn at(root: &Path) -> Checkout<'_> {
     Checkout { root }
 }
@@ -43,31 +38,6 @@ impl Checkout<'_> {
     pub fn identity(&self) -> Result<PathBuf> {
         let path = self.text(&["rev-parse", "--path-format=absolute", "--git-common-dir"])?;
         PathBuf::from(path).canonicalize().map_err(Into::into)
-    }
-
-    #[locus::trace(with = crate::observation::view())]
-    pub fn seat(&self) -> Result<Seat> {
-        let text = self.text(&[
-            "rev-parse",
-            "--path-format=absolute",
-            "--git-common-dir",
-            "--abbrev-ref",
-            "HEAD",
-        ])?;
-        let mut lines = text.lines();
-        let identity = lines
-            .next()
-            .ok_or_else(|| Error::new("git seat is missing common directory"))?;
-        let branch = lines
-            .next()
-            .ok_or_else(|| Error::new("git seat is missing branch"))?;
-        if lines.next().is_some() {
-            return Err(Error::new("git seat produced unexpected output"));
-        }
-        Ok(Seat {
-            identity: PathBuf::from(identity).canonicalize()?,
-            branch: branch.into(),
-        })
     }
 
     #[locus::trace(with = crate::observation::view())]

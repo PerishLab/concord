@@ -1,7 +1,7 @@
 use super::super::task::reserved;
 use super::super::{Estate, Life, World, fault};
+use crate::component;
 use crate::git;
-use crate::model::component;
 use crate::path::at;
 use crate::{Error, Result};
 use std::path::{Path, PathBuf};

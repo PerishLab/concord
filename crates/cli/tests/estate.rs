@@ -98,7 +98,7 @@ fn estate() {
             .any(|finding| finding["code"] == "dependency.cross_domain")
     );
 
-    for removed in ["todo", "memory", "resource"] {
+    for removed in ["todo", "memory", "resource", "migration"] {
         let output = raw(fixture.path(), &[removed]);
         assert!(!output.status.success(), "{removed} must stay absent");
         assert!(String::from_utf8_lossy(&output.stderr).contains("unrecognized subcommand"));

@@ -9,7 +9,7 @@ mod task;
 use crate::args::{self, Command};
 use crate::config::Config;
 use crate::{output, skill};
-use concord_core::{Estate, Result, Seat, Space};
+use concord_core::{Estate, Result, Seat};
 use serde_json::json;
 
 pub async fn run(cli: args::Cli) -> Result<()> {
@@ -38,7 +38,6 @@ pub async fn run(cli: args::Cli) -> Result<()> {
     let root = config.root()?;
     let seat = Seat::new(root.path());
     match command {
-        Command::Migration(args) => migrate(&seat, Space::new(root), args, cli.json).await,
         Command::Domain(args)
             if matches!(args.command, crate::args::domain::Command::Bootstrap { .. }) =>
         {
@@ -68,7 +67,7 @@ struct Dispatch {
 impl Dispatch {
     async fn run(&self, command: Command) -> Result<()> {
         match command {
-            Command::Config(_) | Command::Skill(_) | Command::Migration(_) => {
+            Command::Config(_) | Command::Skill(_) => {
                 unreachable!("handled before estate open")
             }
             Command::Domain(args) => domain::run(&self.estate, args.command, self.json).await,
@@ -109,27 +108,6 @@ impl Dispatch {
                     self.json,
                 )
             }
-        }
-    }
-}
-
-async fn migrate(seat: &Seat, legacy: Space, args: args::Migration, json: bool) -> Result<()> {
-    use args::migration::Command;
-    match args.command {
-        Command::Survey => emit(json!({"census": seat.survey(&legacy)?}), json),
-        Command::Stage => {
-            let staged = seat.stage(&legacy).await?;
-            emit(json!({"root": staged.root, "census": staged.census}), json)
-        }
-        Command::Resume { fingerprint } => {
-            let staged = seat.resume(&legacy, &fingerprint).await?;
-            emit(json!({"root": staged.root, "census": staged.census}), json)
-        }
-        Command::Activate { fingerprint, apply } => {
-            explicit(apply, "migration activate")?;
-            let staged = seat.resume(&legacy, &fingerprint).await?;
-            let active = staged.activate(&legacy, &fingerprint).await?;
-            emit(json!({"root": active.root, "census": active.census}), json)
         }
     }
 }

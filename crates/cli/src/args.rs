@@ -3,7 +3,6 @@ pub(crate) mod audit;
 pub(crate) mod domain;
 pub(crate) mod graph;
 pub(crate) mod member;
-pub(crate) mod migration;
 pub(crate) mod phase;
 pub(crate) mod task;
 
@@ -16,7 +15,6 @@ pub use audit::Args as Audit;
 pub use domain::Args as Domain;
 pub use graph::Args as Graph;
 pub use member::Args as Member;
-pub use migration::Args as Migration;
 pub use phase::Args as Phase;
 pub use task::Args as Task;
 
@@ -55,8 +53,6 @@ pub enum Command {
     Graph(Graph),
     #[command(about = "Audit estate, graph, and external agreement")]
     Audit(Audit),
-    #[command(about = "Stage and activate the v0.10.0 estate migration")]
-    Migration(Migration),
     #[command(about = "Manage Concord agent skill installations")]
     Skill(Skill),
 }
@@ -72,7 +68,6 @@ impl Command {
             Self::Artifact(_) => "artifact",
             Self::Graph(_) => "graph",
             Self::Audit(_) => "audit",
-            Self::Migration(_) => "migration",
             Self::Skill(_) => "skill",
         }
     }

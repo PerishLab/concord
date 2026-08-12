@@ -1,5 +1,6 @@
 mod artifact;
 mod claim;
+mod copy;
 mod proof;
 mod release;
 
@@ -10,8 +11,8 @@ pub use release::Release;
 
 use super::World;
 use super::{Estate, Life, fault};
+use crate::component;
 use crate::git;
-use crate::model::component;
 use crate::path::at;
 use crate::{Error, Result};
 use serde::Serialize;

@@ -12,7 +12,6 @@ mod current;
 mod data;
 mod dependency;
 mod graph;
-mod migration;
 mod model;
 mod phase;
 mod task;
@@ -26,7 +25,6 @@ pub use data::{
     Current, Cut, Degree, Edge, Edit, Entry, Fact, Finish, Flow, Graph, Life, Link, Node, Origin,
     Part, Patch, Phase, Realm, Role, Settle, Settlement, Tune, Weight,
 };
-pub use migration::{Activation, Census, Evidence, Staging};
 pub use task::{Annotate, Rehome, Rename, Repository};
 pub use work::{
     Artifact, Attach, Claiming, Import, Proof, Proving, Release, Removal, Survey, Worktree,
@@ -82,7 +80,7 @@ impl Seat {
             return Err(Error::typed(
                 "concord.estate.absent",
                 format!(
-                    "Concord estate is absent at {}; bootstrap a new Space or follow docs/CHANGELOG/v0.10.0/{{en,zh}}/MIGRATION.md for a legacy Space",
+                    "Concord estate is absent at {}; bootstrap a new Space or follow docs/CHANGELOG/v0.11.0/{{en,zh}}/MIGRATION.md for a legacy Space",
                     self.root.display()
                 ),
             ));
@@ -116,13 +114,6 @@ impl Seat {
         let sudo = held.mint().await.map_err(fault)?;
         at(&self.sudo()).file(&sudo)?;
         Ok(sudo)
-    }
-
-    fn nested(&self, root: PathBuf) -> Self {
-        Self {
-            space: self.space.clone(),
-            root,
-        }
     }
 }
 
@@ -174,7 +165,7 @@ fn upgrade(error: keel::adapt::Error) -> Error {
     Error::typed(
         "concord.estate.upgrade_required",
         format!(
-            "{error}; follow the exact release contract in docs/CHANGELOG/v0.10.0/{{en,zh}}/MIGRATION.md"
+            "{error}; follow the exact release contract in docs/CHANGELOG/v0.11.0/{{en,zh}}/MIGRATION.md"
         ),
     )
 }

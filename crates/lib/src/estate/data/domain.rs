@@ -1,5 +1,5 @@
 use super::super::{Estate, World, fault};
-use crate::model::component;
+use crate::component;
 use crate::{Error, Result};
 use keel::Tx;
 use keel::adapt::db::Sqlite;

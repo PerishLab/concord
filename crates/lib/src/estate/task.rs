@@ -1,6 +1,6 @@
 use super::World;
 use super::{Estate, Finish, Life, Node, Origin, Realm, Weight, fault};
-use crate::model::component;
+use crate::component;
 use crate::{Error, Result};
 use keel::Tie;
 

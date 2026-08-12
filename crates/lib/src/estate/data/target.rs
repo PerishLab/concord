@@ -1,6 +1,6 @@
 use super::super::task::reserved;
 use super::super::{Estate, World};
-use crate::model::component;
+use crate::component;
 use crate::{Error, Result};
 
 pub(super) enum Target {

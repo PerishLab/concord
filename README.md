@@ -29,7 +29,8 @@ concord domain list
 Ordinary open replays the exact sealed model using the retained private sudo
 possession. It never creates, binds, or evolves an occupied estate implicitly.
 Legacy Spaces must follow the exact bilingual
-[v0.10.0 migration contract](docs/CHANGELOG/v0.10.0/en/MIGRATION.md).
+[v0.11.0 migration contract](docs/CHANGELOG/v0.11.0/en/MIGRATION.md) and its
+release-sealed script; migration is not a current Concord subcommand.
 
 Domain, typed Repository annotation, permanent Task identity, current Task
 facts, frozen Phases, Member/Claim/Boundary state, lifetime name Reservations,
