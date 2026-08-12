@@ -1,85 +1,20 @@
-use super::{Memory, MemoryChange, MemoryRead, format, read, revision_error};
-use crate::path::at;
+use super::{Memory, Read, format, read};
 use crate::{Error, Result};
-use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-#[derive(Clone, Debug, Serialize)]
-pub struct PhaseEntry {
+pub(crate) struct Epoch {
     pub number: u32,
     pub path: String,
-    pub revision: String,
-    pub structured: bool,
 }
 
 impl Memory<'_> {
-    pub fn settle(
-        &self,
-        expected: &str,
-        phase: &str,
-        current: &str,
-    ) -> Result<(MemoryChange, PathBuf)> {
-        format::validate_main(current)?;
-        let _lock = self.task.lock()?;
-        self.task.ensure_exact()?;
-        let held = self.read()?;
-        if held.revision != expected {
-            return Err(revision_error(expected, &held.revision));
-        }
-        if held.content == current {
-            return Err(Error::typed(
-                "memory.settle_unchanged",
-                "memory settle requires MAIN.md to change before allocating a phase",
-            ));
-        }
-        let held_kind = format::main_kind(&held.content)?;
-        let current_kind = format::main_kind(current)?;
-        if held_kind == format::Kind::V1 && current_kind != format::Kind::V1 {
-            return Err(Error::typed(
-                "memory.downgrade",
-                "ordinary memory settle cannot downgrade concord-memory:v1",
-            ));
-        }
-        let phase_kind = format::phase_kind(phase)?;
-        if (current_kind == format::Kind::V1) != (phase_kind == format::Kind::V1) {
-            return Err(Error::typed(
-                "memory.settle_format",
-                "memory settle requires MAIN.md and PHASE to use the same format",
-            ));
-        }
-        format::validate_phase(phase, current_kind == format::Kind::V1)?;
-        let phases = self.root().join("phases");
-        let existing = entries(&phases, current_kind == format::Kind::V1)?;
-        at(&phases).directory()?;
-        let path = phases.join(name(existing.len() as u32));
-        at(&path).file(phase)?;
-        match self.write_held(expected, current) {
-            Ok(read) => Ok((read, path)),
-            Err(error) => {
-                let current_revision = self
-                    .read()
-                    .map(|read| read.revision)
-                    .unwrap_or_else(|_| held.revision);
-                Err(Error::typed(
-                    "memory.settle_partial",
-                    format!("{error}; complete phase remains at {}", path.display()),
-                )
-                .with_details(serde_json::json!({
-                    "applied": true,
-                    "phase": path.display().to_string(),
-                    "current_revision": current_revision,
-                })))
-            }
-        }
-    }
-
-    pub fn phases(&self) -> Result<Vec<PhaseEntry>> {
+    pub(crate) fn phases(&self) -> Result<Vec<Epoch>> {
         let main = self.read()?;
-        let structured = format::main_kind(&main.content)? == format::Kind::V1;
+        let structured = format::kind(&main.content, format::Schema::Main)? == format::Kind::V1;
         entries(&self.root().join("phases"), structured)
     }
 
-    pub fn phase(&self, number: u32) -> Result<MemoryRead> {
+    pub(crate) fn phase(&self, number: u32) -> Result<Read> {
         let phases = self.phases()?;
         let entry = phases
             .iter()
@@ -92,13 +27,9 @@ impl Memory<'_> {
             })?;
         read(Path::new(&entry.path))
     }
-
-    pub(super) fn ensure_structured_transition(&self) -> Result<()> {
-        entries(&self.root().join("phases"), true).map(|_| ())
-    }
 }
 
-fn entries(root: &Path, structured: bool) -> Result<Vec<PhaseEntry>> {
+fn entries(root: &Path, structured: bool) -> Result<Vec<Epoch>> {
     if !root.exists() {
         return Ok(Vec::new());
     }
@@ -148,12 +79,10 @@ fn entries(root: &Path, structured: bool) -> Result<Vec<PhaseEntry>> {
             ));
         }
         let read = read(&path)?;
-        format::validate_phase(&read.content, structured)?;
-        phases.push(PhaseEntry {
+        format::phase(&read.content, structured)?;
+        phases.push(Epoch {
             number,
             path: read.path,
-            revision: read.revision,
-            structured: format::phase_kind(&read.content)? == format::Kind::V1,
         });
     }
     Ok(phases)

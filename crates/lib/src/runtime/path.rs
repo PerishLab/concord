@@ -1,5 +1,4 @@
 use crate::{Error, Result};
-use sha2::{Digest, Sha256};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -73,7 +72,7 @@ impl Managed<'_> {
             .and_then(|value| value.to_str())
             .ok_or_else(|| Error::new("managed filename is not utf8"))?;
         let temporary = parent.join(format!(".{name}.concord-{}", std::process::id()));
-        let result = copy_install(source, &temporary, self.path, permissions);
+        let result = copy(source, &temporary, self.path, permissions);
         if result.is_err() {
             let _ = std::fs::remove_file(&temporary);
         }
@@ -119,7 +118,7 @@ fn install(temporary: &Path, path: &Path, bytes: &[u8], permissions: u32) -> Res
     Ok(())
 }
 
-fn copy_install(source: &Path, temporary: &Path, target: &Path, permissions: u32) -> Result<()> {
+fn copy(source: &Path, temporary: &Path, target: &Path, permissions: u32) -> Result<()> {
     let mut source = std::fs::File::open(source)?;
     let mut file = std::fs::OpenOptions::new()
         .write(true)
@@ -130,8 +129,4 @@ fn copy_install(source: &Path, temporary: &Path, target: &Path, permissions: u32
     at(temporary).mode(permissions)?;
     std::fs::rename(temporary, target)?;
     Ok(())
-}
-
-pub fn revision(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
 }

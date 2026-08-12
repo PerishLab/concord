@@ -1,7 +1,7 @@
 use super::*;
 
 struct Check<'a> {
-    task: &'a TaskRef,
+    task: &'a Legacy,
     member: &'a crate::Member,
     path: &'a Path,
     source: &'a Path,
@@ -13,13 +13,13 @@ struct Inspection<'a, 'b> {
 }
 
 #[locus::trace(with = crate::observation::view())]
-pub(super) fn member_audit(
+pub(super) fn inspect(
     audit: &mut Audit,
-    task: &TaskRef,
+    task: &Legacy,
     member: &crate::Member,
     version: u32,
 ) -> Result<()> {
-    let path = task.member_path(&member.name);
+    let path = task.member(&member.name);
     if !path.is_dir() {
         audit.fault("presence", &path, "declared member path is missing");
         return Ok(());
@@ -31,7 +31,7 @@ pub(super) fn member_audit(
             return Ok(());
         }
     };
-    let source_id = git::at(&source).identity();
+    let origin = git::at(&source).identity();
     let seat = git::at(&path).seat();
     let mut inspection = Inspection {
         audit,
@@ -42,7 +42,7 @@ pub(super) fn member_audit(
             source: &source,
         },
     };
-    inspection.identities(&source_id, &seat);
+    inspection.identities(&origin, &seat);
     if source.is_dir() && !git::at(&source).registered(&path)? {
         inspection.audit.fault(
             "worktree",
@@ -56,15 +56,15 @@ pub(super) fn member_audit(
 }
 
 impl Inspection<'_, '_> {
-    fn identities(&mut self, source_id: &Result<std::path::PathBuf>, seat: &Result<git::Seat>) {
-        match (source_id, seat) {
-            (Ok(source_id), Ok(seat)) if source_id != &seat.identity => self.audit.fault(
+    fn identities(&mut self, source: &Result<std::path::PathBuf>, seat: &Result<git::Seat>) {
+        match (source, seat) {
+            (Ok(source), Ok(seat)) if source != &seat.identity => self.audit.fault(
                 "identity",
                 self.check.path,
                 format!(
                     "member Git identity {} differs from source {}",
                     seat.identity.display(),
-                    source_id.display()
+                    source.display()
                 ),
             ),
             (Err(error), _) => self

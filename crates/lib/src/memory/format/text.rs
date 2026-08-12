@@ -1,8 +1,8 @@
 use super::Kind;
 use crate::{Error, Result};
 
-pub(super) fn marker_kind(source: &str, exact: &str, family: &str) -> Result<Kind> {
-    let first = first_line(source);
+pub(super) fn marker(source: &str, exact: &str, family: &str) -> Result<Kind> {
+    let first = first(source);
     let candidate = first.strip_prefix('\u{feff}').unwrap_or(first);
     let candidate = candidate.strip_suffix('\r').unwrap_or(candidate);
     if candidate == exact {
@@ -34,7 +34,7 @@ pub(super) fn limits(content: &str, label: &str, max_bytes: usize, max_lines: us
     Ok(())
 }
 
-pub(super) fn strict_text(content: &str, label: &str) -> Result<()> {
+pub(super) fn strict(content: &str, label: &str) -> Result<()> {
     if content.starts_with('\u{feff}') {
         return Err(Error::typed(
             "memory.text_bom",
@@ -56,6 +56,6 @@ pub(super) fn strict_text(content: &str, label: &str) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn first_line(source: &str) -> &str {
+pub(super) fn first(source: &str) -> &str {
     source.split_once('\n').map_or(source, |(line, _)| line)
 }

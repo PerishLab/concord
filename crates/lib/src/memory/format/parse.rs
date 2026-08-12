@@ -1,4 +1,4 @@
-use super::text::first_line;
+use super::text::first;
 use super::{Document, Section};
 use crate::{Error, Result};
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag};
@@ -14,7 +14,7 @@ pub(super) fn document(
             "memory.schema",
             format!(
                 "{} requires exactly {} fixed H2 sections",
-                first_line(source),
+                first(source),
                 expected.len()
             ),
         ));
@@ -48,41 +48,6 @@ pub(super) fn document(
     Ok(Document { sections })
 }
 
-pub(super) fn subset_sections(
-    patch_source: &str,
-    headings: Vec<(usize, String)>,
-    allowed: &'static [(&'static str, &'static str)],
-) -> Result<Vec<Section>> {
-    let mut sections = Vec::new();
-    let mut last_index = None;
-    for (position, (start, title)) in headings.iter().enumerate() {
-        let index = allowed
-            .iter()
-            .position(|(_, heading)| heading == title)
-            .ok_or_else(|| {
-                Error::typed(
-                    "memory.patch_section",
-                    format!("unknown memory patch section `## {title}`"),
-                )
-            })?;
-        if last_index.is_some_and(|last| index <= last) {
-            return Err(Error::typed(
-                "memory.patch_order",
-                "memory patch sections must be unique and in canonical order",
-            ));
-        }
-        last_index = Some(index);
-        let end = headings
-            .get(position + 1)
-            .map_or(patch_source.len(), |(start, _)| *start);
-        sections.push(Section {
-            key: allowed[index].0,
-            range: *start..end,
-        });
-    }
-    Ok(sections)
-}
-
 pub(super) fn headings(markdown: &str) -> Result<Vec<(usize, String)>> {
     let mut nesting = 0usize;
     let mut found = Vec::new();
@@ -92,7 +57,7 @@ pub(super) fn headings(markdown: &str) -> Result<Vec<(usize, String)>> {
                 level: HeadingLevel::H2,
                 ..
             }) if nesting == 0 => {
-                found.push((range.start, heading_title(markdown, range.start)?));
+                found.push((range.start, title(markdown, range.start)?));
                 nesting += 1;
             }
             Event::Start(_) => nesting += 1,
@@ -103,11 +68,11 @@ pub(super) fn headings(markdown: &str) -> Result<Vec<(usize, String)>> {
     Ok(found)
 }
 
-fn heading_title(markdown: &str, start: usize) -> Result<String> {
-    let line_end = markdown[start..]
+fn title(markdown: &str, start: usize) -> Result<String> {
+    let end = markdown[start..]
         .find('\n')
         .map_or(markdown.len(), |offset| start + offset);
-    markdown[start..line_end]
+    markdown[start..end]
         .strip_prefix("## ")
         .map(str::to_string)
         .ok_or_else(|| {

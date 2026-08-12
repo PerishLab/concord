@@ -44,7 +44,7 @@ impl Config {
     pub fn path(file: Option<&Path>) -> Result<PathBuf> {
         match file {
             Some(path) => absolute(path),
-            None => default_path(),
+            None => default(),
         }
     }
 
@@ -78,11 +78,11 @@ fn selected(file: Option<&Path>) -> Result<Option<PathBuf>> {
     if file.is_some() {
         return Config::path(file).map(Some);
     }
-    let path = default_path()?;
+    let path = default()?;
     Ok(path.is_file().then_some(path))
 }
 
-fn default_path() -> Result<PathBuf> {
+fn default() -> Result<PathBuf> {
     plumb::config::data("concord")
         .map(|home| home.join("concord.toml"))
         .ok_or_else(|| Error::new("platform data home is unavailable; pass --config"))

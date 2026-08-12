@@ -13,16 +13,6 @@ pub(super) fn archive() -> Vec<u8> {
         "concord/SKILL.md",
         b"---\nname: concord\ndescription: fixture\n---\n# Concord\n",
     );
-    append(
-        &mut builder,
-        "concord/references/protocol.md",
-        b"# Protocol\n",
-    );
-    append(
-        &mut builder,
-        "concord/references/memory-v1.md",
-        b"# Memory v1\n",
-    );
     let tar = builder.into_inner().expect("tar");
     let mut zip = GzEncoder::new(Vec::new(), Compression::default());
     zip.write_all(&tar).expect("compress");

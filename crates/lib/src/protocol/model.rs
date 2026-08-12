@@ -9,6 +9,8 @@ pub struct Registry {
     pub task: Vec<Task>,
     #[serde(default)]
     pub repo: Vec<Repo>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, toml::Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -31,13 +33,13 @@ pub struct Member {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub write: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub boundary: Option<BoundaryProof>,
+    pub boundary: Option<Boundary>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, toml::Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct BoundaryProof {
+pub struct Boundary {
     pub schema: String,
     pub plumb: String,
     pub base: String,
@@ -48,19 +50,13 @@ pub struct BoundaryProof {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Repo {
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, toml::Value>,
 }
 
 impl Registry {
-    pub fn empty() -> Self {
-        Self {
-            version: 3,
-            task: Vec::new(),
-            repo: Vec::new(),
-        }
-    }
-
     pub fn validate(&self) -> Result<()> {
         if !matches!(self.version, 1..=3) {
             return Err(Error::new(format!(
@@ -83,15 +79,6 @@ impl Registry {
 }
 
 impl Task {
-    pub fn new(name: String) -> Self {
-        Self {
-            name,
-            todo: Vec::new(),
-            repo: Vec::new(),
-            extra: BTreeMap::new(),
-        }
-    }
-
     fn validate(&self, version: u32, tasks: &std::collections::BTreeSet<&str>) -> Result<()> {
         self.todos(version, tasks)?;
         let mut members = std::collections::BTreeSet::new();
@@ -192,7 +179,7 @@ impl Member {
     }
 }
 
-impl BoundaryProof {
+impl Boundary {
     fn validate(&self, task: &str, member: &str) -> Result<()> {
         if self.schema.is_empty() || self.plumb.is_empty() {
             return Err(Error::new(format!(

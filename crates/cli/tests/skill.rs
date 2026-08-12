@@ -5,27 +5,27 @@ use fixture::{archive, config, run, serve};
 use std::fs;
 
 #[test]
-fn product_skill_install_refusal_and_uninstall_close_the_loop() {
+fn lifecycle() {
     let fixture = tempfile::tempdir().expect("fixture");
     let releases = serve(archive());
-    let config_path = config(fixture.path(), &releases);
-    let argument_home = fixture.path().join("argument-home");
-    let argument_home_text = argument_home.display().to_string();
+    let settings = config(fixture.path(), &releases);
+    let home = fixture.path().join("argument-home");
+    let text = home.display().to_string();
     let skill = fixture.path().join("agent/skills/concord");
-    let skill_text = skill.display().to_string();
+    let target = skill.display().to_string();
 
     let installed = run(
-        &config_path,
+        &settings,
         &[
             "--json",
             "--home",
-            &argument_home_text,
+            &text,
             "skill",
             "install",
             "--version",
             "v0.3.0",
             "--path",
-            &skill_text,
+            &target,
         ],
     );
     assert!(
@@ -34,19 +34,18 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
         String::from_utf8_lossy(&installed.stderr)
     );
     assert!(skill.join("SKILL.md").is_file());
-    assert!(skill.join("references/protocol.md").is_file());
-    assert!(skill.join("references/memory-v1.md").is_file());
+    assert!(!skill.join("references").exists());
     let marker = fs::read_to_string(skill.join("metadata.json")).expect("marker");
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(&marker).expect("marker json")["keeper"],
         "concord"
     );
-    assert!(argument_home.join("state/skills.json").is_file(), "ledger");
+    assert!(home.join("state/skills.json").is_file(), "ledger");
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
 
-        let mode = fs::metadata(argument_home.join("state/skills.json"))
+        let mode = fs::metadata(home.join("state/skills.json"))
             .expect("ledger")
             .permissions()
             .mode()
@@ -58,21 +57,18 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
         "argument layer must override file home"
     );
 
-    let listed = run(
-        &config_path,
-        &["--home", &argument_home_text, "skill", "list"],
-    );
+    let listed = run(&settings, &["--home", &text, "skill", "list"]);
     assert!(listed.status.success());
-    assert!(String::from_utf8_lossy(&listed.stdout).contains(&skill_text));
+    assert!(String::from_utf8_lossy(&listed.stdout).contains(&target));
 
-    let upgraded_releases = serve(archive());
-    let upgraded_config = config(fixture.path(), &upgraded_releases);
+    let release = serve(archive());
+    let next = config(fixture.path(), &release);
     let status = run(
-        &upgraded_config,
+        &next,
         &[
             "--json",
             "--home",
-            &argument_home_text,
+            &text,
             "skill",
             "status",
             "--version",
@@ -85,12 +81,12 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
     assert_eq!(status["seats"][0]["state"], "current");
     assert_eq!(status["seats"][0]["action"], "none");
 
-    let dry_run = run(
-        &upgraded_config,
+    let preview = run(
+        &next,
         &[
             "--json",
             "--home",
-            &argument_home_text,
+            &text,
             "skill",
             "upgrade",
             "--version",
@@ -98,17 +94,17 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
             "--dry-run",
         ],
     );
-    assert!(dry_run.status.success());
-    let dry_run: serde_json::Value = serde_json::from_slice(&dry_run.stdout).expect("dry-run json");
-    assert_eq!(dry_run["operation"], "upgrade_dry_run");
-    assert_eq!(dry_run["seats"][0]["action"], "none");
+    assert!(preview.status.success());
+    let preview: serde_json::Value = serde_json::from_slice(&preview.stdout).expect("dry-run json");
+    assert_eq!(preview["operation"], "upgrade_dry_run");
+    assert_eq!(preview["seats"][0]["action"], "none");
 
     let upgraded = run(
-        &upgraded_config,
+        &next,
         &[
             "--json",
             "--home",
-            &argument_home_text,
+            &text,
             "skill",
             "upgrade",
             "--version",
@@ -131,7 +127,7 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
     {
         use std::os::unix::fs::PermissionsExt;
 
-        let mode = fs::metadata(argument_home.join("state/skills.json"))
+        let mode = fs::metadata(home.join("state/skills.json"))
             .expect("ledger")
             .permissions()
             .mode()
@@ -140,18 +136,12 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
     }
 
     fs::write(skill.join("metadata.json"), "{}").expect("spoil marker");
-    let refused = run(
-        &upgraded_config,
-        &["--home", &argument_home_text, "skill", "uninstall"],
-    );
+    let refused = run(&next, &["--home", &text, "skill", "uninstall"]);
     assert!(!refused.status.success(), "one-sided ownership must refuse");
     assert!(skill.is_dir(), "refused target survives");
 
     fs::write(skill.join("metadata.json"), marker).expect("restore marker");
-    let removed = run(
-        &upgraded_config,
-        &["--home", &argument_home_text, "skill", "uninstall"],
-    );
+    let removed = run(&next, &["--home", &text, "skill", "uninstall"]);
     assert!(
         removed.status.success(),
         "{}",
@@ -161,39 +151,36 @@ fn product_skill_install_refusal_and_uninstall_close_the_loop() {
 }
 
 #[test]
-fn unmanaged_status_is_diagnostic_but_dry_run_refuses() {
+fn unmanaged() {
     let fixture = tempfile::tempdir().expect("fixture");
     let releases = serve(archive());
-    let config_path = config(fixture.path(), &releases);
+    let settings = config(fixture.path(), &releases);
     let home = fixture.path().join("argument-home");
     let home = home.display().to_string();
 
-    let status = run(
-        &config_path,
-        &["--json", "--home", &home, "skill", "status"],
-    );
+    let status = run(&settings, &["--json", "--home", &home, "skill", "status"]);
     assert!(status.status.success());
     let status: serde_json::Value = serde_json::from_slice(&status.stdout).expect("status json");
     assert!(status["seats"].as_array().expect("seats").is_empty());
 
-    let dry_run = run(
-        &config_path,
+    let preview = run(
+        &settings,
         &["--home", &home, "skill", "upgrade", "--dry-run"],
     );
-    assert!(!dry_run.status.success());
-    assert!(String::from_utf8_lossy(&dry_run.stderr).contains("not actionable"));
+    assert!(!preview.status.success());
+    assert!(String::from_utf8_lossy(&preview.stderr).contains("not actionable"));
 }
 
 #[test]
-fn product_skill_stage_isolated() {
+fn staging() {
     let fixture = tempfile::tempdir().expect("fixture");
     let releases = serve(archive());
-    let config_path = config(fixture.path(), &releases);
+    let settings = config(fixture.path(), &releases);
     let home = fixture.path().join("argument-home");
     let staged = fixture.path().join("candidate/skills/concord");
 
     let output = run(
-        &config_path,
+        &settings,
         &[
             "--home",
             &home.display().to_string(),
@@ -214,6 +201,6 @@ fn product_skill_stage_isolated() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(staged.join("SKILL.md").is_file());
-    assert!(staged.join("references/memory-v1.md").is_file());
+    assert!(!staged.join("references").exists());
     assert!(!home.join("state/skills.json").exists());
 }

@@ -1,18 +1,18 @@
 use crate::config::Config;
 use crate::output;
-use clap::{Args, Subcommand};
+use clap::Subcommand;
 use concord_core::{Error, Result};
 use plumb::skill::{Action, Ask, Kit};
 use std::path::PathBuf;
 
-#[derive(Args)]
-pub struct SkillArgs {
+#[derive(clap::Args)]
+pub struct Args {
     #[command(subcommand)]
-    pub command: SkillCommand,
+    pub command: Command,
 }
 
 #[derive(Subcommand)]
-pub enum SkillCommand {
+pub enum Command {
     #[command(about = "Install the Concord skill into detected agent directories")]
     Install {
         #[arg(long, default_value = "stable")]
@@ -31,7 +31,8 @@ pub enum SkillCommand {
         #[arg(long)]
         version: Option<String>,
         #[arg(long)]
-        dry_run: bool,
+        #[arg(long = "dry-run")]
+        dry: bool,
     },
     #[command(about = "Compare managed Concord skills with a selected release")]
     Status {
@@ -55,10 +56,10 @@ pub enum SkillCommand {
     Uninstall,
 }
 
-pub fn run(config: &Config, command: SkillCommand, json_output: bool) -> Result<()> {
+pub fn run(config: &Config, command: Command, output: bool) -> Result<()> {
     let kit = kit(config)?;
     match command {
-        SkillCommand::Install {
+        Command::Install {
             channel,
             version,
             path,
@@ -71,41 +72,41 @@ pub fn run(config: &Config, command: SkillCommand, json_output: bool) -> Result<
                     path,
                     force,
                 })
-                .map_err(skill_error)?;
-            output::skill_done("installed", &done, json_output)?;
+                .map_err(failure)?;
+            output::done("installed", &done, output)?;
             changed(&done)
         }
-        SkillCommand::Upgrade {
+        Command::Upgrade {
             channel,
             version,
-            dry_run,
+            dry,
         } => {
             let ask = Ask {
                 channel,
                 version,
                 ..Ask::default()
             };
-            if dry_run {
-                let report = kit.status(&ask).map_err(skill_error)?;
-                output::skill_report("upgrade_dry_run", &report, json_output)?;
+            if dry {
+                let report = kit.status(&ask).map_err(failure)?;
+                output::report("upgrade_dry_run", &report, output)?;
                 actionable(&report)
             } else {
-                let done = kit.upgrade(&ask).map_err(skill_error)?;
-                output::skill_done("upgraded", &done, json_output)?;
-                changed_or_same(&done)
+                let done = kit.upgrade(&ask).map_err(failure)?;
+                output::done("upgraded", &done, output)?;
+                movable(&done)
             }
         }
-        SkillCommand::Status { channel, version } => {
+        Command::Status { channel, version } => {
             let report = kit
                 .status(&Ask {
                     channel,
                     version,
                     ..Ask::default()
                 })
-                .map_err(skill_error)?;
-            output::skill_report("status", &report, json_output)
+                .map_err(failure)?;
+            output::report("status", &report, output)
         }
-        SkillCommand::Stage {
+        Command::Stage {
             channel,
             version,
             path,
@@ -117,17 +118,17 @@ pub fn run(config: &Config, command: SkillCommand, json_output: bool) -> Result<
                     path: Some(path),
                     ..Ask::default()
                 })
-                .map_err(skill_error)?;
-            output::skill_done("staged", &done, json_output)?;
+                .map_err(failure)?;
+            output::done("staged", &done, output)?;
             changed(&done)
         }
-        SkillCommand::List => {
-            let records = kit.list().map_err(skill_error)?;
-            output::skill_records(&records, json_output)
+        Command::List => {
+            let records = kit.list().map_err(failure)?;
+            output::records(&records, output)
         }
-        SkillCommand::Uninstall => {
-            let done = kit.uninstall().map_err(skill_error)?;
-            output::skill_done("removed", &done, json_output)?;
+        Command::Uninstall => {
+            let done = kit.uninstall().map_err(failure)?;
+            output::done("removed", &done, output)?;
             changed(&done)
         }
     }
@@ -151,7 +152,7 @@ fn changed(done: &plumb::skill::Done) -> Result<()> {
     Ok(())
 }
 
-fn changed_or_same(done: &plumb::skill::Done) -> Result<()> {
+fn movable(done: &plumb::skill::Done) -> Result<()> {
     if done.kept.is_empty() && (done.same.is_empty() || !done.left.is_empty()) {
         return Err(Error::new("no managed skill installation can move"));
     }
@@ -170,6 +171,6 @@ fn actionable(report: &plumb::skill::Report) -> Result<()> {
     Ok(())
 }
 
-fn skill_error(error: plumb::skill::Error) -> Error {
+fn failure(error: plumb::skill::Error) -> Error {
     Error::new(error.to_string())
 }

@@ -16,8 +16,10 @@ clap.workspace = true
 concord-core = { path = "../lib" }
 locus.workspace = true
 plumb.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 flate2.workspace = true

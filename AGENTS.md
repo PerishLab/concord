@@ -6,22 +6,26 @@ authorship is never protocol truth.
 
 ## Laws
 
-- Fail closed when registry, task-root, source identity, and Git worktree
-  metadata disagree. Read-only diagnosis remains available.
-- Keep `.tasks`, task roots, and task memory private. Managed directories are
-  `0700`; registry and memory files are `0600`.
+- Fail closed when the exact estate, Task coordinates, external seats, source
+  identity, and Git worktree metadata disagree. Read-only diagnosis remains
+  available.
+- Keep `.concord`, `.tasks`, task roots, and Artifacts private. Managed
+  directories are `0700`; the estate, retained sudo possession, refusal
+  markers, and bounded migration evidence are `0600`.
 - Mutations print an exact plan. Creation executes unless `--dry-run` is set;
   deletion, migration, recovery, and permission normalization require
   `--apply`.
-- Lock, re-read, compare, then replace files atomically. Do not add a hidden
-  database or persistent journal.
+- One Keel SQLite estate per Space is the sole structured authority. Lock the
+  Space, re-read aggregate revisions, compare, then commit one Keel batch.
+  Ordinary open uses exact seal replay and never evolves the estate; only the
+  explicit release migration may bind a changed graph.
 - Keep protocol agreement and resource health separate. Resource warnings are
   audit facts, not protocol faults; read, audit, landing, and cleanup remain
   available.
 - Gate footprint-expanding operations on current headroom. Do not infer task
   ownership for arbitrary processes or silently clean retained state.
-- Versioned memory envelopes and their top-level section boundaries belong to
-  Concord; section bodies remain opaque Markdown.
+- MAIN and PHASE are typed estate Resources, never files or projections.
+  Addition retains honestly unstructured text without weakening mature roles.
 - Git owns member payload and repository-specific landing. Concord owns the
   member seat and verifies the four protocol surfaces.
 - Optional Locus observation is one-way. Context and report outcomes never
@@ -29,9 +33,9 @@ authorship is never protocol truth.
 
 ## Architecture
 
-- `crates/lib` is the complete protocol kernel: configuration, discovery,
-  registry, protocol and resource audit, Git seats, memory, permissions, and
-  plans.
+- `crates/lib` is the complete protocol kernel: configuration, exact estate,
+  typed Task/Phase transactions, dependency graph, protocol and resource
+  audit, Git seats, Artifacts, permissions, and plans.
 - `crates/cli` contains clap grammar and output dispatch only.
 - Dependency direction is `cli -> lib`.
 - `runseal.toml` and `.runseal/resources` carry env-only repository-local

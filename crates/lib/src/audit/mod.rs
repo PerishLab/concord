@@ -1,27 +1,19 @@
 mod claim;
 mod member;
 mod memory;
-mod preflight;
-pub(crate) mod resource;
 
 use crate::git;
 use crate::path::at;
-use crate::{Domain, Result, Space, TaskRef};
+use crate::{Domain, Legacy, Result, Space};
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::path::Path;
-
-pub use preflight::{LandingProof, MemberPreflight, MemberProof, Preflight};
-pub use resource::{
-    Filesystem, Footprint, HostMemory, ImportPreflight, Inodes, Observation, Status, TaskResources,
-};
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Audit {
     pub target: String,
     pub faults: Vec<Fault>,
     pub observations: Vec<Advisory>,
-    pub resources: Vec<TaskResources>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -74,18 +66,13 @@ impl Audit {
 
 impl Space {
     pub fn audit(&self) -> Result<Audit> {
-        self.audit_with_resources(Some(&resource::host()))
-    }
-
-    fn audit_with_resources(&self, host: Option<&Observation<HostMemory>>) -> Result<Audit> {
         let mut audit = Audit {
             target: self.path().display().to_string(),
             faults: Vec::new(),
             observations: Vec::new(),
-            resources: Vec::new(),
         };
         for domain in self.domains()? {
-            merge(&mut audit, domain.audit_with_resources(host)?);
+            merge(&mut audit, domain.audit()?);
         }
         claim::conflicts(self, &mut audit)?;
         Ok(audit)
@@ -93,19 +80,14 @@ impl Space {
 }
 
 impl Domain {
-    pub fn audit(&self) -> Result<Audit> {
-        self.audit_with_resources(Some(&resource::host()))
-    }
-
-    fn audit_with_resources(&self, host: Option<&Observation<HostMemory>>) -> Result<Audit> {
+    fn audit(&self) -> Result<Audit> {
         let mut audit = Audit {
             target: self.name().to_string(),
             faults: Vec::new(),
             observations: Vec::new(),
-            resources: Vec::new(),
         };
-        permission(&mut audit, &self.tasks_path(), 0o700)?;
-        permission(&mut audit, &self.registry_path(), 0o600)?;
+        permission(&mut audit, &self.tasks(), 0o700)?;
+        permission(&mut audit, &self.manifest(), 0o600)?;
         let registry = self.registry()?;
         let declared = registry
             .task
@@ -113,12 +95,9 @@ impl Domain {
             .map(|task| task.name.as_str())
             .collect::<BTreeSet<_>>();
         for task in &registry.task {
-            merge(
-                &mut audit,
-                self.task(&task.name)?.audit_with_resources(host)?,
-            );
+            merge(&mut audit, self.task(&task.name)?.audit()?);
         }
-        for entry in std::fs::read_dir(self.tasks_path())? {
+        for entry in std::fs::read_dir(self.tasks())? {
             let entry = entry?;
             if !entry.file_type()?.is_dir() {
                 continue;
@@ -133,23 +112,13 @@ impl Domain {
     }
 }
 
-impl TaskRef {
-    pub fn audit(&self) -> Result<Audit> {
-        self.audit_with_resources(Some(&resource::host()))
-    }
-
+impl Legacy {
     #[locus::trace(with = crate::observation::view())]
-    pub(crate) fn agreement(&self) -> Result<Audit> {
-        self.audit_with_resources(None)
-    }
-
-    #[locus::trace(with = crate::observation::view())]
-    fn audit_with_resources(&self, host: Option<&Observation<HostMemory>>) -> Result<Audit> {
+    fn audit(&self) -> Result<Audit> {
         let mut audit = Audit {
             target: self.identity(),
             faults: Vec::new(),
             observations: Vec::new(),
-            resources: Vec::new(),
         };
         let root = self.path();
         if !root.is_dir() {
@@ -165,7 +134,7 @@ impl TaskRef {
             .collect::<BTreeSet<_>>();
         let version = self.domain().registry()?.version;
         for member in &self.task().repo {
-            member::member_audit(&mut audit, self, member, version)?;
+            member::inspect(&mut audit, self, member, version)?;
         }
         for entry in std::fs::read_dir(&root)? {
             let entry = entry?;
@@ -183,24 +152,7 @@ impl TaskRef {
             }
         }
         memory::permissions(&mut audit, &root.join(".task"))?;
-        if let Some(host) = host {
-            audit.resources.push(resource::inspect(self, host));
-        }
         Ok(audit)
-    }
-
-    #[locus::trace(with = crate::observation::view())]
-    pub(crate) fn ensure_exact(&self) -> Result<()> {
-        let audit = self.agreement()?;
-        if audit.agrees() {
-            Ok(())
-        } else {
-            Err(crate::Error::new(format!(
-                "task protocol mismatch: {} fault(s); run concord audit {}",
-                audit.faults.iter().filter(|fault| fault.gates()).count(),
-                self.identity()
-            )))
-        }
     }
 }
 
@@ -223,5 +175,4 @@ fn permission(audit: &mut Audit, path: &Path, wanted: u32) -> Result<()> {
 fn merge(target: &mut Audit, source: Audit) {
     target.faults.extend(source.faults);
     target.observations.extend(source.observations);
-    target.resources.extend(source.resources);
 }

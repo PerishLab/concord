@@ -8,17 +8,18 @@ mod skill;
 use args::Cli;
 use clap::Parser;
 
-fn main() {
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
     let cli = Cli::parse();
     let json = cli.json;
     let observation = observation::Run::start(cli.command.name());
-    let result = dispatch::run(cli);
+    let result = dispatch::run(cli).await;
     if let Some(observation) = observation {
         observation.finish(i32::from(result.is_err()));
     }
     if let Err(error) = result {
         if json {
-            eprintln!("{}", error_json(&error));
+            eprintln!("{}", failure(&error));
         } else {
             eprintln!("concord: {error}");
         }
@@ -26,7 +27,7 @@ fn main() {
     }
 }
 
-fn error_json(error: &concord_core::Error) -> String {
+fn failure(error: &concord_core::Error) -> String {
     let body = serde_json::json!({
         "error": {
             "code": error.code(),

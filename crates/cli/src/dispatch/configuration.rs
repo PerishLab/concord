@@ -1,13 +1,13 @@
-use crate::args::ConfigCommand;
+use crate::args::Configure;
 use crate::config::Config;
 use crate::output;
 use concord_core::Result;
 use serde_json::json;
 
-pub fn run(config: &Config, command: ConfigCommand, json_output: bool) -> Result<()> {
+pub fn run(config: &Config, command: Configure, json_output: bool) -> Result<()> {
     match command {
-        ConfigCommand::Path => unreachable!("config path exits before loading the space"),
-        ConfigCommand::Show => show(config, json_output),
+        Configure::Path => unreachable!("config path exits before loading the space"),
+        Configure::Show => show(config, json_output),
     }
 }
 

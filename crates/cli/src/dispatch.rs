@@ -1,26 +1,20 @@
 mod artifact;
 mod configuration;
+mod domain;
+mod graph;
 mod input;
-mod migration;
-mod mutation;
-mod resource;
+mod member;
 mod task;
 
-use crate::args::{
-    AuditArgs, Cli, Command, ConfigCommand, DomainCommand, MemberCommand, PermissionCommand,
-    RepoCommand,
-};
+use crate::args::{self, Command};
 use crate::config::Config;
-use crate::output;
-use crate::skill;
-use concord_core::{Add, Result, Space};
+use crate::{output, skill};
+use concord_core::{Estate, Result, Seat, Space};
 use serde_json::json;
 
-pub(crate) use mutation::{create, guarded};
-
-pub fn run(cli: Cli) -> Result<()> {
+pub async fn run(cli: args::Cli) -> Result<()> {
     if let Command::Config(config) = &cli.command
-        && matches!(config.command, ConfigCommand::Path)
+        && matches!(config.command, args::Configure::Path)
     {
         output::value(
             json!(Config::path(cli.config.as_deref())?.display().to_string()),
@@ -36,194 +30,126 @@ pub fn run(cli: Cli) -> Result<()> {
     )?;
     let command = match cli.command {
         Command::Skill(skill) => return skill::run(&config, skill.command, cli.json),
-        Command::Config(config_command) => {
-            return configuration::run(&config, config_command.command, cli.json);
+        Command::Config(args) => {
+            return configuration::run(&config, args.command, cli.json);
         }
         command => command,
     };
-    Dispatch {
-        space: Space::new(config.root()?),
-        json: cli.json,
+    let root = config.root()?;
+    let seat = Seat::new(root.path());
+    match command {
+        Command::Migration(args) => migrate(&seat, Space::new(root), args, cli.json).await,
+        Command::Domain(args)
+            if matches!(args.command, crate::args::domain::Command::Bootstrap { .. }) =>
+        {
+            let crate::args::domain::Command::Bootstrap { name } = args.command else {
+                unreachable!()
+            };
+            let estate = seat.bootstrap().await?;
+            let key = estate.manage(&name).await?;
+            emit(domain::value(key, name), cli.json)
+        }
+        command => {
+            Dispatch {
+                estate: seat.open().await?,
+                json: cli.json,
+            }
+            .run(command)
+            .await
+        }
     }
-    .run(command)
 }
 
 struct Dispatch {
-    space: Space,
+    estate: Estate,
     json: bool,
 }
 
 impl Dispatch {
-    fn run(&self, command: Command) -> Result<()> {
+    async fn run(&self, command: Command) -> Result<()> {
         match command {
-            Command::Config(_) | Command::Skill(_) => unreachable!("handled before task config"),
-            Command::Domain(domain) => self.domain(domain.command),
-            Command::Repo(repo) => self.repo(repo.command),
-            Command::Task(task_args) => task::command(&self.space, task_args.command, self.json),
-            Command::Member(member) => self.member(member.command),
-            Command::Memory(memory) => {
-                artifact::memory_command(&self.space, memory.command, self.json)
+            Command::Config(_) | Command::Skill(_) | Command::Migration(_) => {
+                unreachable!("handled before estate open")
             }
-            Command::Resource(resource) => {
-                resource::command(&self.space, resource.command, self.json)
+            Command::Domain(args) => domain::run(&self.estate, args.command, self.json).await,
+            Command::Task(args) => task::run(&self.estate, args.command, self.json).await,
+            Command::Phase(args) => self.phase(args.command).await,
+            Command::Member(args) => member::run(&self.estate, args.command, self.json).await,
+            Command::Artifact(args) => artifact::run(&self.estate, args.command, self.json).await,
+            Command::Graph(args) => graph::run(&self.estate, args.command, self.json).await,
+            Command::Audit(args) => {
+                let report = self
+                    .estate
+                    .inspect(args.task.as_deref(), args.domain.as_deref())
+                    .await?;
+                let agrees = report.agrees();
+                emit(json!({"agreement": report}), self.json)?;
+                if agrees {
+                    Ok(())
+                } else {
+                    Err(concord_core::Error::typed(
+                        "concord.audit.faults",
+                        "estate audit found agreement faults",
+                    ))
+                }
             }
-            Command::Permissions(permission) => self.permission(permission.command),
-            Command::Audit(audit) => self.audit(audit),
         }
     }
 
-    fn domain(&self, command: DomainCommand) -> Result<()> {
+    async fn phase(&self, command: args::phase::Command) -> Result<()> {
         match command {
-            DomainCommand::List => {
-                let values = self
-                    .space
-                    .domains()?
-                    .into_iter()
-                    .map(|domain| json!(domain.name()))
-                    .collect();
-                output::value(serde_json::Value::Array(values), self.json);
-                Ok(())
-            }
-            DomainCommand::Init { name, dry_run } => create(
-                self.space.domain_init(&name, false)?,
-                dry_run,
+            args::phase::Command::List { task } => emit(
+                json!({"task": task, "phases": self.estate.phases(&task).await?}),
                 self.json,
-                || self.space.domain_init(&name, true),
             ),
-            DomainCommand::Migrate {
-                domain,
-                claim,
-                apply,
-            } => {
-                let claims = migration::claims(&claim)?;
-                guarded(
-                    self.space.domain_migrate(&domain, &claims, false)?,
-                    apply,
+            args::phase::Command::Settle { input: path } => {
+                let settle = input::read(&path)?;
+                emit(
+                    json!({"settlement": self.estate.settle(&settle).await?}),
                     self.json,
-                    || self.space.domain_migrate(&domain, &claims, true),
                 )
             }
         }
     }
+}
 
-    fn repo(&self, command: RepoCommand) -> Result<()> {
-        match command {
-            RepoCommand::Annotate {
-                domain,
-                name,
-                note,
-                dry_run,
-            } => create(
-                self.space
-                    .repo_annotate(&domain, &name, note.as_deref(), false)?,
-                dry_run,
-                self.json,
-                || {
-                    self.space
-                        .repo_annotate(&domain, &name, note.as_deref(), true)
-                },
-            ),
+async fn migrate(seat: &Seat, legacy: Space, args: args::Migration, json: bool) -> Result<()> {
+    use args::migration::Command;
+    match args.command {
+        Command::Survey => emit(json!({"census": seat.survey(&legacy)?}), json),
+        Command::Stage => {
+            let staged = seat.stage(&legacy).await?;
+            emit(json!({"root": staged.root, "census": staged.census}), json)
+        }
+        Command::Resume { fingerprint } => {
+            let staged = seat.resume(&legacy, &fingerprint).await?;
+            emit(json!({"root": staged.root, "census": staged.census}), json)
+        }
+        Command::Activate { fingerprint, apply } => {
+            explicit(apply, "migration activate")?;
+            let staged = seat.resume(&legacy, &fingerprint).await?;
+            let active = staged.activate(&legacy, &fingerprint).await?;
+            emit(json!({"root": active.root, "census": active.census}), json)
         }
     }
+}
 
-    fn member(&self, command: MemberCommand) -> Result<()> {
-        match command {
-            MemberCommand::Add {
-                task,
-                source,
-                name,
-                branch,
-                orphan,
-                write,
-                dry_run,
-            } => {
-                let name = match name {
-                    Some(name) => name,
-                    None => source
-                        .file_name()
-                        .and_then(|value| value.to_str())
-                        .ok_or_else(|| concord_core::Error::new("source has no utf8 filename"))?
-                        .to_string(),
-                };
-                let request = || Add {
-                    task: &task,
-                    name: &name,
-                    source: &source,
-                    branch: branch.as_deref(),
-                    orphan,
-                    write: &write,
-                };
-                create(
-                    self.space.member_add(request(), false)?,
-                    dry_run,
-                    self.json,
-                    || self.space.member_add(request(), true),
-                )
-            }
-            MemberCommand::Preflight { task } => {
-                output::preflight(&self.space.resolve(&task)?.preflight()?, self.json)
-            }
-            MemberCommand::Claim {
-                task,
-                name,
-                write,
-                dry_run,
-            } => create(
-                self.space.member_claim(&task, &name, &write, false)?,
-                dry_run,
-                self.json,
-                || self.space.member_claim(&task, &name, &write, true),
-            ),
-            MemberCommand::Boundary { task, name } => {
-                let value = serde_json::to_value(self.space.member_boundary(&task, &name)?)
-                    .map_err(|error| {
-                        concord_core::Error::new(format!("cannot encode boundary proof: {error}"))
-                    })?;
-                output::value(value, self.json);
-                Ok(())
-            }
-            MemberCommand::RemoveLanded { task, name, apply } => guarded(
-                self.space.member_remove(&task, &name, false)?,
-                apply,
-                self.json,
-                || self.space.member_remove(&task, &name, true),
-            ),
-        }
-    }
+pub(super) fn emit(body: serde_json::Value, json: bool) -> Result<()> {
+    let mut body = body;
+    let object = body
+        .as_object_mut()
+        .expect("Concord CLI protocol body must be an object");
+    object.insert("version".to_string(), json!(1));
+    output::value(body, json);
+    Ok(())
+}
 
-    fn permission(&self, command: PermissionCommand) -> Result<()> {
-        match command {
-            PermissionCommand::Normalize { task, apply } => guarded(
-                self.space.normalize(&task, false)?,
-                apply,
-                self.json,
-                || self.space.normalize(&task, true),
-            ),
-        }
+pub(super) fn explicit(apply: bool, operation: &str) -> Result<()> {
+    if apply {
+        return Ok(());
     }
-
-    fn audit(&self, args: AuditArgs) -> Result<()> {
-        let audit = if args.space {
-            if args.task.is_some() || args.domain.is_some() {
-                return Err(concord_core::Error::new(
-                    "--space cannot be combined with a task or --domain",
-                ));
-            }
-            self.space.audit()?
-        } else if let Some(task) = args.task {
-            if args.domain.is_some() {
-                return Err(concord_core::Error::new(
-                    "task cannot be combined with --domain",
-                ));
-            }
-            self.space.resolve(&task)?.audit()?
-        } else if let Some(domain) = args.domain {
-            self.space.domain(&domain)?.audit()?
-        } else {
-            return Err(concord_core::Error::new(
-                "audit requires a task, --domain, or --space",
-            ));
-        };
-        output::audit(&audit, self.json)
-    }
+    Err(concord_core::Error::typed(
+        "concord.apply.required",
+        format!("{operation} requires explicit --apply"),
+    ))
 }

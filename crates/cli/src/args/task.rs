@@ -1,74 +1,100 @@
-use clap::{Args, Subcommand};
+use clap::Subcommand;
+use std::path::PathBuf;
 
-#[derive(Args)]
-pub struct TaskArgs {
+#[derive(clap::Args)]
+pub struct Args {
     #[command(subcommand)]
-    pub command: TaskCommand,
+    pub command: Command,
 }
 
 #[derive(Subcommand)]
-pub enum TaskCommand {
-    #[command(about = "List registered tasks")]
+pub enum Command {
+    #[command(about = "List Tasks from the estate")]
     List {
         #[arg(long)]
         domain: Option<String>,
-    },
-    #[command(about = "Project bounded task and memory evidence for one domain")]
-    Brief {
         #[arg(long)]
-        domain: String,
-        #[arg(long)]
-        after: Option<String>,
+        retired: bool,
     },
-    #[command(about = "Show one resolved task")]
+    #[command(about = "Read one Task and its current structured facts")]
     Show { task: String },
-    #[command(about = "Start a repo-less task")]
-    Start {
-        task: String,
-        #[arg(long)]
-        dry_run: bool,
+    #[command(about = "Start an estate-only Task in an existing Domain")]
+    Start { domain: String, name: String },
+    #[command(about = "Apply a versioned JSON change-set from stdin by default")]
+    Change {
+        #[arg(long, value_name = "PATH|-", default_value = "-")]
+        input: PathBuf,
     },
-    #[command(about = "Manage outgoing future-task todos")]
-    Todo {
-        #[command(subcommand)]
-        command: TaskTodoCommand,
-    },
-    #[command(about = "Rename a task through an explicit migration")]
+    #[command(about = "Rename a Task while retaining its permanent identity")]
     Rename {
         task: String,
         name: String,
         #[arg(long)]
-        apply: bool,
+        revision: i64,
     },
-    #[command(about = "Move a task to another home domain")]
+    #[command(about = "Move a Task to another Domain")]
     Rehome {
         task: String,
         domain: String,
         #[arg(long)]
-        apply: bool,
+        revision: i64,
     },
-    #[command(about = "Remove an empty task and registry entry")]
+    #[command(about = "Manage directed Task dependencies")]
+    Dependency {
+        #[command(subcommand)]
+        command: Dependency,
+    },
+    #[command(about = "Retire a Task and cut every incident dependency")]
     Finish {
         task: String,
+        #[arg(long)]
+        revision: i64,
+        #[arg(long)]
+        graph: i64,
+        #[arg(long)]
+        reason: String,
         #[arg(long)]
         apply: bool,
     },
 }
 
 #[derive(Subcommand)]
-pub enum TaskTodoCommand {
-    #[command(about = "Link an existing task or create and link a repo-less task")]
+pub enum Dependency {
+    #[command(about = "Declare SOURCE depends_on TARGET")]
     Add {
-        task: String,
+        source: String,
         target: String,
         #[arg(long)]
-        dry_run: bool,
+        weight: String,
+        #[arg(long)]
+        revision: i64,
+        #[arg(long = "create-target")]
+        create: bool,
     },
-    #[command(about = "Remove one outgoing task todo")]
-    Remove {
-        task: String,
+    #[command(about = "Set the weight of one direct dependency")]
+    Set {
+        source: String,
         target: String,
+        #[arg(long)]
+        weight: String,
+        #[arg(long)]
+        revision: i64,
+    },
+    #[command(about = "Remove one direct dependency with a retained reason")]
+    Remove {
+        source: String,
+        target: String,
+        #[arg(long)]
+        revision: i64,
+        #[arg(long)]
+        reason: String,
         #[arg(long)]
         apply: bool,
+    },
+    #[command(about = "List direct dependencies touching one Task")]
+    List {
+        task: String,
+        #[arg(long, default_value = "both")]
+        direction: String,
     },
 }

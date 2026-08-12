@@ -41,7 +41,7 @@ fn members(domain: &Domain) -> Result<Vec<Held>> {
             };
             held.push(Held {
                 owner: format!("{}/{}/{}", domain.name(), task.name, member.name),
-                path: resolved.member_path(&member.name),
+                path: resolved.member(&member.name),
                 identity,
                 write,
             });

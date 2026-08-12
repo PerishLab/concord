@@ -22,11 +22,6 @@ impl Error {
         }
     }
 
-    pub fn with_details(mut self, details: serde_json::Value) -> Self {
-        self.details = Some(details);
-        self
-    }
-
     pub fn code(&self) -> &str {
         &self.code
     }

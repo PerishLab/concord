@@ -40,7 +40,7 @@ fn legacy(home: &Path) -> PathBuf {
 }
 
 #[test]
-fn default_config_uses_only_the_product_seat() {
+fn default() {
     let fixture = tempfile::tempdir().expect("fixture");
     let old = legacy(fixture.path());
     fs::create_dir_all(old.parent().expect("legacy parent")).expect("legacy parent");

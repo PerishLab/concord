@@ -10,13 +10,13 @@ build = "src/runtime/build.rs"
 
 [dependencies]
 fs2.workspace = true
+keel.workspace = true
 locus.workspace = true
 plumb.workspace = true
 pulldown-cmark.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
-sysinfo.workspace = true
 toml.workspace = true
 
 [target.'cfg(unix)'.dependencies]
@@ -24,6 +24,11 @@ rustix.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+tokio.workspace = true
 
 [build-dependencies]
 toml.workspace = true
+
+[[test]]
+name = "estate"
+path = "tests/estate/main.rs"

@@ -3,15 +3,15 @@ use crate::Result;
 use crate::memory::format;
 use std::path::Path;
 
-pub(super) fn inspect(report: &mut Audit, root: &Path) -> Result<()> {
-    let main = root.join("MAIN.md");
-    let structured = main_format(report, &main)?;
+pub(super) fn inspect(audit: &mut Audit, root: &Path) -> Result<()> {
+    let primary = root.join("MAIN.md");
+    let structured = main(audit, &primary)?;
     let phases = root.join("phases");
     if !phases.exists() {
         return Ok(());
     }
     if !phases.is_dir() {
-        report.fault("memory", &phases, "memory phases path is not a directory");
+        audit.fault("memory", &phases, "memory phases path is not a directory");
         return Ok(());
     }
     let mut numbered = Vec::new();
@@ -19,15 +19,15 @@ pub(super) fn inspect(report: &mut Audit, root: &Path) -> Result<()> {
         let entry = entry?;
         let path = entry.path();
         if !entry.file_type()?.is_file() {
-            report.fault("memory", &path, "memory phase entry is not a regular file");
+            audit.fault("memory", &path, "memory phase entry is not a regular file");
             continue;
         }
         let Some(filename) = entry.file_name().to_str().map(str::to_string) else {
-            report.fault("memory", &path, "memory phase name is not UTF-8");
+            audit.fault("memory", &path, "memory phase name is not UTF-8");
             continue;
         };
-        let Some(number) = phase_number(&filename) else {
-            report.fault("memory", &path, "malformed memory phase name");
+        let Some(number) = number(&filename) else {
+            audit.fault("memory", &path, "malformed memory phase name");
             continue;
         };
         numbered.push((number, path));
@@ -35,7 +35,7 @@ pub(super) fn inspect(report: &mut Audit, root: &Path) -> Result<()> {
     numbered.sort_by_key(|(number, _)| *number);
     for (expected, (number, path)) in numbered.iter().enumerate() {
         if *number != expected as u32 {
-            report.fault(
+            audit.fault(
                 "memory",
                 path,
                 format!(
@@ -43,10 +43,10 @@ pub(super) fn inspect(report: &mut Audit, root: &Path) -> Result<()> {
                 ),
             );
         }
-        phase_format(report, path, structured)?;
+        phase(audit, path, structured)?;
     }
     if numbered.len() >= 16 {
-        report.observe(
+        audit.observe(
             "memory",
             &phases,
             format!(
@@ -58,37 +58,37 @@ pub(super) fn inspect(report: &mut Audit, root: &Path) -> Result<()> {
     Ok(())
 }
 
-fn main_format(main_audit: &mut Audit, path: &Path) -> Result<bool> {
+fn main(audit: &mut Audit, path: &Path) -> Result<bool> {
     let Ok(metadata) = std::fs::symlink_metadata(path) else {
         return Ok(false);
     };
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         return Ok(false);
     }
-    let Some(content) = text(main_audit, path, format::MAX_MAIN_BYTES, "MAIN.md")? else {
+    let Some(content) = text(audit, path, format::limit(format::Schema::Main), "MAIN.md")? else {
         return Ok(false);
     };
-    match format::validate_main(&content) {
-        Ok(_) => match format::main_kind(&content) {
+    match format::main(&content) {
+        Ok(_) => match format::kind(&content, format::Schema::Main) {
             Ok(kind) => Ok(kind == format::Kind::V1),
             Err(error) => {
-                main_audit.fault("memory", path, format!("{}: {error}", error.code()));
+                audit.fault("memory", path, format!("{}: {error}", error.code()));
                 Ok(false)
             }
         },
         Err(error) => {
-            main_audit.fault("memory", path, format!("{}: {error}", error.code()));
+            audit.fault("memory", path, format!("{}: {error}", error.code()));
             Ok(false)
         }
     }
 }
 
-fn phase_format(phase_audit: &mut Audit, path: &Path, structured: bool) -> Result<()> {
-    let Some(content) = text(phase_audit, path, format::MAX_PHASE_BYTES, "phase")? else {
+fn phase(audit: &mut Audit, path: &Path, structured: bool) -> Result<()> {
+    let Some(content) = text(audit, path, format::limit(format::Schema::Phase), "phase")? else {
         return Ok(());
     };
-    if let Err(error) = format::validate_phase(&content, structured) {
-        phase_audit.fault("memory", path, format!("{}: {error}", error.code()));
+    if let Err(error) = format::phase(&content, structured) {
+        audit.fault("memory", path, format!("{}: {error}", error.code()));
     }
     Ok(())
 }
@@ -116,7 +116,7 @@ fn text(report: &mut Audit, path: &Path, max_bytes: usize, label: &str) -> Resul
     }
 }
 
-fn phase_number(name: &str) -> Option<u32> {
+fn number(name: &str) -> Option<u32> {
     let digits = name.strip_prefix("PHASE-")?.strip_suffix(".md")?;
     if digits.len() < 2 || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
         return None;

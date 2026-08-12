@@ -1,11 +1,8 @@
 # Concord
 
-Concord is the executable control plane for the private `.tasks` + `.task`
-protocol. It audits agreement between the registry, task root, canonical
-repository, and Git worktree metadata before ordinary mutation. It keeps no
-hidden database.
-
-Configuration contains one absolute domain-space root:
+Concord is the executable control plane for private task estates. One Keel
+SQLite estate owns one configured Space; Git worktrees and direct Artifact
+directories remain external payload.
 
 ```toml
 domain_space_root = "/srv/projects"
@@ -14,183 +11,147 @@ releases = "https://releases.concord.perish.uk"
 ```
 
 The default config path is `~/.concord/concord.toml` on Unix and
-`%LOCALAPPDATA%\concord\concord.toml` on Windows; global `--config` selects an
-explicit file. Concord does not discover or fall back to another config seat.
-Runtime policy follows the Plumb cascade: defaults, file, typed `CONCORD_`
-environment, then arguments.
-`CONCORD_DOMAIN_SPACE_ROOT` or `--root` supplies the required task root;
-`CONCORD_HOME` or `--home` selects user state. Concord does not assume
-`~/Projects`, and skill commands do not require task-domain configuration.
+`%LOCALAPPDATA%\concord\concord.toml` on Windows. Global `--config` selects one
+explicit file. `CONCORD_DOMAIN_SPACE_ROOT` or `--root` supplies the Space;
+Concord never assumes `~/Projects`.
 
-Process-cycle observation is a separate, environment-only control section:
+## Estate
 
-```text
-CONCORD_LOCUS_ENABLED=false
-CONCORD_LOCUS_REPORT_FILE=
-CONCORD_LOCUS_TRACE_FILE=
-CONCORD_LOCUS_TRACE_ID=
-```
-
-The gate defaults to false and returns before Locus bootstrap. Enabling it
-requires a report file. An optional trace file shares one generated identity
-across processes. When present, `CODEX_THREAD_ID` is collected exactly and
-bound to `locus.trace`; an explicit trace ID wins over that collection, which
-in turn wins over shared or random generation. Collection provenance remains
-in the accepted Atom. Invalid observation config is handed to stderr after the
-fact and never replaces the command result. Every successfully parsed CLI
-command emits product-owned `cli.start` and `cli.finish` facts with one shared
-span; the finish fact records the command's exit code only after dispatch has
-returned. Existing traced kernel functions remain independent nested facts.
-
-Common operations are explicit and composable:
+Keel bootstrap is the only database genesis mechanism. Start a fresh Space and
+add later Domains explicitly:
 
 ```text
+concord domain bootstrap perish.code
+concord domain add another.domain
 concord domain list
-concord task start perish.code/ship-feature
-concord task brief --domain perish.code
-concord task todo add perish.code/ship-feature follow-up
-concord member add perish.code/ship-feature --source /srv/projects/perish.code/repo
-concord audit perish.code/ship-feature
-concord member preflight perish.code/ship-feature
-concord memory read perish.code/ship-feature --json
 ```
 
-`task brief` is a bounded, read-only portfolio projection. It keeps registry
-order and reports each task's existing registry state plus `focus` and `next`
-memory evidence; it does not rank, schedule, or infer readiness. One page
-contains at most 64 tasks and at most 512 UTF-8 bytes from each projected
-section. Missing, legacy, and unreadable memory remain explicit. Continue a
-large domain with the exact cursor returned as `next`:
+Ordinary open replays the exact sealed model using the retained private sudo
+possession. It never creates, binds, or evolves an occupied estate implicitly.
+Legacy Spaces must follow the exact bilingual
+[v0.10.0 migration contract](docs/CHANGELOG/v0.10.0/en/MIGRATION.md).
+
+Domain, typed Repository annotation, permanent Task identity, current Task
+facts, frozen Phases, Member/Claim/Boundary state, lifetime name Reservations,
+and direct dependency closure live in the estate. Repo-less Task start creates
+no filesystem root.
+
+## Tasks and Phases
+
+Task state is read with its revision and changed through a versioned JSON
+envelope. Generated changes should use stdin:
 
 ```text
-concord task brief --domain perish.code --after TASK
+concord task start perish.code ship-feature
+concord --json task show perish.code/ship-feature
+concord task change
+concord phase settle
+concord phase list perish.code/ship-feature
 ```
 
-JSON output uses the versioned `concord.task-brief:v1` envelope. An unknown
-cursor fails with `task.brief_cursor` instead of silently changing the page.
+Current roles are Goal, Constraint, Decision, Focus, Question, Next, and
+Addition. Goal, Focus, and Next are singular. A change-set explicitly creates,
+sets, ends, or reorders facts under Task revision CAS. Settle atomically creates
+one immutable Phase and applies only its submitted current-state delta; it
+never snapshots or infers carry-forward. Every new Phase requires exactly one
+nonblank Outcome.
 
-A task todo is an outgoing reference to another ordinary task in the same
-domain. It records a concrete future obligation before that task needs a
-member, assignee, priority, or any other execution resource. Adding a missing
-target creates its private repo-less task root and links it atomically;
-repeating the add is a no-op. Removing the relation requires `--apply`:
+Rename and rehome keep the permanent Task key, all facts and Phases, and every
+graph endpoint. Derived Member and Artifact seats move with the Task and Git
+worktree registration is repaired. All occupied coordinates remain
+lifetime-reserved.
+
+## Dependency graph
+
+An edge means `source depends_on target`. Weights are ordered
+`unknown < context < sequence < required`. The graph exists first to expose
+coordination problems: weight never schedules work or blocks member operations,
+settle, rename, rehome, finish, or release. Self-edges and cycles refuse.
 
 ```text
-concord task todo add perish.code/ship-feature follow-up
-concord task todo remove perish.code/ship-feature follow-up --apply
+concord task dependency add SOURCE TARGET --weight sequence --revision GRAPH
+concord task dependency set SOURCE TARGET --weight required --revision GRAPH
+concord task dependency remove SOURCE TARGET --revision GRAPH --reason TEXT --apply
+concord task dependency list TASK --direction both
+concord graph adjacency
+concord graph neighbors TASK --direction out --depth 2
+concord graph degree TASK
+concord graph reach TASK --direction out --min-weight context
+concord graph path SOURCE TARGET
+concord graph cycles
+concord graph scc
+concord graph export
 ```
 
-Finishing the source prints every target as a handoff and leaves those tasks
-alive. A target cannot finish while another task still references it. Rename
-rewrites incoming references; linked tasks refuse rehome until the relation is
-removed or handed off. Todos carry identities only: issue text and execution
-state remain with the target task and their owning systems.
+Cross-Domain dependencies are valid and exposed by audit. `--create-target`
+atomically creates an explicitly qualified missing target; it is never the
+default.
 
-`audit` keeps protocol agreement and local resource health separate. Protocol
-faults still fail the command; resource findings are advisory `OK`, `WARN`,
-`CRIT`, or `UNKNOWN` observations and never make a task impossible to inspect,
-land, or clean up. Each task audit measures allocated task, member, memory, and
-resource-seat bytes, plus the task filesystem, inode capacity where available,
-and current host memory:
+## Members and Artifacts
 
-| Observation | WARN | CRIT |
-| --- | ---: | ---: |
-| task or member footprint | 2 GiB | 8 GiB |
-| memory or resource seat | 512 MiB | 2 GiB |
-| filesystem or inode use | 60% | 75% |
-| host memory available | 40% | 25% |
-
-These intentionally conservative defaults catch accidental growth early in a
-Rust-oriented workplane. Concord records no resource history and attributes no
-arbitrary process to a task. Use global `--json` for structured observations;
-an unavailable platform metric is reported as `UNKNOWN`.
-
-Member preflight returns one record per declared member. A successful record
-proves canonical repository identity, the expected branch, a clean worktree,
-and either landed commit reachability or exact tree equivalence. JSON output
-carries the Git identities, heads, and trees used as evidence.
-
-Creation prints its plan and executes by default; add `--dry-run` to stop after
-planning. Deletion, task migration, permission normalization, and landed-seat
-removal only execute with `--apply`.
-
-Task memory uses whole-file compare-and-swap:
+Member, Claim, and Boundary facts live in Keel while Git owns the worktree.
+Claims are normalized nonempty repository-relative prefixes. Claim expansion
+is union-only and invalidates the previous proof.
 
 ```text
-concord memory init perish.code/ship-feature --file -
-concord memory read perish.code/ship-feature --json
-concord memory read perish.code/ship-feature --section focus --section next
-concord memory patch perish.code/ship-feature --file -
-concord memory write perish.code/ship-feature --expect SHA256 --file -
-concord memory settle perish.code/ship-feature \
-  --expect SHA256 --phase-file - --main-file MAIN.md
-concord memory phase list perish.code/ship-feature
+concord member attach TASK NAME --source PATH --claim PATH --revision TASK_REV
+concord member claim TASK NAME --claim PATH --revision TASK_REV
+concord member prove TASK NAME --revision TASK_REV
+concord member release TASK NAME --revision TASK_REV --apply
 ```
 
-All mutation inputs accept `-`; prefer stdin for generated content. Explicit
-files are bounded regular inputs and are consumed after a complete successful
-mutation by default. Use `--keep-file` or settle's `--keep-files` to retain
-them. If post-apply cleanup fails, Concord returns a typed nonzero error with
-`applied=true` and the resulting revision rather than rolling memory back.
+Release requires a current Plumb Boundary proof, a clean Member, and landed
+reachability or exact tree equivalence.
 
-New memory may use the `concord-memory:v1` fixed-section envelope. A projected
-`--section` result embeds its whole-file revision and can be sent directly to
-`memory patch`; patching splices only selected source ranges. MAIN is limited
-to 400 lines/64 KiB and each immutable PHASE to 800 lines/128 KiB. Audit
-reports schema and limit violations as non-gating memory hygiene, while 16
-retained phases emit a non-failing advisory.
-
-Once `memory settle` creates a phase, that immutable lineage is also a
-lifecycle boundary: `concord memory remove` refuses the whole `.task/` tree.
-Keep the repo-less task as retained history and put later work in a follow-up
-task. Exact removal remains available for unphased memory, so mistaken or
-never-settled task setup can still be cleaned up before `task finish`.
-
-Resource payload remains opaque after Concord allocates or imports its private
-seat:
+Artifact is a named private directory at the derived
+`.task/artifacts/<name>/` seat. It has no Keel row and does not participate in
+Task revision CAS.
 
 ```text
-concord resource allocate perish.code/ship-feature evidence
-concord resource import perish.code/ship-feature logs --source ./logs
-concord resource show perish.code/ship-feature logs
+concord artifact list TASK
+concord artifact preflight TASK NAME --source PATH
+concord artifact import TASK NAME --source PATH
+concord artifact remove TASK NAME --apply
 ```
 
-Import preflight measures the complete source tree and preserves at least 25%
-filesystem and inode headroom (with a 1 GiB minimum byte reserve). Apply
-rechecks under the task lock and copies files as a stream. Member creation also
-refuses to expand a filesystem already at the critical threshold.
+Import preflight measures the full source, refuses links and special files,
+preserves conservative filesystem and inode headroom, and streams the private
+copy.
 
-`concord --help` is the complete command grammar. The canonical manager installs
-the stable consensus:
+## Audit and lifecycle
 
-```sh
-curl -fsSL https://releases.concord.perish.uk/manage.sh | sh
+`concord --json audit` checks estate rows, name Reservations, current and Phase
+shape, direct graph and materialized closure, retired endpoints, Member/Claim/
+Boundary agreement, private custody, and foreign derived-seat territory. Every
+ordinary mutation runs this agreement gate first.
+
+Unknown and cross-Domain dependencies, missing Goal/Focus/Next, and migrated
+legacy Phases without Outcome are observations. They expose problems but never
+authorize cleanup or make ordinary work impossible.
+
+Finish requires zero live Members and no retained Artifacts. It archives every
+incident dependency, cuts those edges, marks the permanent Task retired, and
+bumps Task and graph revisions. Current facts and frozen Phases remain lineage.
+
+```text
+concord task finish TASK --revision TASK_REV --graph GRAPH_REV --reason TEXT --apply
 ```
 
-Every non-stable release exists only as an exact seal. Resolve its fixed manager
-and give it an isolated seat:
+## Observation and skill
 
-```sh
-seal=https://releases.concord.perish.uk/v1/releases/beta/v0.5.0-beta.1/seal.json
-manager=$(curl -fsSL "$seal" | jq -er '.managers.unix.url')
-curl -fsSL "$manager" | sh -s -- install \
-  --install-root "$HOME/.local/share/concord-beta" \
-  --bin-dir "$HOME/.local/concord-beta/bin"
-```
+Optional Locus process-cycle observation remains environment-only and muted by
+default. Enabling it requires `CONCORD_LOCUS_ENABLED=true` and
+`CONCORD_LOCUS_REPORT_FILE`; Context never affects business output or control
+flow.
 
-Concord also ships its operating brief as a release-matched managed skill:
+Concord ships a release-matched managed skill:
 
 ```text
 concord skill install
-concord skill install --path ~/.codex/skills/concord
-concord skill stage --channel beta --version v0.5.0-beta.1 \
-  --path ~/.local/share/concord-beta/skills/concord
-concord skill list
+concord skill status
 concord skill upgrade
 concord skill uninstall
 ```
 
-Default installation detects present Claude, Codex, shared agent, and OpenCode
-skill directories. Replacement and removal require both Concord's
-`state/skills.json` record and the target's `metadata.json` ownership marker;
-the exact stage path is separate from managed state.
+`concord <command> --help` is the exhaustive CLI grammar. The canonical release
+manager is available at `https://releases.concord.perish.uk/manage.sh`.

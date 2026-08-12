@@ -25,7 +25,7 @@ pub(super) fn permissions(audit: &mut Audit, root: &Path) -> Result<()> {
             audit.fault("memory", &path, "symbolic links are not managed memory");
         } else if entry.file_name() == "resources" && kind.is_dir() {
             permission(audit, &path, 0o700)?;
-            visit_resources(audit, &path)?;
+            resources(audit, &path)?;
         } else if kind.is_dir() {
             permission(audit, &path, 0o700)?;
             visit(audit, &path)?;
@@ -54,7 +54,7 @@ fn visit(audit: &mut Audit, root: &Path) -> Result<()> {
     Ok(())
 }
 
-fn visit_resources(audit: &mut Audit, root: &Path) -> Result<()> {
+fn resources(audit: &mut Audit, root: &Path) -> Result<()> {
     for entry in std::fs::read_dir(root)? {
         let entry = entry?;
         let path = entry.path();
@@ -67,7 +67,7 @@ fn visit_resources(audit: &mut Audit, root: &Path) -> Result<()> {
             );
         } else if kind.is_dir() {
             permission(audit, &path, 0o700)?;
-            visit_resources(audit, &path)?;
+            resources(audit, &path)?;
         } else if let Some(held) = at(&path).held()?
             && held & 0o077 != 0
         {

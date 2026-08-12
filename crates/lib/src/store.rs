@@ -17,14 +17,9 @@ pub struct Domain {
 }
 
 #[derive(Clone, Debug)]
-pub struct TaskRef {
+pub struct Legacy {
     domain: Domain,
     task: Task,
-}
-
-pub(crate) struct Snapshot {
-    pub raw: Vec<u8>,
-    pub registry: Registry,
 }
 
 pub(crate) struct Lock {
@@ -51,7 +46,7 @@ impl Space {
             }
             let name = entry.file_name().to_string_lossy().to_string();
             let domain = Domain::new(&self.root, &name)?;
-            if domain.registry_path().is_file() {
+            if domain.manifest().is_file() {
                 found.push(domain);
             }
         }
@@ -61,34 +56,10 @@ impl Space {
 
     pub fn domain(&self, name: &str) -> Result<Domain> {
         let domain = Domain::new(&self.root, name)?;
-        if !domain.registry_path().is_file() {
+        if !domain.manifest().is_file() {
             return Err(Error::new(format!("unknown managed domain {name}")));
         }
         Ok(domain)
-    }
-
-    pub fn resolve(&self, identity: &str) -> Result<TaskRef> {
-        if let Some((domain, task)) = identity.split_once('/') {
-            return self.domain(domain)?.task(task);
-        }
-        if let Some(domain) = self.containing_domain()?
-            && let Ok(task) = domain.task(identity)
-        {
-            return Ok(task);
-        }
-        let mut found = Vec::new();
-        for domain in self.domains()? {
-            if let Ok(task) = domain.task(identity) {
-                found.push(task);
-            }
-        }
-        match found.len() {
-            0 => Err(Error::new(format!("task not found: {identity}"))),
-            1 => Ok(found.remove(0)),
-            _ => Err(Error::new(format!(
-                "task name is ambiguous; use domain/{identity}"
-            ))),
-        }
     }
 
     pub(crate) fn lock(&self) -> Result<Lock> {
@@ -102,32 +73,6 @@ impl Space {
         at(&path).mode(0o600)?;
         file.lock_exclusive()?;
         Ok(Lock { file })
-    }
-
-    pub(crate) fn task_identity(&self, identity: &str) -> Result<String> {
-        if identity.contains('/') {
-            return Ok(identity.to_string());
-        }
-        let domain = self.containing_domain()?.ok_or_else(|| {
-            Error::new("task creation outside a managed domain requires domain/task identity")
-        })?;
-        Ok(format!("{}/{}", domain.name(), identity))
-    }
-
-    fn containing_domain(&self) -> Result<Option<Domain>> {
-        let current = crate::config::current_dir()?;
-        let mut found = self
-            .domains()?
-            .into_iter()
-            .filter(|domain| {
-                domain
-                    .path()
-                    .canonicalize()
-                    .is_ok_and(|path| current.starts_with(path))
-            })
-            .collect::<Vec<_>>();
-        found.sort_by_key(|domain| std::cmp::Reverse(domain.path().as_os_str().len()));
-        Ok(found.into_iter().next())
     }
 }
 
@@ -148,39 +93,34 @@ impl Domain {
         &self.root
     }
 
-    pub fn tasks_path(&self) -> PathBuf {
+    pub fn tasks(&self) -> PathBuf {
         self.root.join(".tasks")
     }
 
-    pub fn registry_path(&self) -> PathBuf {
-        self.tasks_path().join("tasks.toml")
+    pub fn manifest(&self) -> PathBuf {
+        self.tasks().join("tasks.toml")
     }
 
-    pub fn task(&self, name: &str) -> Result<TaskRef> {
+    pub fn task(&self, name: &str) -> Result<Legacy> {
         component("task name", name)?;
-        let snapshot = self.read()?;
-        let task = snapshot
-            .registry
+        let task = self
+            .read()?
             .task
             .into_iter()
             .find(|task| task.name == name)
             .ok_or_else(|| Error::new(format!("task not found: {}/{}", self.name, name)))?;
-        Ok(self.bind_task(task))
-    }
-
-    pub(crate) fn bind_task(&self, task: Task) -> TaskRef {
-        TaskRef {
+        Ok(Legacy {
             domain: self.clone(),
             task,
-        }
+        })
     }
 
     pub fn registry(&self) -> Result<Registry> {
-        Ok(self.read()?.registry)
+        self.read()
     }
 
-    pub(crate) fn read(&self) -> Result<Snapshot> {
-        let path = self.registry_path();
+    fn read(&self) -> Result<Registry> {
+        let path = self.manifest();
         let raw = std::fs::read(&path).map_err(|error| {
             Error::new(format!("cannot read registry {}: {error}", path.display()))
         })?;
@@ -188,33 +128,11 @@ impl Domain {
             .map_err(|_| Error::new(format!("registry is not utf8: {}", path.display())))?;
         let registry: Registry = toml::from_str(text)?;
         registry.validate()?;
-        Ok(Snapshot { raw, registry })
-    }
-
-    pub(crate) fn write(&self, before: &[u8], registry: &Registry) -> Result<()> {
-        let path = self.registry_path();
-        let current = std::fs::read(&path)?;
-        if current != before {
-            return Err(Error::new(format!(
-                "registry changed concurrently: {}",
-                path.display()
-            )));
-        }
-        let text = toml::to_string_pretty(registry)?;
-        at(&path).file(&text)
-    }
-
-    pub(crate) fn bootstrap(&self) -> Result<()> {
-        if self.registry_path().exists() {
-            return Err(Error::new(format!("domain already managed: {}", self.name)));
-        }
-        std::fs::create_dir_all(&self.root)?;
-        at(&self.tasks_path()).directory()?;
-        at(&self.registry_path()).file(&toml::to_string_pretty(&Registry::empty())?)
+        Ok(registry)
     }
 }
 
-impl TaskRef {
+impl Legacy {
     pub fn domain(&self) -> &Domain {
         &self.domain
     }
@@ -224,32 +142,19 @@ impl TaskRef {
     }
 
     pub fn path(&self) -> PathBuf {
-        self.domain.tasks_path().join(&self.task.name)
+        self.domain.tasks().join(&self.task.name)
     }
 
-    pub fn member_path(&self, name: &str) -> PathBuf {
+    pub fn member(&self, name: &str) -> PathBuf {
         self.path().join(name)
     }
 
     pub fn source(&self, value: &str) -> Result<PathBuf> {
-        expand(value, &self.domain.tasks_path())
+        expand(value, &self.domain.tasks())
     }
 
     pub fn identity(&self) -> String {
         format!("{}/{}", self.domain.name, self.task.name)
-    }
-
-    #[locus::trace(with = crate::observation::view())]
-    pub(crate) fn lock(&self) -> Result<Lock> {
-        let space = self
-            .domain
-            .path()
-            .parent()
-            .ok_or_else(|| Error::new("managed domain has no domain-space parent"))?;
-        Space {
-            root: space.to_path_buf(),
-        }
-        .lock()
     }
 }
 

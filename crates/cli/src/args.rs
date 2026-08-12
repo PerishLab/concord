@@ -1,12 +1,24 @@
-mod memory;
-mod task;
+pub(crate) mod artifact;
+pub(crate) mod audit;
+pub(crate) mod domain;
+pub(crate) mod graph;
+pub(crate) mod member;
+pub(crate) mod migration;
+pub(crate) mod phase;
+pub(crate) mod task;
 
-use crate::skill::SkillArgs;
+use crate::skill::Args as Skill;
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
-pub use memory::{MemoryArgs, MemoryCommand, MemoryPhaseCommand};
-pub use task::{TaskArgs, TaskCommand, TaskTodoCommand};
+pub use artifact::Args as Artifact;
+pub use audit::Args as Audit;
+pub use domain::Args as Domain;
+pub use graph::Args as Graph;
+pub use member::Args as Member;
+pub use migration::Args as Migration;
+pub use phase::Args as Phase;
+pub use task::Args as Task;
 
 #[derive(Parser)]
 #[command(version = plumb::version!("CONCORD"), about)]
@@ -28,25 +40,25 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Command {
     #[command(about = "Inspect Concord configuration")]
-    Config(ConfigArgs),
-    #[command(about = "List or initialize managed domains")]
-    Domain(DomainArgs),
-    #[command(about = "Manage repository annotations")]
-    Repo(RepoArgs),
-    #[command(about = "Manage task lifecycle")]
-    Task(TaskArgs),
-    #[command(about = "Manage repository member seats")]
-    Member(MemberArgs),
-    #[command(about = "Read and replace task memory")]
-    Memory(MemoryArgs),
-    #[command(about = "Manage opaque resource seats")]
-    Resource(ResourceArgs),
-    #[command(about = "Normalize private task permissions")]
-    Permissions(PermissionArgs),
+    Config(Config),
+    #[command(about = "Manage estate Domains")]
+    Domain(Domain),
+    #[command(about = "Manage Task lifecycle, facts, and dependencies")]
+    Task(Task),
+    #[command(about = "Settle and read frozen Task Phases")]
+    Phase(Phase),
+    #[command(about = "Manage repository worktree Members")]
+    Member(Member),
+    #[command(about = "Manage direct private Artifact payload")]
+    Artifact(Artifact),
+    #[command(about = "Inspect the Task dependency graph")]
+    Graph(Graph),
+    #[command(about = "Audit estate, graph, and external agreement")]
+    Audit(Audit),
+    #[command(about = "Stage and activate the v0.10.0 estate migration")]
+    Migration(Migration),
     #[command(about = "Manage Concord agent skill installations")]
-    Skill(SkillArgs),
-    #[command(about = "Audit protocol agreement")]
-    Audit(AuditArgs),
+    Skill(Skill),
 }
 
 impl Command {
@@ -54,181 +66,28 @@ impl Command {
         match self {
             Self::Config(_) => "config",
             Self::Domain(_) => "domain",
-            Self::Repo(_) => "repo",
             Self::Task(_) => "task",
+            Self::Phase(_) => "phase",
             Self::Member(_) => "member",
-            Self::Memory(_) => "memory",
-            Self::Resource(_) => "resource",
-            Self::Permissions(_) => "permissions",
-            Self::Skill(_) => "skill",
+            Self::Artifact(_) => "artifact",
+            Self::Graph(_) => "graph",
             Self::Audit(_) => "audit",
+            Self::Migration(_) => "migration",
+            Self::Skill(_) => "skill",
         }
     }
 }
 
 #[derive(Args)]
-pub struct ConfigArgs {
+pub struct Config {
     #[command(subcommand)]
-    pub command: ConfigCommand,
+    pub command: Configure,
 }
 
 #[derive(Subcommand)]
-pub enum ConfigCommand {
+pub enum Configure {
     #[command(about = "Print the selected config path")]
     Path,
     #[command(about = "Print resolved runtime configuration")]
     Show,
-}
-
-#[derive(Args)]
-pub struct DomainArgs {
-    #[command(subcommand)]
-    pub command: DomainCommand,
-}
-
-#[derive(Subcommand)]
-pub enum DomainCommand {
-    #[command(about = "List managed domains")]
-    List,
-    #[command(about = "Initialize a domain registry")]
-    Init {
-        name: String,
-        #[arg(long)]
-        dry_run: bool,
-    },
-    #[command(about = "Migrate a registry to the current protocol version")]
-    Migrate {
-        domain: String,
-        #[arg(long)]
-        claim: Vec<String>,
-        #[arg(long)]
-        apply: bool,
-    },
-}
-
-#[derive(Args)]
-pub struct RepoArgs {
-    #[command(subcommand)]
-    pub command: RepoCommand,
-}
-
-#[derive(Subcommand)]
-pub enum RepoCommand {
-    #[command(about = "Add a repository annotation")]
-    Annotate {
-        domain: String,
-        name: String,
-        #[arg(long)]
-        note: Option<String>,
-        #[arg(long)]
-        dry_run: bool,
-    },
-}
-
-#[derive(Args)]
-pub struct MemberArgs {
-    #[command(subcommand)]
-    pub command: MemberCommand,
-}
-
-#[derive(Subcommand)]
-pub enum MemberCommand {
-    #[command(about = "Create and register a Git worktree seat")]
-    Add {
-        task: String,
-        #[arg(long)]
-        source: PathBuf,
-        #[arg(long)]
-        name: Option<String>,
-        #[arg(long)]
-        branch: Option<String>,
-        #[arg(long)]
-        orphan: bool,
-        #[arg(long, required = true, num_args = 1..)]
-        write: Vec<String>,
-        #[arg(long)]
-        dry_run: bool,
-    },
-    #[command(about = "Prove cleanliness and landed reachability")]
-    Preflight { task: String },
-    #[command(about = "Expand a member write claim")]
-    Claim {
-        task: String,
-        name: String,
-        #[arg(long, required = true, num_args = 1..)]
-        write: Vec<String>,
-        #[arg(long)]
-        dry_run: bool,
-    },
-    #[command(about = "Prove committed changes stay inside a member write claim")]
-    Boundary { task: String, name: String },
-    #[command(about = "Remove a clean, reachable landed worktree")]
-    RemoveLanded {
-        task: String,
-        name: String,
-        #[arg(long)]
-        apply: bool,
-    },
-}
-
-#[derive(Args)]
-pub struct ResourceArgs {
-    #[command(subcommand)]
-    pub command: ResourceCommand,
-}
-
-#[derive(Subcommand)]
-pub enum ResourceCommand {
-    #[command(about = "List allocated resource seats")]
-    List { task: String },
-    #[command(about = "Resolve one resource seat")]
-    Show { task: String, name: String },
-    #[command(about = "Allocate an empty private resource seat")]
-    Allocate {
-        task: String,
-        name: String,
-        #[arg(long)]
-        dry_run: bool,
-    },
-    #[command(about = "Import a file or tree into a private seat")]
-    Import {
-        task: String,
-        name: String,
-        #[arg(long)]
-        source: PathBuf,
-        #[arg(long)]
-        dry_run: bool,
-    },
-    #[command(about = "Remove one exact resource seat")]
-    Remove {
-        task: String,
-        name: String,
-        #[arg(long)]
-        apply: bool,
-    },
-}
-
-#[derive(Args)]
-pub struct PermissionArgs {
-    #[command(subcommand)]
-    pub command: PermissionCommand,
-}
-
-#[derive(Subcommand)]
-pub enum PermissionCommand {
-    #[command(about = "Restore private modes without changing payload")]
-    Normalize {
-        task: String,
-        #[arg(long)]
-        apply: bool,
-    },
-}
-
-#[derive(Args)]
-pub struct AuditArgs {
-    pub task: Option<String>,
-    #[arg(long)]
-    pub domain: Option<String>,
-    #[arg(long)]
-    pub space: bool,
 }

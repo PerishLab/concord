@@ -2,7 +2,7 @@ use crate::path::at;
 use crate::{Error, Result};
 use std::path::Path;
 
-pub(super) fn tree(source: &Path, target: &Path) -> Result<()> {
+pub(crate) fn tree(source: &Path, target: &Path) -> Result<()> {
     for entry in std::fs::read_dir(source)? {
         let entry = entry?;
         let kind = entry.file_type()?;
@@ -28,13 +28,19 @@ pub(super) fn tree(source: &Path, target: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn file(source: &Path, target: &Path) -> Result<()> {
-    at(target).copy(
-        source,
-        if super::held_owner_execute(source)? {
-            0o700
-        } else {
-            0o600
-        },
-    )
+pub(crate) fn file(source: &Path, target: &Path) -> Result<()> {
+    at(target).copy(source, if executable(source)? { 0o700 } else { 0o600 })
+}
+
+fn executable(path: &Path) -> Result<bool> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        Ok(std::fs::metadata(path)?.permissions().mode() & 0o100 != 0)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        Ok(false)
+    }
 }

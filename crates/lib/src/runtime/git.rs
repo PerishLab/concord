@@ -2,19 +2,6 @@ use crate::{Error, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub enum Landing {
-    Reachable {
-        member_head: String,
-        source_head: String,
-    },
-    TreeEquivalent {
-        member_head: String,
-        source_head: String,
-        member_tree: String,
-        source_tree: String,
-    },
-}
-
 pub struct Checkout<'a> {
     root: &'a Path,
 }
@@ -31,7 +18,7 @@ pub fn at(root: &Path) -> Checkout<'_> {
 impl Checkout<'_> {
     #[locus::trace(with = crate::observation::view())]
     pub fn text(&self, args: &[&str]) -> Result<String> {
-        let root = git_path(self.root);
+        let root = native(self.root);
         let output = command()
             .arg("-C")
             .arg(&root)
@@ -98,13 +85,13 @@ impl Checkout<'_> {
         self.text(&["rev-parse", "--verify", "HEAD^{commit}"])
     }
 
-    pub fn merge_base(&self, left: &str, right: &str) -> Result<String> {
+    pub fn merge(&self, left: &str, right: &str) -> Result<String> {
         self.text(&["merge-base", left, right])
     }
 
     pub fn exists(&self, branch: &str) -> Result<bool> {
         let reference = format!("refs/heads/{branch}");
-        let root = git_path(self.root);
+        let root = native(self.root);
         let status = command()
             .arg("-C")
             .arg(&root)
@@ -118,33 +105,22 @@ impl Checkout<'_> {
         }
     }
 
-    pub fn landing(&self, source: &Path) -> Result<Option<Landing>> {
-        let member_head = self.text(&["rev-parse", "HEAD"])?;
+    pub fn landed(&self, source: &Path) -> Result<bool> {
+        let member = self.text(&["rev-parse", "HEAD"])?;
         let source = at(source);
-        let source_head = source.text(&["rev-parse", "HEAD"])?;
+        let origin = source.text(&["rev-parse", "HEAD"])?;
         let status = command()
             .arg("-C")
-            .arg(git_path(source.root))
-            .args(["merge-base", "--is-ancestor", &member_head, &source_head])
+            .arg(native(source.root))
+            .args(["merge-base", "--is-ancestor", &member, &origin])
             .status()
             .map_err(|error| Error::new(format!("cannot run git: {error}")))?;
         if status.success() {
-            return Ok(Some(Landing::Reachable {
-                member_head,
-                source_head,
-            }));
+            return Ok(true);
         }
-        let member_tree = self.text(&["rev-parse", "HEAD^{tree}"])?;
-        let source_tree = source.text(&["rev-parse", "HEAD^{tree}"])?;
-        if member_tree != source_tree {
-            return Ok(None);
-        }
-        Ok(Some(Landing::TreeEquivalent {
-            member_head,
-            source_head,
-            member_tree,
-            source_tree,
-        }))
+        let member = self.text(&["rev-parse", "HEAD^{tree}"])?;
+        let source = source.text(&["rev-parse", "HEAD^{tree}"])?;
+        Ok(member == source)
     }
 
     #[locus::trace(with = crate::observation::view())]
@@ -162,7 +138,7 @@ impl Checkout<'_> {
     }
 
     pub fn repair(&self, member: &Path) -> Result<()> {
-        let member = git_path(member);
+        let member = native(member);
         let member = member
             .to_str()
             .ok_or_else(|| Error::new("member path is not utf8"))?;
@@ -170,11 +146,11 @@ impl Checkout<'_> {
     }
 
     pub fn add(&self, path: &Path, branch: &str, orphan: bool) -> Result<()> {
-        let source = git_path(self.root);
+        let source = native(self.root);
         let source = source
             .to_str()
             .ok_or_else(|| Error::new("source path is not utf8"))?;
-        let target = git_path(path);
+        let target = native(path);
         let target = target
             .to_str()
             .ok_or_else(|| Error::new("member path is not utf8"))?;
@@ -187,7 +163,7 @@ impl Checkout<'_> {
         let output = command().args(args).output()?;
         if !output.status.success() {
             let failure = String::from_utf8_lossy(&output.stderr).trim().to_string();
-            if let Err(cleanup) = self.rollback_add(path, branch) {
+            if let Err(cleanup) = self.rollback(path, branch) {
                 return Err(Error::new(format!(
                     "git worktree add failed: {failure}; failed to roll back branch {branch}: {cleanup}"
                 )));
@@ -198,14 +174,14 @@ impl Checkout<'_> {
     }
 
     pub fn remove(&self, path: &Path) -> Result<()> {
-        let path = git_path(path);
+        let path = native(path);
         let path = path
             .to_str()
             .ok_or_else(|| Error::new("member path is not utf8"))?;
         self.run(&["worktree", "remove", path])
     }
 
-    fn rollback_add(&self, path: &Path, branch: &str) -> Result<()> {
+    fn rollback(&self, path: &Path, branch: &str) -> Result<()> {
         if !path.exists() && self.exists(branch)? {
             self.run(&["branch", "-D", branch])?;
         }
@@ -214,7 +190,7 @@ impl Checkout<'_> {
 }
 
 #[cfg(windows)]
-fn git_path(path: &Path) -> PathBuf {
+fn native(path: &Path) -> PathBuf {
     if let Some(text) = path.to_str() {
         if let Some(rest) = text.strip_prefix("\\\\?\\UNC\\") {
             return PathBuf::from(format!("\\\\{rest}"));
@@ -227,7 +203,7 @@ fn git_path(path: &Path) -> PathBuf {
 }
 
 #[cfg(not(windows))]
-fn git_path(path: &Path) -> PathBuf {
+fn native(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
 
