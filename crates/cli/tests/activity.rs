@@ -67,6 +67,19 @@ fn activity() {
     assert!(warning.contains("has recent activity from another session; take care"));
     assert!(warning.contains("codex codex-one task.show at"));
 
+    let repeated = Command::new(env!("CARGO_BIN_EXE_concord"))
+        .args(["--root", fixture.path().to_str().expect("root path")])
+        .args(["task", "show", "local/alpha"])
+        .env_remove("CONCORD_LOCUS_ENABLED")
+        .env_remove("CLAUDE_CODE_SESSION_ID")
+        .env_remove("GROK_SESSION_ID")
+        .env_remove("CODEX_THREAD_ID")
+        .env("GROK_SESSION_ID", "grok-one")
+        .output()
+        .expect("repeat Concord as Grok operator");
+    assert!(repeated.status.success());
+    assert!(repeated.stderr.is_empty());
+
     std::fs::write(
         fixture.path().join(format!(".concord/activity/{key}.json")),
         b"not-json",
@@ -90,7 +103,7 @@ fn activity() {
 }
 
 #[test]
-fn ambiguous() {
+fn context() {
     let fixture = tempfile::tempdir().expect("fixture");
     success(fixture.path(), &["domain", "bootstrap", "local"]);
     success(fixture.path(), &["task", "start", "local", "alpha"]);
@@ -103,12 +116,25 @@ fn ambiguous() {
     assert!(output.status.success());
     let current: Value = serde_json::from_slice(&output.stdout).expect("primary result JSON");
     assert_eq!(current["current"]["task"]["revision"], 0);
-    let warning: Value = serde_json::from_slice(&output.stderr).expect("warning JSON");
-    assert_eq!(warning["warning"]["code"], "concord.activity.unavailable");
-    assert_eq!(
-        warning["warning"]["details"]["code"],
-        "concord.activity.ambiguous"
-    );
+    assert!(output.stderr.is_empty());
+
+    let key = current["current"]["task"]["key"]
+        .as_i64()
+        .expect("Task key");
+    let ledger: Value = serde_json::from_slice(
+        &std::fs::read(fixture.path().join(format!(".concord/activity/{key}.json")))
+            .expect("activity ledger"),
+    )
+    .expect("activity ledger JSON");
+    let touch = ledger["touches"]
+        .as_array()
+        .expect("touches")
+        .iter()
+        .find(|touch| touch["operation"] == "task.show")
+        .expect("show touch");
+    assert!(touch.get("agent").is_none());
+    assert!(touch.get("session").is_none());
+    assert!(touch["time"].is_u64());
 }
 
 fn success(space: &Path, arguments: &[&str]) -> Value {

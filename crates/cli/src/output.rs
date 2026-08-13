@@ -35,13 +35,15 @@ pub fn activity(activity: &Activity, output: bool) {
         activity.task
     );
     for touch in &activity.recent {
-        eprintln!(
-            "  {} {} {} at {}",
-            touch.agent.name(),
-            touch.session,
-            touch.operation,
-            touch.time
-        );
+        if let (Some(agent), Some(session)) = (touch.agent, touch.session.as_deref()) {
+            eprintln!(
+                "  {} {} {} at {}",
+                agent.name(),
+                session,
+                touch.operation,
+                touch.time
+            );
+        }
     }
 }
 
@@ -49,7 +51,7 @@ pub fn unavailable(task: &str, error: &Error, output: bool) {
     let warning = json!({
         "warning": {
             "code": "concord.activity.unavailable",
-            "message": "operator activity is unavailable; the primary command remains unaffected",
+            "message": "Task activity is unavailable; the primary command remains unaffected",
             "task": task,
             "details": {
                 "code": error.code(),
@@ -65,7 +67,7 @@ pub fn unavailable(task: &str, error: &Error, output: bool) {
         return;
     }
     eprintln!(
-        "concord: warning: operator activity is unavailable for {task}: {}",
+        "concord: warning: Task activity is unavailable for {task}: {}",
         error.message()
     );
 }

@@ -21,7 +21,8 @@ of weakening the Claim.
 
 ## Another session recently touched the Task
 
-Restate the reported agent, session, operation, and time as objective facts.
+Restate the reported operation and time plus any agent and session context as
+objective facts. The context does not establish who initiated the operation.
 For read-only operations, normally continue because the warning is not a gate.
 Before a write, re-read the Task revision and inspect relevant Members, Claims,
 and local Git impact. Continue when the write surface is clearly disjoint. When

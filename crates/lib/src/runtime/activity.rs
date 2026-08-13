@@ -27,8 +27,10 @@ pub struct Operator {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Touch {
-    pub agent: Agent,
-    pub session: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<Agent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<String>,
     pub operation: String,
     pub time: u64,
 }
@@ -50,7 +52,7 @@ struct Ledger {
 impl Default for Ledger {
     fn default() -> Self {
         Self {
-            version: 1,
+            version: 2,
             touches: Vec::new(),
         }
     }
@@ -67,18 +69,29 @@ impl Agent {
 }
 
 impl Operator {
-    pub fn detect() -> Result<Option<Self>> {
+    pub fn detect() -> Option<Self> {
         crate::config::operator()
+    }
+
+    pub(crate) fn valid(&self) -> bool {
+        let session = self.session.as_str();
+        !session.is_empty()
+            && session.len() <= 512
+            && session.chars().all(|character| {
+                character.is_ascii_alphanumeric()
+                    || matches!(character, '-' | '_' | '.' | ':' | '/')
+            })
     }
 }
 
 pub(crate) fn record(
     space: &Path,
     task: &Node,
-    operator: &Operator,
+    operator: Option<&Operator>,
     operation: &str,
 ) -> Result<Activity> {
-    validate(operator, operation)?;
+    validate(operation)?;
+    let operator = operator.filter(|operator| operator.valid());
     let time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|error| Error::typed("concord.activity.clock", error.to_string()))?
@@ -88,16 +101,31 @@ pub(crate) fn record(
     let _guard = guard(&root, task.key)?;
     let path = root.join(format!("{}.json", task.key));
     let mut ledger = read(&path)?;
+    ledger.version = 2;
     let identity = task.identity();
     let current = Touch {
-        agent: operator.agent,
-        session: operator.session.clone(),
+        agent: operator.map(|operator| operator.agent),
+        session: operator.map(|operator| operator.session.clone()),
         operation: operation.to_string(),
         time,
     };
-    ledger
-        .touches
-        .retain(|touch| touch.agent != operator.agent || touch.session != operator.session);
+    let previous = operator.and_then(|operator| {
+        ledger
+            .touches
+            .iter()
+            .filter(|touch| {
+                touch.agent == Some(operator.agent)
+                    && touch.session.as_deref() == Some(operator.session.as_str())
+            })
+            .map(|touch| touch.time)
+            .max()
+    });
+    if let Some(operator) = operator {
+        ledger.touches.retain(|touch| {
+            touch.agent != Some(operator.agent)
+                || touch.session.as_deref() != Some(operator.session.as_str())
+        });
+    }
     ledger.touches.push(current.clone());
     ledger.touches.sort_by(|left, right| {
         right
@@ -107,7 +135,7 @@ pub(crate) fn record(
             .then_with(|| right.session.cmp(&left.session))
     });
     ledger.touches.truncate(CAPACITY);
-    let recent = recent(&ledger, operator, time);
+    let recent = recent(&ledger, operator, previous, time);
     let encoded = serde_json::to_vec_pretty(&ledger)
         .map_err(|error| Error::typed("concord.activity.encode", error.to_string()))?;
     at(&path).write(&encoded, 0o600)?;
@@ -131,7 +159,7 @@ fn guard(root: &Path, key: i64) -> Result<File> {
     file.try_lock_exclusive().map_err(|error| {
         Error::typed(
             "concord.activity.busy",
-            format!("operator activity ledger is busy: {error}"),
+            format!("Task activity ledger is busy: {error}"),
         )
     })?;
     Ok(file)
@@ -144,42 +172,44 @@ fn read(path: &Path) -> Result<Ledger> {
     let bytes = std::fs::read(path)?;
     let ledger = serde_json::from_slice::<Ledger>(&bytes)
         .map_err(|error| Error::typed("concord.activity.invalid", error.to_string()))?;
-    if ledger.version != 1 {
+    if !matches!(ledger.version, 1 | 2) {
         return Err(Error::typed(
             "concord.activity.version",
-            format!("unsupported operator activity version {}", ledger.version),
+            format!("unsupported Task activity version {}", ledger.version),
         ));
     }
     Ok(ledger)
 }
 
-fn recent(ledger: &Ledger, operator: &Operator, time: u64) -> Vec<Touch> {
+fn recent(
+    ledger: &Ledger,
+    operator: Option<&Operator>,
+    previous: Option<u64>,
+    time: u64,
+) -> Vec<Touch> {
+    let Some(operator) = operator else {
+        return Vec::new();
+    };
     let earliest = time.saturating_sub(WINDOW);
     ledger
         .touches
         .iter()
         .filter(|touch| touch.time >= earliest)
-        .filter(|touch| touch.agent != operator.agent || touch.session != operator.session)
+        .filter(|touch| previous.is_none_or(|previous| touch.time > previous))
+        .filter(|touch| match (touch.agent, touch.session.as_deref()) {
+            (Some(agent), Some(session)) => agent != operator.agent || session != operator.session,
+            _ => false,
+        })
         .take(LIMIT)
         .cloned()
         .collect()
 }
 
-fn validate(operator: &Operator, operation: &str) -> Result<()> {
-    let session = operator.session.as_str();
-    let safe = session.chars().all(|character| {
-        character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.' | ':' | '/')
-    });
-    if session.is_empty() || session.len() > 512 || !safe {
-        return Err(Error::typed(
-            "concord.activity.session",
-            "operator session id must be 1..=512 safe ASCII bytes",
-        ));
-    }
+fn validate(operation: &str) -> Result<()> {
     if operation.is_empty() || operation.len() > 128 {
         return Err(Error::typed(
             "concord.activity.operation",
-            "operator activity operation must be 1..=128 bytes",
+            "Task activity operation must be 1..=128 bytes",
         ));
     }
     Ok(())
