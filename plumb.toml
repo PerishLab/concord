@@ -11,11 +11,11 @@ skill = true
 
 [[document]]
 strategy = "agent"
-source = [{ path = ".", seal = "bfd5c5c8cb4d264ae0d93eb44be1d33bb2714b18338d51a1b79852616bd4c7c0" }]
+source = [{ path = ".", seal = "494024bd5550497ada5b20fb99559445362c1bf5695eb0436e251342cb28487a" }]
 target-seal = "e019fe21d644837c1bb440cb5781bcc7d3d9713344b584cec4aca4944a864531"
 
 [[document]]
 strategy = "brief"
 name = "concord"
-source = [{ path = ".", seal = "bfd5c5c8cb4d264ae0d93eb44be1d33bb2714b18338d51a1b79852616bd4c7c0" }]
-target-seal = "634d7073b1a5b237f5947058f02e5cc74e597121216efc3bab5f607994900809"
+source = [{ path = ".", seal = "494024bd5550497ada5b20fb99559445362c1bf5695eb0436e251342cb28487a" }]
+target-seal = "14eeea8ffee24045f461772ea7ab372b40ed64539aaa36b5dc7aa81eb8542d39"

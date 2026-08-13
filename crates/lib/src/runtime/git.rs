@@ -46,9 +46,14 @@ impl Checkout<'_> {
     }
 
     pub fn clean(&self) -> Result<bool> {
-        Ok(self
-            .text(&["status", "--porcelain=v1", "--untracked-files=all"])?
-            .is_empty())
+        let (tracked, untracked) = self.changes()?;
+        Ok(tracked == 0 && untracked == 0)
+    }
+
+    pub fn changes(&self) -> Result<(usize, usize)> {
+        let status = self.text(&["status", "--porcelain=v1", "--untracked-files=all"])?;
+        let untracked = status.lines().filter(|line| line.starts_with("??")).count();
+        Ok((status.lines().count() - untracked, untracked))
     }
 
     pub fn head(&self) -> Result<String> {
@@ -57,6 +62,63 @@ impl Checkout<'_> {
 
     pub fn merge(&self, left: &str, right: &str) -> Result<String> {
         self.text(&["merge-base", left, right])
+    }
+
+    pub fn ancestor(&self, left: &str, right: &str) -> Result<bool> {
+        let root = native(self.root);
+        let status = command()
+            .arg("-C")
+            .arg(&root)
+            .args(["merge-base", "--is-ancestor", left, right])
+            .status()
+            .map_err(|error| Error::new(format!("cannot run git: {error}")))?;
+        match status.code() {
+            Some(0) => Ok(true),
+            Some(1) => Ok(false),
+            _ => Err(Error::new("cannot inspect Git ancestry")),
+        }
+    }
+
+    pub fn tree(&self, revision: &str) -> Result<String> {
+        self.text(&["rev-parse", &format!("{revision}^{{tree}}")])
+    }
+
+    pub fn upstream(&self, branch: &str) -> Result<Option<String>> {
+        let reference = format!("refs/heads/{branch}");
+        let value = self.text(&["for-each-ref", "--format=%(upstream:short)", &reference])?;
+        Ok((!value.is_empty()).then_some(value))
+    }
+
+    pub fn divergence(&self, left: &str, right: &str) -> Result<(usize, usize)> {
+        let range = format!("{left}...{right}");
+        let value = self.text(&["rev-list", "--left-right", "--count", &range])?;
+        let counts = value
+            .split_whitespace()
+            .map(str::parse::<usize>)
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|error| Error::new(format!("cannot read Git divergence: {error}")))?;
+        match counts.as_slice() {
+            [ahead, behind] => Ok((*ahead, *behind)),
+            _ => Err(Error::new("Git divergence did not return two counts")),
+        }
+    }
+
+    pub fn tracking(&self, revision: &str) -> Result<Vec<String>> {
+        let mut refs = self
+            .text(&[
+                "for-each-ref",
+                "--format=%(refname:short)",
+                "--contains",
+                revision,
+                "refs/remotes",
+            ])?
+            .lines()
+            .filter(|line| !line.is_empty())
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        refs.sort();
+        refs.dedup();
+        Ok(refs)
     }
 
     pub fn exists(&self, branch: &str) -> Result<bool> {

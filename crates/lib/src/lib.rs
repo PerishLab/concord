@@ -16,10 +16,11 @@ pub(crate) use protocol::{claim, component};
 pub use config::Root;
 pub use error::{Error, Result};
 pub use estate::{
-    Agreement, Annotate, Artifact, Attach, Claiming, Current, Cut, Degree, Edge, Edit, Entry,
-    Estate, Fact, FactBrief, Finding, Finish, Flow, Graph, Import, Life, Link, Node, Origin, Part,
-    Patch, Phase, Proof, Proving, Realm, Rehome, Release, Removal, Rename, Repository, Role,
-    RoleBrief, Seat, Settle, Settlement, Survey, TASK_BRIEF_LIMIT, TASK_BRIEF_ROLE_BYTES,
-    TaskBriefEntry, TaskBriefLimits, TaskBriefPage, TextPreview, Tune, Weight, Worktree,
+    Agreement, Annotate, Artifact, Attach, BoundaryState, CheckoutState, Claiming, Current, Cut,
+    Degree, Edge, Edit, Entry, Estate, Fact, FactBrief, Finding, Finish, Flow, Graph, Import,
+    IntegrationState, Life, Link, MemberStatus, Node, Origin, Part, Patch, Phase, Proof, Proving,
+    Realm, Rehome, Release, Removal, Rename, Repository, Role, RoleBrief, Seat, Settle, Settlement,
+    Survey, TASK_BRIEF_LIMIT, TASK_BRIEF_ROLE_BYTES, TaskBriefEntry, TaskBriefLimits,
+    TaskBriefPage, TextPreview, Tune, UpstreamState, Weight, Worktree,
 };
 pub use protocol::PLUMB;

@@ -14,6 +14,8 @@ pub enum Command {
         #[arg(long)]
         task: Option<String>,
     },
+    #[command(about = "Inspect one Member's current local Git health")]
+    Status { task: String, member: String },
     #[command(about = "Create and attach a Git worktree Member")]
     Attach {
         task: String,

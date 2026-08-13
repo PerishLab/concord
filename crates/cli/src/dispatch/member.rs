@@ -12,6 +12,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             }
             emit(json!({"members": members}), output)
         }
+        Command::Status { task, member } => status(estate, &task, &member, output).await,
         Command::Attach {
             task,
             name,
@@ -71,4 +72,13 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             emit(json!({"revision": estate.release(&request).await?}), output)
         }
     }
+}
+
+async fn status(estate: &Estate, task: &str, member: &str, output: bool) -> Result<()> {
+    let status = estate.member_status(task, member).await?;
+    if output {
+        return emit(json!({"status": status}), true);
+    }
+    super::output::member_status(&status);
+    Ok(())
 }

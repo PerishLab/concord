@@ -3,19 +3,19 @@ mod claim;
 mod copy;
 mod proof;
 mod release;
-
-pub use artifact::{Artifact, Import, Removal, Survey};
-pub use claim::Claiming;
-pub use proof::Proving;
-pub use release::Release;
-
+mod status;
 use super::World;
 use super::{Estate, Life, fault};
 use crate::component;
 use crate::git;
 use crate::path::at;
 use crate::{Error, Result};
+pub use artifact::{Artifact, Import, Removal, Survey};
+pub use claim::Claiming;
+pub use proof::Proving;
+pub use release::Release;
 use serde::Serialize;
+pub use status::{BoundaryState, CheckoutState, IntegrationState, MemberStatus, UpstreamState};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Eq, PartialEq)]

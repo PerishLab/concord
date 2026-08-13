@@ -26,7 +26,7 @@ hand.
 - Change current facts through a versioned `task change` envelope.
 - Freeze an explicit Phase through `phase settle`.
 - Add, weigh, list, or remove Dependencies; cycles and self-edges refuse.
-- Attach, claim, prove, and release Members.
+- Attach, inspect status, claim, prove, and release Members.
 - Preflight, import, show, and remove Artifacts.
 - Start, rename, rehome, and finish Tasks using current Task and Graph revisions.
 

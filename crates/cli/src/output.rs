@@ -1,9 +1,11 @@
+mod member;
 mod task;
 
 use concord_core::Result;
 use plumb::skill::{Done, Record, Report};
 use serde_json::json;
 
+pub use member::status as member_status;
 pub use task::brief as task_brief;
 
 pub fn value(value: serde_json::Value, output: bool) {

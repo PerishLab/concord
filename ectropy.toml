@@ -96,3 +96,51 @@ name = "role_bytes"
 [[vocabulary.term]]
 description = "The bounded current Domain portfolio projection command is one product operation."
 name = "task_brief"
+
+[[vocabulary.term]]
+description = "Boundary proof absence, currency, or staleness is one Member health atom."
+name = "BoundaryState"
+
+[[vocabulary.term]]
+description = "The Member-to-integration relation is one local Git health atom."
+name = "IntegrationState"
+
+[[vocabulary.term]]
+description = "Tree equivalence is one named successful Member integration relation."
+name = "TreeEquivalent"
+
+[[vocabulary.term]]
+description = "One local checkout HEAD and file-state projection is one health atom."
+name = "CheckoutState"
+
+[[vocabulary.term]]
+description = "The count of tracked paths changed in one local checkout."
+name = "tracked_changes"
+
+[[vocabulary.term]]
+description = "The count of untracked paths present in one local checkout."
+name = "untracked_files"
+
+[[vocabulary.term]]
+description = "One local upstream ref and its observed divergence form one health atom."
+name = "UpstreamState"
+
+[[vocabulary.term]]
+description = "One complete read-only local Member health projection."
+name = "MemberStatus"
+
+[[vocabulary.term]]
+description = "The integration checkout paired with one Member worktree."
+name = "integration_checkout"
+
+[[vocabulary.term]]
+description = "The locally configured upstream for one Member branch."
+name = "local_upstream"
+
+[[vocabulary.term]]
+description = "Local remote-tracking refs observed to contain one Member HEAD."
+name = "local_tracking_refs"
+
+[[vocabulary.term]]
+description = "Reading one Member's local Git health is one product operation."
+name = "member_status"

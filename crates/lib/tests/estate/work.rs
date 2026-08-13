@@ -1,12 +1,17 @@
-use concord_core::{Attach, Claiming, Finish, Life, Proving, Rehome, Release, Rename, Seat};
-use std::path::Path;
-use std::process::Command;
+use concord_core::{
+    Attach, BoundaryState, Claiming, Finish, IntegrationState, Life, Proving, Rehome, Release,
+    Rename, Seat,
+};
+use std::{path::Path, process::Command};
 
 #[tokio::test(flavor = "current_thread")]
 async fn member() {
     let temp = tempfile::tempdir().expect("temporary Space");
     let source = temp.path().join("source");
+    let remote = temp.path().join("remote.git");
     std::fs::create_dir(&source).expect("source directory");
+    std::fs::create_dir(&remote).expect("remote directory");
+    git(&remote, &["init", "--bare"]);
     git(&source, &["init", "-b", "main"]);
     git(&source, &["config", "user.name", "Concord Test"]);
     git(
@@ -16,6 +21,16 @@ async fn member() {
     std::fs::write(source.join("README.md"), "fixture\n").expect("fixture file");
     git(&source, &["add", "README.md"]);
     git(&source, &["commit", "-m", "fixture"]);
+    git(
+        &source,
+        &[
+            "remote",
+            "add",
+            "origin",
+            remote.to_str().expect("remote path"),
+        ],
+    );
+    git(&source, &["push", "-u", "origin", "main"]);
 
     let estate = Seat::new(temp.path())
         .bootstrap()
@@ -35,7 +50,33 @@ async fn member() {
     assert_eq!(member.task, "local/work");
     assert_eq!(member.branch, "work");
     assert_eq!(member.claims, vec!["crates"]);
-    assert!(temp.path().join("local/.tasks/work/repo/.git").is_file());
+    let path = temp.path().join("local/.tasks/work/repo");
+    assert!(path.join(".git").is_file());
+    let status = estate
+        .member_status("work", "repo")
+        .await
+        .expect("read Member status");
+    assert_eq!(status.boundary, BoundaryState::Absent);
+    assert_eq!(status.integration, IntegrationState::Reachable);
+    assert!(status.worktree.clean);
+    assert!(status.integration_checkout.clean);
+    assert!(status.local_upstream.is_none());
+    git(&path, &["push", "-u", "origin", "work"]);
+    let status = estate
+        .member_status("local/work", "repo")
+        .await
+        .expect("read tracked Member status");
+    let upstream = status.local_upstream.expect("local upstream");
+    assert_eq!(
+        (upstream.reference.as_str(), upstream.ahead, upstream.behind),
+        ("origin/work", 0, 0)
+    );
+    assert!(
+        status
+            .local_tracking_refs
+            .iter()
+            .any(|reference| reference == "origin/work")
+    );
 
     let finish = Finish {
         task: "local/work".to_string(),
@@ -81,6 +122,42 @@ async fn member() {
     };
     let member = estate.prove(&proving).await.expect("prove Boundary");
     assert!(member.proof.is_some());
+    assert_eq!(
+        estate
+            .member_status("local/work", "repo")
+            .await
+            .expect("current Boundary status")
+            .boundary,
+        BoundaryState::Current
+    );
+    std::fs::create_dir(path.join("docs")).expect("docs directory");
+    std::fs::write(path.join("docs/note.md"), "member delta\n").expect("member delta");
+    git(&path, &["add", "docs/note.md"]);
+    git(&path, &["commit", "-m", "member delta"]);
+    let status = estate
+        .member_status("local/work", "repo")
+        .await
+        .expect("stale Boundary status");
+    assert_eq!(status.boundary, BoundaryState::Stale);
+    assert_eq!(status.integration, IntegrationState::Unlanded);
+    assert_eq!(status.local_upstream.expect("upstream").ahead, 1);
+    assert!(status.local_tracking_refs.is_empty());
+    std::fs::write(path.join("README.md"), "dirty\n").expect("tracked change");
+    std::fs::write(path.join("scratch.txt"), "untracked\n").expect("untracked file");
+    let status = estate
+        .member_status("local/work", "repo")
+        .await
+        .expect("dirty Member status");
+    assert_eq!(
+        (
+            status.worktree.tracked_changes,
+            status.worktree.untracked_files
+        ),
+        (1, 1)
+    );
+    assert!(!status.worktree.clean);
+    git(&path, &["checkout", "--", "README.md"]);
+    std::fs::remove_file(path.join("scratch.txt")).expect("remove fixture scratch");
 
     let claiming = Claiming {
         task: "local/work".to_string(),
@@ -97,6 +174,26 @@ async fn member() {
         revision: 4,
     };
     estate.prove(&proving).await.expect("renew Boundary");
+    git(&path, &["push"]);
+    git(&source, &["cherry-pick", "--no-commit", "work"]);
+    git(&source, &["commit", "-m", "equivalent member delta"]);
+    assert_eq!(
+        estate
+            .member_status("local/work", "repo")
+            .await
+            .expect("tree-equivalent status")
+            .integration,
+        IntegrationState::TreeEquivalent
+    );
+    git(&source, &["merge", "--no-ff", "work", "-m", "land member"]);
+    assert_eq!(
+        estate
+            .member_status("local/work", "repo")
+            .await
+            .expect("landed status")
+            .integration,
+        IntegrationState::Reachable
+    );
     let release = Release {
         task: "local/work".to_string(),
         member: "repo".to_string(),

@@ -52,10 +52,47 @@ fn estate() {
         brief["brief"]["tasks"][0]["roles"]["next"]["facts"][0]["body"]["text"],
         "Audit the estate"
     );
-    let human = human(fixture.path(), &["task", "brief", "--domain", "local"]);
-    assert!(human.contains("task brief: local (1/1, max 64 tasks, 512 bytes/role)"));
-    assert!(human.contains("goal: Expose the control plane"));
-    assert!(human.contains("next: Audit the estate"));
+    let brief = human(fixture.path(), &["task", "brief", "--domain", "local"]);
+    assert!(brief.contains("task brief: local (1/1, max 64 tasks, 512 bytes/role)"));
+    assert!(brief.contains("goal: Expose the control plane"));
+    assert!(brief.contains("next: Audit the estate"));
+
+    let source = fixture.path().join("source");
+    std::fs::create_dir(&source).expect("source directory");
+    git(&source, &["init", "-b", "main"]);
+    git(&source, &["config", "user.name", "Concord Test"]);
+    git(
+        &source,
+        &["config", "user.email", "concord@example.invalid"],
+    );
+    std::fs::write(source.join("README.md"), "fixture\n").expect("fixture file");
+    git(&source, &["add", "README.md"]);
+    git(&source, &["commit", "-m", "fixture"]);
+    let attached = success(
+        fixture.path(),
+        &[
+            "member",
+            "attach",
+            "alpha",
+            "repo",
+            "--source",
+            source.to_str().expect("source path"),
+            "--claim",
+            "README.md",
+            "--revision",
+            "2",
+        ],
+    );
+    assert_eq!(attached["member"]["task"], "local/alpha");
+    let status = success(fixture.path(), &["member", "status", "alpha", "repo"]);
+    assert_eq!(status["status"]["boundary"], "absent");
+    assert_eq!(status["status"]["integration"], "reachable");
+    assert_eq!(status["status"]["worktree"]["clean"], true);
+    assert!(status["status"]["local_upstream"].is_null());
+    let status = human(fixture.path(), &["member", "status", "alpha", "repo"]);
+    assert!(status.contains("member status: local/alpha/repo"));
+    assert!(status.contains("boundary: absent"));
+    assert!(status.contains("integration relation: reachable"));
 
     let linked = success(
         fixture.path(),
@@ -174,6 +211,16 @@ fn human(space: &Path, arguments: &[&str]) -> String {
         String::from_utf8_lossy(&output.stderr)
     );
     String::from_utf8(output.stdout).expect("Concord text")
+}
+
+fn git(root: &Path, arguments: &[&str]) {
+    let status = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(arguments)
+        .status()
+        .expect("run git");
+    assert!(status.success(), "git {arguments:?}");
 }
 
 fn command(seat: &Path) -> Command {

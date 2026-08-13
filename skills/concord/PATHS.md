@@ -44,9 +44,14 @@ Dependencies expose coordination and do not block lifecycle actions.
 
 ```sh
 concord member attach TASK NAME --source PATH --claim PATH --revision TASK_REV
+concord --json member status TASK NAME
 concord member prove TASK NAME --revision TASK_REV
 concord member release TASK NAME --revision TASK_REV --apply
 ```
+
+Status reads local worktree and integration-checkout health, Boundary currency,
+integration relation, and local tracking refs. It never fetches and does not
+claim its upstream or remote-tracking observations are current remote truth.
 
 Prove a clean committed delta. Release only after delivery makes the proved
 Member reachable or tree-equivalent and leaves it clean.
