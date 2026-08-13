@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 #[path = "data/agreement.rs"]
 mod agreement;
+mod brief;
 mod current;
 mod data;
 mod dependency;
@@ -20,6 +21,10 @@ mod territory;
 mod work;
 
 pub use agreement::{Agreement, Finding};
+pub use brief::{
+    FactBrief, RoleBrief, TASK_BRIEF_LIMIT, TASK_BRIEF_ROLE_BYTES, TaskBriefEntry, TaskBriefLimits,
+    TaskBriefPage, TextPreview,
+};
 pub(in crate::estate) use data::World;
 pub use data::{
     Current, Cut, Degree, Edge, Edit, Entry, Fact, Finish, Flow, Graph, Life, Link, Node, Origin,

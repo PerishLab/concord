@@ -1,4 +1,5 @@
 mod artifact;
+mod brief;
 mod changes;
 mod coordinate;
 mod work;

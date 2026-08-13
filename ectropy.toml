@@ -56,3 +56,43 @@ single = true
 [[vocabulary.term]]
 description = "The stable config and environment key for Concord's domain-space root."
 name = "domain_space_root"
+
+[[vocabulary.term]]
+description = "The fixed Task count for one bounded Domain projection page."
+name = "TASK_BRIEF_LIMIT"
+
+[[vocabulary.term]]
+description = "The fixed cumulative UTF-8 byte ceiling for one projected current-fact role."
+name = "TASK_BRIEF_ROLE_BYTES"
+
+[[vocabulary.term]]
+description = "One bounded Domain Task projection is one Concord read result atom."
+name = "TaskBriefPage"
+
+[[vocabulary.term]]
+description = "The explicit ceilings and selected roles carried by one Task projection result."
+name = "TaskBriefLimits"
+
+[[vocabulary.term]]
+description = "One current Task and its bounded role facts form one projection entry."
+name = "TaskBriefEntry"
+
+[[vocabulary.term]]
+description = "One current role and its cumulative fact projection form one read atom."
+name = "RoleBrief"
+
+[[vocabulary.term]]
+description = "One typed current Fact with a bounded body forms one read atom."
+name = "FactBrief"
+
+[[vocabulary.term]]
+description = "One UTF-8-safe bounded text projection is one read atom."
+name = "TextPreview"
+
+[[vocabulary.term]]
+description = "The byte ceiling applied independently to each selected current-fact role."
+name = "role_bytes"
+
+[[vocabulary.term]]
+description = "The bounded current Domain portfolio projection command is one product operation."
+name = "task_brief"

@@ -21,7 +21,8 @@ hand.
 
 ## Actions
 
-- Inspect with `audit`, `task show`, `phase list`, `graph`, and `artifact list`.
+- Inspect with bounded `task brief`, then `audit`, `task show`, `phase list`,
+  `graph`, and `artifact list` as needed.
 - Change current facts through a versioned `task change` envelope.
 - Freeze an explicit Phase through `phase settle`.
 - Add, weigh, list, or remove Dependencies; cycles and self-edges refuse.

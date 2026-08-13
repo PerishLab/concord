@@ -3,10 +3,15 @@
 ## Enter
 
 ```sh
+concord --json task brief --domain DOMAIN
 concord --json audit [TASK]
 concord --json task show TASK
 concord --json task dependency list TASK --direction both
 ```
+
+Use the fixed-size Domain brief to select a Task from current Goal, Focus,
+Question, and Next facts. Follow its exact `--after` cursor when another page
+exists; full Task and Phase history stays opt-in.
 
 Stop ordinary mutation on audit faults. Treat observations as evidence, not
 authorization or blockers.

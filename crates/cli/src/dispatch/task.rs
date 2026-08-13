@@ -12,6 +12,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             }
             emit(json!({"tasks": tasks}), output)
         }
+        Command::Brief { domain, after } => brief(estate, &domain, after.as_deref(), output).await,
         Command::Show { task } => emit(
             json!({
                 "current": estate.current(&task).await?,
@@ -60,6 +61,15 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             emit(json!({"task": estate.finish(&finish).await?}), output)
         }
     }
+}
+
+async fn brief(estate: &Estate, domain: &str, after: Option<&str>, output: bool) -> Result<()> {
+    let brief = estate.task_brief(domain, after).await?;
+    if output {
+        return emit(json!({"brief": brief}), true);
+    }
+    super::output::task_brief(&brief);
+    Ok(())
 }
 
 async fn dependency(estate: &Estate, command: Dependency, output: bool) -> Result<()> {

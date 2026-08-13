@@ -16,6 +16,13 @@ pub enum Command {
         #[arg(long)]
         retired: bool,
     },
+    #[command(about = "Project bounded current Task facts for one Domain")]
+    Brief {
+        #[arg(long)]
+        domain: String,
+        #[arg(long)]
+        after: Option<String>,
+    },
     #[command(about = "Read one Task and its current structured facts")]
     Show { task: String },
     #[command(about = "Start an estate-only Task in an existing Domain")]

@@ -41,6 +41,22 @@ fn estate() {
     );
     assert_eq!(settled["settlement"]["current"]["task"]["revision"], 2);
 
+    let brief = success(fixture.path(), &["task", "brief", "--domain", "local"]);
+    assert_eq!(brief["brief"]["schema"], "concord.task-brief:v1");
+    assert_eq!(brief["brief"]["tasks"][0]["identity"], "local/alpha");
+    assert_eq!(
+        brief["brief"]["tasks"][0]["roles"]["goal"]["facts"][0]["body"]["text"],
+        "Expose the control plane"
+    );
+    assert_eq!(
+        brief["brief"]["tasks"][0]["roles"]["next"]["facts"][0]["body"]["text"],
+        "Audit the estate"
+    );
+    let human = human(fixture.path(), &["task", "brief", "--domain", "local"]);
+    assert!(human.contains("task brief: local (1/1, max 64 tasks, 512 bytes/role)"));
+    assert!(human.contains("goal: Expose the control plane"));
+    assert!(human.contains("next: Audit the estate"));
+
     let linked = success(
         fixture.path(),
         &[
@@ -143,6 +159,21 @@ fn raw(space: &Path, arguments: &[&str]) -> Output {
         .args(arguments)
         .output()
         .expect("run Concord")
+}
+
+fn human(space: &Path, arguments: &[&str]) -> String {
+    let output = Command::new(env!("CARGO_BIN_EXE_concord"))
+        .args(["--root", space.to_str().expect("root path")])
+        .args(arguments)
+        .env_remove("CONCORD_LOCUS_ENABLED")
+        .output()
+        .expect("run Concord");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).expect("Concord text")
 }
 
 fn command(seat: &Path) -> Command {
