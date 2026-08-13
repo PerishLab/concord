@@ -60,26 +60,26 @@ pub enum Command {
 impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
-            Self::Config(_) => "config",
-            Self::Domain(_) => "domain",
-            Self::Task(_) => "task",
-            Self::Phase(_) => "phase",
-            Self::Member(_) => "member",
-            Self::Artifact(_) => "artifact",
-            Self::Graph(_) => "graph",
+            Self::Config(args) => args.command.name(),
+            Self::Domain(args) => args.command.name(),
+            Self::Task(args) => args.command.name(),
+            Self::Phase(args) => args.command.name(),
+            Self::Member(args) => args.command.name(),
+            Self::Artifact(args) => args.command.name(),
+            Self::Graph(args) => args.command.name(),
             Self::Audit(_) => "audit",
-            Self::Skill(_) => "skill",
+            Self::Skill(args) => args.command.name(),
         }
     }
 
-    pub(crate) fn activity(&self) -> Option<(&'static str, Vec<&str>)> {
+    pub(crate) fn activity(&self) -> Option<Vec<&str>> {
         match self {
             Self::Task(args) => args.command.activity(),
             Self::Phase(args) => args.command.activity(),
             Self::Member(args) => args.command.activity(),
             Self::Artifact(args) => Some(args.command.activity()),
             Self::Graph(args) => args.command.activity(),
-            Self::Audit(args) => args.task.as_deref().map(|task| ("audit", vec![task])),
+            Self::Audit(args) => args.task.as_deref().map(|task| vec![task]),
             Self::Config(_) | Self::Domain(_) | Self::Skill(_) => None,
         }
     }
@@ -97,4 +97,13 @@ pub enum Configure {
     Path,
     #[command(about = "Print resolved runtime configuration")]
     Show,
+}
+
+impl Configure {
+    pub(crate) fn name(&self) -> &'static str {
+        match self {
+            Self::Path => "config.path",
+            Self::Show => "config.show",
+        }
+    }
 }

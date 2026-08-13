@@ -37,13 +37,23 @@ pub enum Command {
 }
 
 impl Command {
-    pub(crate) fn activity(&self) -> (&'static str, Vec<&str>) {
+    pub(crate) fn name(&self) -> &'static str {
         match self {
-            Self::List { task } => ("artifact.list", vec![task]),
-            Self::Show { task, .. } => ("artifact.show", vec![task]),
-            Self::Preflight { task, .. } => ("artifact.preflight", vec![task]),
-            Self::Import { task, .. } => ("artifact.import", vec![task]),
-            Self::Remove { task, .. } => ("artifact.remove", vec![task]),
+            Self::List { .. } => "artifact.list",
+            Self::Show { .. } => "artifact.show",
+            Self::Preflight { .. } => "artifact.preflight",
+            Self::Import { .. } => "artifact.import",
+            Self::Remove { .. } => "artifact.remove",
+        }
+    }
+
+    pub(crate) fn activity(&self) -> Vec<&str> {
+        match self {
+            Self::List { task } => vec![task],
+            Self::Show { task, .. } => vec![task],
+            Self::Preflight { task, .. } => vec![task],
+            Self::Import { task, .. } => vec![task],
+            Self::Remove { task, .. } => vec![task],
         }
     }
 }

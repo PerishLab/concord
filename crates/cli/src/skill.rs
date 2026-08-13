@@ -56,6 +56,19 @@ pub enum Command {
     Uninstall,
 }
 
+impl Command {
+    pub(crate) fn name(&self) -> &'static str {
+        match self {
+            Self::Install { .. } => "skill.install",
+            Self::Upgrade { .. } => "skill.upgrade",
+            Self::Status { .. } => "skill.status",
+            Self::Stage { .. } => "skill.stage",
+            Self::List => "skill.list",
+            Self::Uninstall => "skill.uninstall",
+        }
+    }
+}
+
 pub fn run(config: &Config, command: Command, output: bool) -> Result<()> {
     let kit = kit(config)?;
     match command {

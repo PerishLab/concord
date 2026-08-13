@@ -19,9 +19,16 @@ pub enum Command {
 }
 
 impl Command {
-    pub(crate) fn activity(&self) -> Option<(&'static str, Vec<&str>)> {
+    pub(crate) fn name(&self) -> &'static str {
         match self {
-            Self::List { task } => Some(("phase.list", vec![task])),
+            Self::List { .. } => "phase.list",
+            Self::Settle { .. } => "phase.settle",
+        }
+    }
+
+    pub(crate) fn activity(&self) -> Option<Vec<&str>> {
+        match self {
+            Self::List { task } => Some(vec![task]),
             Self::Settle { .. } => None,
         }
     }

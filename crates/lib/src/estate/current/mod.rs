@@ -7,6 +7,7 @@ use crate::{Error, Result};
 use keel::Row;
 
 impl Estate {
+    #[locus::trace(with = crate::observation::view())]
     pub async fn current(&self, identity: &str) -> Result<Current> {
         let world = World::load(self).await?;
         let task = world.node(identity)?.clone();
@@ -52,6 +53,7 @@ impl Estate {
         })
     }
 
+    #[locus::trace(with = crate::observation::view())]
     pub(super) async fn facts(&self, task: i64) -> Result<Vec<Fact>> {
         let mut facts = Vec::new();
         for role in Role::ALL {

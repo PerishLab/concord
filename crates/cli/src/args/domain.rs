@@ -38,3 +38,23 @@ pub enum Repository {
         revision: i64,
     },
 }
+
+impl Command {
+    pub(crate) fn name(&self) -> &'static str {
+        match self {
+            Self::Bootstrap { .. } => "domain.bootstrap",
+            Self::List => "domain.list",
+            Self::Add { .. } => "domain.add",
+            Self::Repository { command } => command.name(),
+        }
+    }
+}
+
+impl Repository {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::List { .. } => "domain.repository.list",
+            Self::Annotate { .. } => "domain.repository.annotate",
+        }
+    }
+}

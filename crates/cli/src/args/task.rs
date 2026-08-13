@@ -107,13 +107,27 @@ pub enum Dependency {
 }
 
 impl Command {
-    pub(crate) fn activity(&self) -> Option<(&'static str, Vec<&str>)> {
+    pub(crate) fn name(&self) -> &'static str {
         match self {
-            Self::Show { task } => Some(("task.show", vec![task])),
-            Self::Rename { task, .. } => Some(("task.rename", vec![task])),
-            Self::Rehome { task, .. } => Some(("task.rehome", vec![task])),
+            Self::List { .. } => "task.list",
+            Self::Brief { .. } => "task.brief",
+            Self::Show { .. } => "task.show",
+            Self::Start { .. } => "task.start",
+            Self::Change { .. } => "task.change",
+            Self::Rename { .. } => "task.rename",
+            Self::Rehome { .. } => "task.rehome",
+            Self::Dependency { command } => command.name(),
+            Self::Finish { .. } => "task.finish",
+        }
+    }
+
+    pub(crate) fn activity(&self) -> Option<Vec<&str>> {
+        match self {
+            Self::Show { task } => Some(vec![task]),
+            Self::Rename { task, .. } => Some(vec![task]),
+            Self::Rehome { task, .. } => Some(vec![task]),
             Self::Dependency { command } => Some(command.activity()),
-            Self::Finish { task, .. } => Some(("task.finish", vec![task])),
+            Self::Finish { task, .. } => Some(vec![task]),
             Self::List { .. } | Self::Brief { .. } | Self::Start { .. } | Self::Change { .. } => {
                 None
             }
@@ -122,12 +136,21 @@ impl Command {
 }
 
 impl Dependency {
-    fn activity(&self) -> (&'static str, Vec<&str>) {
+    fn name(&self) -> &'static str {
         match self {
-            Self::Add { source, target, .. } => ("task.dependency.add", vec![source, target]),
-            Self::Set { source, target, .. } => ("task.dependency.set", vec![source, target]),
-            Self::Remove { source, target, .. } => ("task.dependency.remove", vec![source, target]),
-            Self::List { task, .. } => ("task.dependency.list", vec![task]),
+            Self::Add { .. } => "task.dependency.add",
+            Self::Set { .. } => "task.dependency.set",
+            Self::Remove { .. } => "task.dependency.remove",
+            Self::List { .. } => "task.dependency.list",
+        }
+    }
+
+    fn activity(&self) -> Vec<&str> {
+        match self {
+            Self::Add { source, target, .. } => vec![source, target],
+            Self::Set { source, target, .. } => vec![source, target],
+            Self::Remove { source, target, .. } => vec![source, target],
+            Self::List { task, .. } => vec![task],
         }
     }
 }

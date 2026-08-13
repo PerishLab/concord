@@ -79,16 +79,29 @@ pub enum Command {
 }
 
 impl Command {
-    pub(crate) fn activity(&self) -> Option<(&'static str, Vec<&str>)> {
+    pub(crate) fn name(&self) -> &'static str {
         match self {
-            Self::List { task } => task.as_deref().map(|task| ("member.list", vec![task])),
-            Self::Status { task, .. } => Some(("member.status", vec![task])),
-            Self::Attach { task, .. } => Some(("member.attach", vec![task])),
-            Self::Claim { task, .. } => Some(("member.claim", vec![task])),
-            Self::Narrow { task, .. } => Some(("member.narrow", vec![task])),
-            Self::Prove { task, .. } => Some(("member.prove", vec![task])),
-            Self::Release { task, .. } => Some(("member.release", vec![task])),
-            Self::Retire { task, .. } => Some(("member.retire", vec![task])),
+            Self::List { .. } => "member.list",
+            Self::Status { .. } => "member.status",
+            Self::Attach { .. } => "member.attach",
+            Self::Claim { .. } => "member.claim",
+            Self::Narrow { .. } => "member.narrow",
+            Self::Prove { .. } => "member.prove",
+            Self::Release { .. } => "member.release",
+            Self::Retire { .. } => "member.retire",
+        }
+    }
+
+    pub(crate) fn activity(&self) -> Option<Vec<&str>> {
+        match self {
+            Self::List { task } => task.as_deref().map(|task| vec![task]),
+            Self::Status { task, .. } => Some(vec![task]),
+            Self::Attach { task, .. } => Some(vec![task]),
+            Self::Claim { task, .. } => Some(vec![task]),
+            Self::Narrow { task, .. } => Some(vec![task]),
+            Self::Prove { task, .. } => Some(vec![task]),
+            Self::Release { task, .. } => Some(vec![task]),
+            Self::Retire { task, .. } => Some(vec![task]),
         }
     }
 }

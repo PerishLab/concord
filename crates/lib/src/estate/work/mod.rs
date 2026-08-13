@@ -49,6 +49,7 @@ pub struct Worktree {
 }
 
 impl Estate {
+    #[locus::trace(with = crate::observation::view())]
     pub async fn worktrees(&self) -> Result<Vec<Worktree>> {
         let world = World::load(self).await?;
         let claims = self.core.live("Claim").await.map_err(fault)?;

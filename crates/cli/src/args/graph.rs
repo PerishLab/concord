@@ -82,13 +82,26 @@ pub enum Command {
 }
 
 impl Command {
-    pub(crate) fn activity(&self) -> Option<(&'static str, Vec<&str>)> {
+    pub(crate) fn name(&self) -> &'static str {
         match self {
-            Self::Neighbors { task, .. } => Some(("graph.neighbors", vec![task])),
-            Self::Degree { task, .. } => Some(("graph.degree", vec![task])),
-            Self::Reach { task, .. } => Some(("graph.reach", vec![task])),
-            Self::Path { source, target, .. } => Some(("graph.path", vec![source, target])),
-            Self::Export { from, .. } => from.as_deref().map(|task| ("graph.export", vec![task])),
+            Self::Adjacency { .. } => "graph.adjacency",
+            Self::Neighbors { .. } => "graph.neighbors",
+            Self::Degree { .. } => "graph.degree",
+            Self::Reach { .. } => "graph.reach",
+            Self::Path { .. } => "graph.path",
+            Self::Cycles { .. } => "graph.cycles",
+            Self::Scc { .. } => "graph.scc",
+            Self::Export { .. } => "graph.export",
+        }
+    }
+
+    pub(crate) fn activity(&self) -> Option<Vec<&str>> {
+        match self {
+            Self::Neighbors { task, .. } => Some(vec![task]),
+            Self::Degree { task, .. } => Some(vec![task]),
+            Self::Reach { task, .. } => Some(vec![task]),
+            Self::Path { source, target, .. } => Some(vec![source, target]),
+            Self::Export { from, .. } => from.as_deref().map(|task| vec![task]),
             Self::Adjacency { .. } | Self::Cycles { .. } | Self::Scc { .. } => None,
         }
     }

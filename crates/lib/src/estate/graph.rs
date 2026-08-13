@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 mod route;
 
 impl Estate {
+    #[locus::trace(with = crate::observation::view())]
     pub async fn graph(&self, retired: bool) -> Result<Graph> {
         let world = World::load(self).await?;
         let mut nodes = world.nodes.clone();

@@ -18,7 +18,12 @@ fn observation() {
     ];
     let shown = run(fixture.path(), &["task", "show", "local/seen"], &settings);
     assert!(shown.status.success());
-    cycle(&read(&report), "task", 0);
+    cycle(&read(&report), "task.show", 0);
+
+    std::fs::remove_file(&report).expect("remove report");
+    let listed = run(fixture.path(), &["task", "list"], &settings);
+    assert!(listed.status.success());
+    cycle(&read(&report), "task.list", 0);
 
     std::fs::remove_file(&report).expect("remove report");
     let missing = run(
@@ -27,7 +32,7 @@ fn observation() {
         &settings,
     );
     assert!(!missing.status.success());
-    cycle(&read(&report), "task", 1);
+    cycle(&read(&report), "task.show", 1);
 }
 
 fn run(root: &Path, arguments: &[&str], environment: &[(&str, &str)]) -> Output {

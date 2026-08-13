@@ -12,6 +12,7 @@ pub async fn run(
     activity: &activity::Run,
     output: bool,
 ) -> Result<()> {
+    let operation = command.name();
     match command {
         Command::List { domain, retired } => {
             let mut tasks = estate.nodes(retired).await?;
@@ -30,12 +31,12 @@ pub async fn run(
         ),
         Command::Start { domain, name } => {
             let task = estate.start(&domain, &name).await?;
-            activity.touch(estate, &task.identity(), "task.start").await;
+            activity.touch(estate, &task.identity(), operation).await;
             emit(json!({"task": task}), output)
         }
         Command::Change { input } => {
             let patch: Patch = super::input::read(&input)?;
-            activity.touch(estate, &patch.task, "task.change").await;
+            activity.touch(estate, &patch.task, operation).await;
             emit(json!({"current": estate.change(&patch).await?}), output)
         }
         Command::Rename {

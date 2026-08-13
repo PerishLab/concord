@@ -50,6 +50,7 @@ impl Agreement {
 }
 
 impl Estate {
+    #[locus::trace(with = crate::observation::view())]
     pub async fn inspect(&self, task: Option<&str>, domain: Option<&str>) -> Result<Agreement> {
         if task.is_some() && domain.is_some() {
             return Err(Error::typed(

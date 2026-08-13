@@ -50,6 +50,7 @@ impl Estate {
         })
     }
 
+    #[locus::trace(with = crate::observation::view())]
     pub async fn phases(&self, identity: &str) -> Result<Vec<Phase>> {
         let world = World::load(self).await?;
         let task = world.node(identity)?;

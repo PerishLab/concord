@@ -19,6 +19,7 @@ pub struct Realm {
 }
 
 impl World {
+    #[locus::trace(with = crate::observation::view())]
     pub async fn load(estate: &Estate) -> Result<Self> {
         let spaces = estate.core.live("Space").await.map_err(fault)?;
         let domains = estate.core.live("Domain").await.map_err(fault)?;

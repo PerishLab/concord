@@ -69,9 +69,11 @@ struct Dispatch {
 
 impl Dispatch {
     async fn run(&self, command: Command) -> Result<()> {
-        if let Some((operation, tasks)) = command.activity() {
+        if let Some(tasks) = command.activity() {
             for task in tasks {
-                self.activity.touch(&self.estate, task, operation).await;
+                self.activity
+                    .touch(&self.estate, task, command.name())
+                    .await;
             }
         }
         match command {
@@ -106,6 +108,7 @@ impl Dispatch {
     }
 
     async fn phase(&self, command: args::phase::Command) -> Result<()> {
+        let operation = command.name();
         match command {
             args::phase::Command::List { task } => emit(
                 json!({"task": task, "phases": self.estate.phases(&task).await?}),
@@ -114,7 +117,7 @@ impl Dispatch {
             args::phase::Command::Settle { input: path } => {
                 let settle: Settle = input::read(&path)?;
                 self.activity
-                    .touch(&self.estate, &settle.task, "phase.settle")
+                    .touch(&self.estate, &settle.task, operation)
                     .await;
                 emit(
                     json!({"settlement": self.estate.settle(&settle).await?}),
