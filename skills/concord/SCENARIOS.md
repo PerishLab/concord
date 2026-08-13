@@ -15,9 +15,10 @@ real even if no action should be blocked.
 
 ## Concurrent Members share a Repository
 
-Keep branches, worktrees, and Claims distinct. Expand Claims only; expansion
-invalidates the prior Boundary. If overlap is real, serialize delivery instead
-of weakening the Claim.
+Keep branches, worktrees, and Claims distinct. Expand with `member claim` and
+shrink with `member narrow`; either change invalidates the prior Boundary.
+Narrow refuses a proposed claim that would fail `prove`. If overlap is real,
+serialize delivery instead of weakening the Claim.
 
 ## Another session recently touched the Task
 
@@ -32,6 +33,7 @@ current presence, or permission from the warning.
 
 ## Retiring a Task
 
-First release every Member and remove every Artifact. `task finish` archives
+First release every landed Member, or retire an unlanded Member against a
+matching Artifact, then remove every Artifact. `task finish` archives
 incident dependency facts, cuts the edges, and reserves the Task name while
 retaining current facts and Phases as lineage.

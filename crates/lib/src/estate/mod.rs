@@ -33,7 +33,8 @@ pub use data::{
 pub use task::{Annotate, Rehome, Rename, Repository};
 pub use work::{
     Artifact, Attach, BoundaryState, CheckoutState, Claiming, Import, IntegrationState,
-    MemberStatus, Proof, Proving, Release, Removal, Survey, UpstreamState, Worktree,
+    MemberStatus, Narrowing, Proof, Proving, Release, Removal, Retirement, Survey, UpstreamState,
+    Worktree,
 };
 
 pub struct Estate {

@@ -1,6 +1,6 @@
 use super::{emit, explicit};
 use crate::args::member::Command;
-use concord_core::{Attach, Claiming, Estate, Proving, Release, Result};
+use concord_core::{Attach, Claiming, Estate, Narrowing, Proving, Release, Result, Retirement};
 use serde_json::json;
 
 pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> {
@@ -45,6 +45,22 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             };
             emit(json!({"member": estate.claim(&request).await?}), output)
         }
+        Command::Narrow {
+            task,
+            member,
+            claim,
+            revision,
+            apply,
+        } => {
+            explicit(apply, "member narrow")?;
+            let request = Narrowing {
+                task,
+                member,
+                claims: claim,
+                revision,
+            };
+            emit(json!({"member": estate.narrow(&request).await?}), output)
+        }
         Command::Prove {
             task,
             member,
@@ -70,6 +86,22 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 revision,
             };
             emit(json!({"revision": estate.release(&request).await?}), output)
+        }
+        Command::Retire {
+            task,
+            member,
+            artifacts,
+            revision,
+            apply,
+        } => {
+            explicit(apply, "member retire")?;
+            let request = Retirement {
+                task,
+                member,
+                artifacts,
+                revision,
+            };
+            emit(json!({"revision": estate.retire(&request).await?}), output)
         }
     }
 }

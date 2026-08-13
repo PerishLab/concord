@@ -50,16 +50,22 @@ Dependencies expose coordination and do not block lifecycle actions.
 ```sh
 concord member attach TASK NAME --source PATH --claim PATH --revision TASK_REV
 concord --json member status TASK NAME
+concord member narrow TASK NAME --claim PATH --revision TASK_REV --apply
 concord member prove TASK NAME --revision TASK_REV
 concord member release TASK NAME --revision TASK_REV --apply
+concord member retire TASK NAME --artifacts PATTERN --revision TASK_REV --apply
 ```
 
 Status reads local worktree and integration-checkout health, Boundary currency,
 integration relation, and local tracking refs. It never fetches and does not
 claim its upstream or remote-tracking observations are current remote truth.
 
-Prove a clean committed delta. Release only after delivery makes the proved
-Member reachable or tree-equivalent and leaves it clean.
+Prove a clean committed delta. Narrow replaces the claim with the given set
+and invalidates any held Boundary; it refuses a set that `prove` would refuse.
+Release only after delivery makes the proved Member reachable or tree-equivalent
+and leaves it clean. Retire is the unlanded exit: same clean current-proof gates,
+no landed check, and at least one Artifact name must match `--artifacts`
+(`*` matches any name; quote it in the shell). Zero matches refuse.
 
 ## Retain or finish
 
