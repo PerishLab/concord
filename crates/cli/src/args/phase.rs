@@ -17,3 +17,12 @@ pub enum Command {
         input: PathBuf,
     },
 }
+
+impl Command {
+    pub(crate) fn activity(&self) -> Option<(&'static str, Vec<&str>)> {
+        match self {
+            Self::List { task } => Some(("phase.list", vec![task])),
+            Self::Settle { .. } => None,
+        }
+    }
+}

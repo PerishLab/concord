@@ -55,3 +55,16 @@ pub enum Command {
         apply: bool,
     },
 }
+
+impl Command {
+    pub(crate) fn activity(&self) -> Option<(&'static str, Vec<&str>)> {
+        match self {
+            Self::List { task } => task.as_deref().map(|task| ("member.list", vec![task])),
+            Self::Status { task, .. } => Some(("member.status", vec![task])),
+            Self::Attach { task, .. } => Some(("member.attach", vec![task])),
+            Self::Claim { task, .. } => Some(("member.claim", vec![task])),
+            Self::Prove { task, .. } => Some(("member.prove", vec![task])),
+            Self::Release { task, .. } => Some(("member.release", vec![task])),
+        }
+    }
+}

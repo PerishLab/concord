@@ -35,3 +35,15 @@ pub enum Command {
         apply: bool,
     },
 }
+
+impl Command {
+    pub(crate) fn activity(&self) -> (&'static str, Vec<&str>) {
+        match self {
+            Self::List { task } => ("artifact.list", vec![task]),
+            Self::Show { task, .. } => ("artifact.show", vec![task]),
+            Self::Preflight { task, .. } => ("artifact.preflight", vec![task]),
+            Self::Import { task, .. } => ("artifact.import", vec![task]),
+            Self::Remove { task, .. } => ("artifact.remove", vec![task]),
+        }
+    }
+}

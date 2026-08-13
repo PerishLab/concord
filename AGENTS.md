@@ -35,12 +35,17 @@ exact sealed model.
   member seat and verifies the four protocol surfaces.
 - Optional Locus observation is one-way. Context and report outcomes never
   enter protocol state, command output, authorization, or control flow.
+- Task-scoped operator activity is a private auxiliary observation ledger, not
+  Keel protocol state. It records only the observed agent, native session,
+  operation, and time. Its warnings never revise Tasks, assert ownership or
+  presence, enter authorization or audit agreement, or replace command results.
 
 ## Architecture
 
 - `crates/lib` is the complete protocol kernel: configuration, exact estate,
   typed Task/Phase transactions, dependency graph, protocol and resource
-  audit, Git seats, Artifacts, permissions, and plans.
+  audit, Git seats, Artifacts, permissions, plans, and private operator
+  observations.
 - `crates/cli` contains clap grammar and output dispatch only.
 - Dependency direction is `cli -> lib`.
 - `runseal.toml` and `.runseal/resources` carry env-only repository-local

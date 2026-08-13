@@ -19,6 +19,16 @@ Keep branches, worktrees, and Claims distinct. Expand Claims only; expansion
 invalidates the prior Boundary. If overlap is real, serialize delivery instead
 of weakening the Claim.
 
+## Another session recently touched the Task
+
+Restate the reported agent, session, operation, and time as objective facts.
+For read-only operations, normally continue because the warning is not a gate.
+Before a write, re-read the Task revision and inspect relevant Members, Claims,
+and local Git impact. Continue when the write surface is clearly disjoint. When
+surfaces overlap or the impact remains unclear, report the facts and impact to
+the caller before writing. Do not infer an owner, lease, heartbeat, takeover,
+current presence, or permission from the warning.
+
 ## Retiring a Task
 
 First release every Member and remove every Artifact. `task finish` archives

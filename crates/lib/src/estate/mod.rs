@@ -124,6 +124,15 @@ impl Seat {
 }
 
 impl Estate {
+    pub fn touch(
+        &self,
+        task: &Node,
+        operator: &crate::activity::Operator,
+        operation: &str,
+    ) -> Result<crate::activity::Activity> {
+        crate::activity::record(&self.space, task, operator, operation)
+    }
+
     fn guard(&self) -> Result<File> {
         let path = self.space.join(".concord.lock");
         let file = std::fs::OpenOptions::new()

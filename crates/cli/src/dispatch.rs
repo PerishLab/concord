@@ -1,3 +1,4 @@
+mod activity;
 mod artifact;
 mod configuration;
 mod domain;
@@ -9,7 +10,7 @@ mod task;
 use crate::args::{self, Command};
 use crate::config::Config;
 use crate::{output, skill};
-use concord_core::{Estate, Result, Seat};
+use concord_core::{Estate, Result, Seat, Settle};
 use serde_json::json;
 
 pub async fn run(cli: args::Cli) -> Result<()> {
@@ -50,6 +51,7 @@ pub async fn run(cli: args::Cli) -> Result<()> {
         }
         command => {
             Dispatch {
+                activity: activity::Run::new(cli.json),
                 estate: seat.open().await?,
                 json: cli.json,
             }
@@ -60,18 +62,26 @@ pub async fn run(cli: args::Cli) -> Result<()> {
 }
 
 struct Dispatch {
+    activity: activity::Run,
     estate: Estate,
     json: bool,
 }
 
 impl Dispatch {
     async fn run(&self, command: Command) -> Result<()> {
+        if let Some((operation, tasks)) = command.activity() {
+            for task in tasks {
+                self.activity.touch(&self.estate, task, operation).await;
+            }
+        }
         match command {
             Command::Config(_) | Command::Skill(_) => {
                 unreachable!("handled before estate open")
             }
             Command::Domain(args) => domain::run(&self.estate, args.command, self.json).await,
-            Command::Task(args) => task::run(&self.estate, args.command, self.json).await,
+            Command::Task(args) => {
+                task::run(&self.estate, args.command, &self.activity, self.json).await
+            }
             Command::Phase(args) => self.phase(args.command).await,
             Command::Member(args) => member::run(&self.estate, args.command, self.json).await,
             Command::Artifact(args) => artifact::run(&self.estate, args.command, self.json).await,
@@ -102,7 +112,10 @@ impl Dispatch {
                 self.json,
             ),
             args::phase::Command::Settle { input: path } => {
-                let settle = input::read(&path)?;
+                let settle: Settle = input::read(&path)?;
+                self.activity
+                    .touch(&self.estate, &settle.task, "phase.settle")
+                    .await;
                 emit(
                     json!({"settlement": self.estate.settle(&settle).await?}),
                     self.json,

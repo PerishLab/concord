@@ -1,3 +1,5 @@
+#[path = "runtime/activity.rs"]
+pub mod activity;
 #[path = "runtime/config.rs"]
 mod config;
 #[path = "runtime/error.rs"]

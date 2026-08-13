@@ -1,9 +1,17 @@
+use super::activity;
 use super::{emit, explicit};
 use crate::args::task::{Command, Dependency};
-use concord_core::{Cut, Estate, Finish, Link, Origin, Rehome, Rename, Result, Tune, Weight};
+use concord_core::{
+    Cut, Estate, Finish, Link, Origin, Patch, Rehome, Rename, Result, Tune, Weight,
+};
 use serde_json::json;
 
-pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> {
+pub async fn run(
+    estate: &Estate,
+    command: Command,
+    activity: &activity::Run,
+    output: bool,
+) -> Result<()> {
     match command {
         Command::List { domain, retired } => {
             let mut tasks = estate.nodes(retired).await?;
@@ -21,10 +29,13 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             output,
         ),
         Command::Start { domain, name } => {
-            emit(json!({"task": estate.start(&domain, &name).await?}), output)
+            let task = estate.start(&domain, &name).await?;
+            activity.touch(estate, &task.identity(), "task.start").await;
+            emit(json!({"task": task}), output)
         }
         Command::Change { input } => {
-            let patch = super::input::read(&input)?;
+            let patch: Patch = super::input::read(&input)?;
+            activity.touch(estate, &patch.task, "task.change").await;
             emit(json!({"current": estate.change(&patch).await?}), output)
         }
         Command::Rename {

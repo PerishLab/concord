@@ -1,3 +1,4 @@
+mod activity;
 mod artifact;
 mod brief;
 mod changes;

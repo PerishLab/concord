@@ -71,6 +71,18 @@ impl Command {
             Self::Skill(_) => "skill",
         }
     }
+
+    pub(crate) fn activity(&self) -> Option<(&'static str, Vec<&str>)> {
+        match self {
+            Self::Task(args) => args.command.activity(),
+            Self::Phase(args) => args.command.activity(),
+            Self::Member(args) => args.command.activity(),
+            Self::Artifact(args) => Some(args.command.activity()),
+            Self::Graph(args) => args.command.activity(),
+            Self::Audit(args) => args.task.as_deref().map(|task| ("audit", vec![task])),
+            Self::Config(_) | Self::Domain(_) | Self::Skill(_) => None,
+        }
+    }
 }
 
 #[derive(Args)]

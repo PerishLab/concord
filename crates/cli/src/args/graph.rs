@@ -80,3 +80,16 @@ pub enum Command {
         depth: Option<usize>,
     },
 }
+
+impl Command {
+    pub(crate) fn activity(&self) -> Option<(&'static str, Vec<&str>)> {
+        match self {
+            Self::Neighbors { task, .. } => Some(("graph.neighbors", vec![task])),
+            Self::Degree { task, .. } => Some(("graph.degree", vec![task])),
+            Self::Reach { task, .. } => Some(("graph.reach", vec![task])),
+            Self::Path { source, target, .. } => Some(("graph.path", vec![source, target])),
+            Self::Export { from, .. } => from.as_deref().map(|task| ("graph.export", vec![task])),
+            Self::Adjacency { .. } | Self::Cycles { .. } | Self::Scc { .. } => None,
+        }
+    }
+}

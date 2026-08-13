@@ -16,6 +16,10 @@ exists; full Task and Phase history stays opt-in.
 Stop ordinary mutation on audit faults. Treat observations as evidence, not
 authorization or blockers.
 
+A recent-session warning is also observational and non-blocking. Restate its
+agent, session, operation, and time without claiming that the other session is
+still active, then follow the bounded strategy in SCENARIOS.md.
+
 ## Change and settle
 
 Send version-1 JSON to stdin:

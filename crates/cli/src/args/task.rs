@@ -105,3 +105,29 @@ pub enum Dependency {
         direction: String,
     },
 }
+
+impl Command {
+    pub(crate) fn activity(&self) -> Option<(&'static str, Vec<&str>)> {
+        match self {
+            Self::Show { task } => Some(("task.show", vec![task])),
+            Self::Rename { task, .. } => Some(("task.rename", vec![task])),
+            Self::Rehome { task, .. } => Some(("task.rehome", vec![task])),
+            Self::Dependency { command } => Some(command.activity()),
+            Self::Finish { task, .. } => Some(("task.finish", vec![task])),
+            Self::List { .. } | Self::Brief { .. } | Self::Start { .. } | Self::Change { .. } => {
+                None
+            }
+        }
+    }
+}
+
+impl Dependency {
+    fn activity(&self) -> (&'static str, Vec<&str>) {
+        match self {
+            Self::Add { source, target, .. } => ("task.dependency.add", vec![source, target]),
+            Self::Set { source, target, .. } => ("task.dependency.set", vec![source, target]),
+            Self::Remove { source, target, .. } => ("task.dependency.remove", vec![source, target]),
+            Self::List { task, .. } => ("task.dependency.list", vec![task]),
+        }
+    }
+}

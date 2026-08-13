@@ -203,6 +203,9 @@ fn human(space: &Path, arguments: &[&str]) -> String {
         .args(["--root", space.to_str().expect("root path")])
         .args(arguments)
         .env_remove("CONCORD_LOCUS_ENABLED")
+        .env_remove("CLAUDE_CODE_SESSION_ID")
+        .env_remove("GROK_SESSION_ID")
+        .env_remove("CODEX_THREAD_ID")
         .output()
         .expect("run Concord");
     assert!(
@@ -227,6 +230,9 @@ fn command(seat: &Path) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_concord"));
     command
         .args(["--root", seat.to_str().expect("root path"), "--json"])
-        .env_remove("CONCORD_LOCUS_ENABLED");
+        .env_remove("CONCORD_LOCUS_ENABLED")
+        .env_remove("CLAUDE_CODE_SESSION_ID")
+        .env_remove("GROK_SESSION_ID")
+        .env_remove("CODEX_THREAD_ID");
     command
 }

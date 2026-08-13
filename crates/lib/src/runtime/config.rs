@@ -1,3 +1,4 @@
+use crate::activity::{Agent, Operator};
 use crate::{Error, Result};
 use std::path::{Path, PathBuf};
 
@@ -33,4 +34,33 @@ impl Root {
 
 pub(crate) fn home() -> Result<PathBuf> {
     plumb::config::home().ok_or_else(|| Error::new("HOME is required to expand repository source"))
+}
+
+pub(crate) fn operator() -> Result<Option<Operator>> {
+    let variables = [
+        (Agent::Claude, "CLAUDE_CODE_SESSION_ID"),
+        (Agent::Grok, "GROK_SESSION_ID"),
+        (Agent::Codex, "CODEX_THREAD_ID"),
+    ];
+    let mut found = Vec::new();
+    for (agent, variable) in variables {
+        match std::env::var(variable) {
+            Ok(session) if !session.is_empty() => found.push(Operator { agent, session }),
+            Ok(_) | Err(std::env::VarError::NotPresent) => {}
+            Err(error) => {
+                return Err(Error::typed(
+                    "concord.activity.environment",
+                    format!("cannot read {variable}: {error}"),
+                ));
+            }
+        }
+    }
+    match found.len() {
+        0 => Ok(None),
+        1 => Ok(found.pop()),
+        count => Err(Error::typed(
+            "concord.activity.ambiguous",
+            format!("found {count} operator session environments"),
+        )),
+    }
 }
