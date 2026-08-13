@@ -113,6 +113,7 @@ impl Estate {
         let task = world.node(&attach.task)?;
         active(task.life, &attach.task)?;
         stale(task.revision, attach.revision)?;
+        let identity = task.identity();
         let branch = attach.branch.as_deref().unwrap_or(&task.name);
         if git::at(&source).exists(branch)? {
             return Err(Error::typed(
@@ -195,7 +196,7 @@ impl Estate {
                 )),
             };
         }
-        self.member(&attach.task, &attach.name).await
+        self.member(&identity, &attach.name).await
     }
 
     pub(super) async fn member(&self, task: &str, name: &str) -> Result<Worktree> {

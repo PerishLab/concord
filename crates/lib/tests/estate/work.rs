@@ -24,7 +24,7 @@ async fn member() {
     estate.manage("local").await.expect("manage Domain");
     estate.start("local", "work").await.expect("start Task");
     let attach = Attach {
-        task: "local/work".to_string(),
+        task: "work".to_string(),
         name: "repo".to_string(),
         source: source.clone(),
         branch: None,
@@ -32,6 +32,7 @@ async fn member() {
         revision: 0,
     };
     let member = estate.attach(&attach).await.expect("attach Member");
+    assert_eq!(member.task, "local/work");
     assert_eq!(member.branch, "work");
     assert_eq!(member.claims, vec!["crates"]);
     assert!(temp.path().join("local/.tasks/work/repo/.git").is_file());
