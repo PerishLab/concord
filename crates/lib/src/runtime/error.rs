@@ -22,6 +22,17 @@ impl Error {
         }
     }
 
+    pub fn detailed(
+        code: impl Into<String>,
+        message: impl Into<String>,
+        details: serde_json::Value,
+    ) -> Self {
+        Self {
+            details: Some(details),
+            ..Self::typed(code, message)
+        }
+    }
+
     pub fn code(&self) -> &str {
         &self.code
     }

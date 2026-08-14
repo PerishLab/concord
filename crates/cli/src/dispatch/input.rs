@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 const LIMIT: usize = 1024 * 1024;
 
-pub fn read<T: DeserializeOwned>(path: &Path) -> Result<T> {
+pub fn read<T: DeserializeOwned>(path: &Path, shape: &str) -> Result<T> {
     let (bytes, label) = if path == Path::new("-") {
         (
             bounded(std::io::stdin().lock(), "stdin")?,
@@ -15,11 +15,16 @@ pub fn read<T: DeserializeOwned>(path: &Path) -> Result<T> {
         regular(path)?
     };
     serde_json::from_slice(&bytes).map_err(|error| {
-        Error::typed(
+        Error::detailed(
             "concord.input.json",
             format!("cannot decode JSON change-set from {label}: {error}"),
+            serde_json::json!({"envelope": envelope(shape)}),
         )
     })
+}
+
+fn envelope(shape: &str) -> serde_json::Value {
+    serde_json::from_str(shape).unwrap_or_else(|_| serde_json::Value::String(shape.to_string()))
 }
 
 fn regular(source: &Path) -> Result<(Vec<u8>, String)> {

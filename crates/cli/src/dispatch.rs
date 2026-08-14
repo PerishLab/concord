@@ -115,7 +115,7 @@ impl Dispatch {
                 self.json,
             ),
             args::phase::Command::Settle { input: path } => {
-                let settle: Settle = input::read(&path)?;
+                let settle: Settle = input::read(&path, Settle::SHAPE)?;
                 self.activity
                     .touch(&self.estate, &settle.task, operation)
                     .await;

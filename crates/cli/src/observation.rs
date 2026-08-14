@@ -50,7 +50,7 @@ impl Run {
         })
     }
 
-    pub(crate) fn finish(self, code: i32) {
+    pub(crate) fn finish(self, code: i32, fault: Option<&str>) {
         let Some((engine, _)) = concord_core::observation::view() else {
             return;
         };
@@ -58,6 +58,7 @@ impl Run {
             "event": "cli.finish",
             "command": self.command,
             "code": code,
+            "fault": fault,
         }))
         .ensure(Role::trace())
         .ensure(Role::span());

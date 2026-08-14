@@ -18,12 +18,12 @@ fn observation() {
     ];
     let shown = run(fixture.path(), &["task", "show", "local/seen"], &settings);
     assert!(shown.status.success());
-    cycle(&read(&report), "task.show", 0);
+    assert_eq!(cycle(&read(&report), "task.show", 0), Value::Null);
 
     std::fs::remove_file(&report).expect("remove report");
     let listed = run(fixture.path(), &["task", "list"], &settings);
     assert!(listed.status.success());
-    cycle(&read(&report), "task.list", 0);
+    assert_eq!(cycle(&read(&report), "task.list", 0), Value::Null);
 
     std::fs::remove_file(&report).expect("remove report");
     let missing = run(
@@ -32,7 +32,10 @@ fn observation() {
         &settings,
     );
     assert!(!missing.status.success());
-    cycle(&read(&report), "task.show", 1);
+    assert_eq!(
+        cycle(&read(&report), "task.show", 1),
+        Value::String("concord.task.absent".to_string())
+    );
 }
 
 fn run(root: &Path, arguments: &[&str], environment: &[(&str, &str)]) -> Output {
@@ -59,7 +62,7 @@ fn read(path: &Path) -> Vec<Value> {
         .collect()
 }
 
-fn cycle(atoms: &[Value], command: &str, code: i64) {
+fn cycle(atoms: &[Value], command: &str, code: i64) -> Value {
     let start = atoms
         .iter()
         .find(|atom| atom["payload"]["event"] == "cli.start")
@@ -72,4 +75,5 @@ fn cycle(atoms: &[Value], command: &str, code: i64) {
     assert_eq!(finish["payload"]["command"], command);
     assert_eq!(finish["payload"]["code"], code);
     assert_eq!(start["context"]["locus.trace"], "concord-thread");
+    finish["payload"]["fault"].clone()
 }

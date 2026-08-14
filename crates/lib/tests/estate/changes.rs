@@ -178,3 +178,15 @@ async fn changes() {
     );
     assert_eq!(estate.phases("local/typed").await.expect("Phases").len(), 1);
 }
+
+#[test]
+fn shape() {
+    let patch: Patch = serde_json::from_str(Patch::SHAPE).expect("Patch shape decodes");
+    assert_eq!(patch.version, 1);
+    assert_eq!(patch.edits.len(), 3);
+
+    let settle: Settle = serde_json::from_str(Settle::SHAPE).expect("Settle shape decodes");
+    assert_eq!(settle.version, 1);
+    assert_eq!(settle.phase.len(), 2);
+    assert_eq!(settle.edits.len(), 1);
+}

@@ -43,6 +43,19 @@ pub struct Patch {
     pub edits: Vec<Edit>,
 }
 
+impl Patch {
+    pub const SHAPE: &'static str = r#"{
+  "version": 1,
+  "task": "DOMAIN/NAME",
+  "revision": 0,
+  "edits": [
+    { "op": "create", "fact": { "role": "goal", "body": "TEXT" } },
+    { "op": "set", "fact": { "key": 1, "role": "focus", "body": "TEXT" } },
+    { "op": "end", "role": "next", "key": 1 }
+  ]
+}"#;
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Current {
     pub task: Node,
@@ -81,6 +94,21 @@ pub struct Settle {
     pub phase: Vec<Entry>,
     #[serde(default)]
     pub edits: Vec<Edit>,
+}
+
+impl Settle {
+    pub const SHAPE: &'static str = r#"{
+  "version": 1,
+  "task": "DOMAIN/NAME",
+  "revision": 0,
+  "phase": [
+    { "part": "outcome", "body": "TEXT" },
+    { "part": "decision", "title": "TEXT", "body": "TEXT" }
+  ],
+  "edits": [
+    { "op": "set", "fact": { "key": 1, "role": "focus", "body": "TEXT" } }
+  ]
+}"#;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]

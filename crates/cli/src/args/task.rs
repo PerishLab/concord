@@ -27,7 +27,10 @@ pub enum Command {
     Show { task: String },
     #[command(about = "Start an estate-only Task in an existing Domain")]
     Start { domain: String, name: String },
-    #[command(about = "Apply a versioned JSON change-set from stdin by default")]
+    #[command(
+        about = "Apply a versioned JSON change-set from stdin by default",
+        after_help = concord_core::Patch::SHAPE
+    )]
     Change {
         #[arg(long, value_name = "PATH|-", default_value = "-")]
         input: PathBuf,

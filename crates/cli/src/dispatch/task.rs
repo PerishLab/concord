@@ -35,7 +35,7 @@ pub async fn run(
             emit(json!({"task": task}), output)
         }
         Command::Change { input } => {
-            let patch: Patch = super::input::read(&input)?;
+            let patch: Patch = super::input::read(&input, Patch::SHAPE)?;
             activity.touch(estate, &patch.task, operation).await;
             emit(json!({"current": estate.change(&patch).await?}), output)
         }
