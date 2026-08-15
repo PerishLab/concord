@@ -29,39 +29,36 @@ struct Trace {
 }
 
 pub(crate) struct Run {
-    command: &'static str,
     context: Context,
 }
 
 impl Run {
     pub(crate) fn start(command: &'static str) -> Option<Self> {
         let (engine, context) = load()?;
-        let candidate = Candidate::event(json!({
-            "event": "cli.start",
-            "command": command,
-        }))
-        .ensure(Role::trace())
-        .ensure(Role::span());
+        let candidate = Candidate::event(json!({"event": "cli.start"}))
+            .ensure(Role::trace())
+            .ensure(Role::span())
+            .explicit(Role::new("concord.command").ok()?, Key::new(command).ok()?);
         let cycle = engine.append(&context, candidate).ok()?.context();
         concord_core::observation::install(engine, context);
-        Some(Self {
-            command,
-            context: cycle,
-        })
+        Some(Self { context: cycle })
     }
 
     pub(crate) fn finish(self, code: i32, fault: Option<&str>) {
         let Some((engine, _)) = concord_core::observation::view() else {
             return;
         };
-        let candidate = Candidate::event(json!({
+        let mut candidate = Candidate::event(json!({
             "event": "cli.finish",
-            "command": self.command,
             "code": code,
-            "fault": fault,
         }))
         .ensure(Role::trace())
         .ensure(Role::span());
+        if let Some(fault) = fault
+            && let (Ok(role), Ok(key)) = (Role::new("concord.fault"), Key::new(fault))
+        {
+            candidate = candidate.explicit(role, key);
+        }
         let _ = engine.append(&self.context, candidate);
     }
 }

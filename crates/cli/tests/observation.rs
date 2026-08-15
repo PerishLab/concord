@@ -71,9 +71,13 @@ fn cycle(atoms: &[Value], command: &str, code: i64) -> Value {
         .iter()
         .find(|atom| atom["payload"]["event"] == "cli.finish")
         .expect("cli finish");
-    assert_eq!(start["payload"]["command"], command);
-    assert_eq!(finish["payload"]["command"], command);
+    assert_eq!(start["context"]["concord.command"], command);
+    assert_eq!(finish["context"]["concord.command"], command);
     assert_eq!(finish["payload"]["code"], code);
     assert_eq!(start["context"]["locus.trace"], "concord-thread");
-    finish["payload"]["fault"].clone()
+    for atom in atoms.iter().filter(|atom| atom["source"].is_object()) {
+        assert_eq!(atom["context"]["concord.command"], Value::Null);
+        assert_eq!(atom["context"]["concord.fault"], Value::Null);
+    }
+    finish["context"]["concord.fault"].clone()
 }
