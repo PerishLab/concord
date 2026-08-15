@@ -1,15 +1,14 @@
+#[path = "seat/spawn.rs"]
+mod spawn;
+
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 fn run(home: &Path, arguments: &[&str]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_concord"));
-    command
-        .env_remove("CONCORD_DOMAIN_SPACE_ROOT")
-        .env_remove("CONCORD_HOME")
-        .env_remove("CONCORD_RELEASES")
-        .args(arguments);
+    let mut command = spawn::concord(home);
+    command.args(arguments);
     if cfg!(windows) {
         command
             .env("LOCALAPPDATA", home.join("data"))

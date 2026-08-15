@@ -2,7 +2,10 @@ use super::super::{Estate, Life, Node, fault};
 use crate::{Error, Result};
 use keel::Row;
 use serde::Serialize;
+use serde_json::json;
 use std::collections::BTreeMap;
+
+const CATALOGUE: usize = 64;
 
 pub(in crate::estate) struct World {
     pub space: i64,
@@ -97,7 +100,7 @@ impl World {
                 .nodes
                 .iter()
                 .find(|node| node.domain == domain && node.name == name)
-                .ok_or_else(|| missing(identity));
+                .ok_or_else(|| self.missing(identity, Some(domain)));
         }
         let found = self
             .nodes
@@ -105,14 +108,66 @@ impl World {
             .filter(|node| node.name == identity)
             .collect::<Vec<_>>();
         match found.as_slice() {
-            [] => Err(missing(identity)),
+            [] => Err(self.missing(identity, None)),
             [node] => Ok(node),
-            _ => Err(Error::typed(
+            _ => Err(Error::detailed(
                 "concord.task.ambiguous",
                 format!("task name is ambiguous; use domain/{identity}"),
+                json!({"identity": identity, "tasks": qualified(&found)}),
             )),
         }
     }
+
+    pub fn absent(&self, domain: &str) -> Error {
+        Error::detailed(
+            "concord.domain.absent",
+            format!("unknown managed domain {domain}"),
+            json!({"domain": domain, "domains": self.realms()}),
+        )
+    }
+
+    fn missing(&self, identity: &str, domain: Option<&str>) -> Error {
+        let held: Vec<&Node> = match domain {
+            Some(domain) if self.domain(domain).is_none() => {
+                return Error::detailed(
+                    "concord.task.absent",
+                    format!("task not found: {identity}"),
+                    json!({"identity": identity, "domains": self.realms()}),
+                );
+            }
+            Some(domain) => self.nodes.iter().filter(|n| n.domain == domain).collect(),
+            None => self.nodes.iter().collect(),
+        };
+        let live: Vec<&Node> = held
+            .iter()
+            .copied()
+            .filter(|node| node.life == Life::Active)
+            .collect();
+        Error::detailed(
+            "concord.task.absent",
+            format!("task not found: {identity}"),
+            json!({
+                "identity": identity,
+                "tasks": qualified(&live),
+                "active": live.len(),
+                "retired": held.len() - live.len(),
+            }),
+        )
+    }
+
+    fn realms(&self) -> Vec<&str> {
+        self.domains
+            .values()
+            .map(|held| held.name.as_str())
+            .collect()
+    }
+}
+
+fn qualified(held: &[&Node]) -> Vec<String> {
+    held.iter()
+        .take(CATALOGUE)
+        .map(|node| format!("{}/{}", node.domain, node.name))
+        .collect()
 }
 
 fn text<'a>(row: &'a Row, field: &str) -> Result<&'a str> {
@@ -128,8 +183,4 @@ fn malformed(row: &Row, field: &str) -> Error {
         "concord.estate.row",
         format!("Resource {} has malformed field {field}", row.key()),
     )
-}
-
-fn missing(identity: &str) -> Error {
-    Error::typed("concord.task.absent", format!("task not found: {identity}"))
 }

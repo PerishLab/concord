@@ -4,7 +4,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Output;
 
 pub(super) fn archive() -> Vec<u8> {
     let mut builder = tar::Builder::new(Vec::new());
@@ -76,7 +76,7 @@ fn route(request: &str) -> Option<(&str, &str)> {
 }
 
 pub(super) fn run(config: &Path, arguments: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_concord"))
+    crate::spawn::concord(config.parent().expect("scratch"))
         .arg("--config")
         .arg(config)
         .args(arguments)

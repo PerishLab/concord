@@ -27,10 +27,7 @@ impl Estate {
         if let Some(domain) = domain
             && world.domain(domain).is_none()
         {
-            return Err(Error::typed(
-                "concord.domain.absent",
-                format!("unknown managed domain {domain}"),
-            ));
+            return Err(world.absent(domain));
         }
         let mut found = Vec::new();
         for row in self.core.live("Repository").await.map_err(fault)? {

@@ -1,3 +1,6 @@
+#[path = "seat/spawn.rs"]
+mod spawn;
+
 use serde_json::Value;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -52,13 +55,9 @@ fn activity() {
     let current = success(fixture.path(), &["task", "show", "local/alpha"]);
     assert_eq!(current["current"]["task"]["revision"], 1);
 
-    let human = Command::new(env!("CARGO_BIN_EXE_concord"))
+    let human = spawn::concord(fixture.path())
         .args(["--root", fixture.path().to_str().expect("root path")])
         .args(["task", "show", "local/alpha"])
-        .env_remove("CONCORD_LOCUS_ENABLED")
-        .env_remove("CLAUDE_CODE_SESSION_ID")
-        .env_remove("GROK_SESSION_ID")
-        .env_remove("CODEX_THREAD_ID")
         .env("GROK_SESSION_ID", "grok-one")
         .output()
         .expect("run Concord as Grok operator");
@@ -67,13 +66,9 @@ fn activity() {
     assert!(warning.contains("has recent activity from another session; take care"));
     assert!(warning.contains("codex codex-one task.show at"));
 
-    let repeated = Command::new(env!("CARGO_BIN_EXE_concord"))
+    let repeated = spawn::concord(fixture.path())
         .args(["--root", fixture.path().to_str().expect("root path")])
         .args(["task", "show", "local/alpha"])
-        .env_remove("CONCORD_LOCUS_ENABLED")
-        .env_remove("CLAUDE_CODE_SESSION_ID")
-        .env_remove("GROK_SESSION_ID")
-        .env_remove("CODEX_THREAD_ID")
         .env("GROK_SESSION_ID", "grok-one")
         .output()
         .expect("repeat Concord as Grok operator");
@@ -159,12 +154,7 @@ fn operator(space: &Path, arguments: &[&str], variable: &str, session: &str) -> 
 }
 
 fn command(space: &Path) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_concord"));
-    command
-        .args(["--root", space.to_str().expect("root path"), "--json"])
-        .env_remove("CONCORD_LOCUS_ENABLED")
-        .env_remove("CLAUDE_CODE_SESSION_ID")
-        .env_remove("GROK_SESSION_ID")
-        .env_remove("CODEX_THREAD_ID");
+    let mut command = spawn::concord(space);
+    command.args(["--root", space.to_str().expect("root path"), "--json"]);
     command
 }

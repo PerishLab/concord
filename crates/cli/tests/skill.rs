@@ -1,5 +1,7 @@
 #[path = "skill/fixture.rs"]
 mod fixture;
+#[path = "seat/spawn.rs"]
+mod spawn;
 
 use fixture::{archive, config, run, serve};
 use std::fs;

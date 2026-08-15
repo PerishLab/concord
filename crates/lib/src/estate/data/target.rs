@@ -17,12 +17,7 @@ pub(super) async fn fresh(estate: &Estate, world: &World, identity: &str) -> Res
     })?;
     component("domain name", domain)?;
     component("task name", name)?;
-    let root = world.domain(domain).ok_or_else(|| {
-        Error::typed(
-            "concord.domain.absent",
-            format!("unknown managed domain {domain}"),
-        )
-    })?;
+    let root = world.domain(domain).ok_or_else(|| world.absent(domain))?;
     if reserved(estate, root, name).await? {
         return Err(Error::typed(
             "concord.task.reserved",

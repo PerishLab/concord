@@ -62,6 +62,11 @@ exact sealed model.
   and finish facts around dispatch; the finish code is a post-command fact.
   Kernel functions may only read that seat and append independent function
   facts through Locus. A missing seat is the default muted state.
+- Tests spawn the binary only through the shared test seat. The seat clears
+  every inherited `CONCORD_` variable and redirects the report into the
+  fixture, so a suite run cannot reach the operator's report file even when
+  muting fails. A test that needs observation enables it on top of that
+  redirect; none re-derives the muting itself.
 
 ## Operating
 

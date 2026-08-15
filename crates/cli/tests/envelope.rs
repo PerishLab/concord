@@ -1,22 +1,27 @@
+#[path = "seat/spawn.rs"]
+mod spawn;
+
 use serde_json::Value;
 use std::io::Write;
-use std::process::{Command, Stdio};
+use std::path::Path;
+use std::process::Stdio;
 
 #[test]
 fn envelope() {
-    let change = help(&["task", "change", "--help"]);
+    let fixture = tempfile::tempdir().expect("fixture");
+    let root = fixture.path();
+
+    let change = help(root, &["task", "change", "--help"]);
     assert!(change.contains("\"edits\""), "{change}");
     assert!(change.contains("\"op\": \"set\""), "{change}");
     assert!(change.contains("\"revision\""), "{change}");
 
-    let settle = help(&["phase", "settle", "--help"]);
+    let settle = help(root, &["phase", "settle", "--help"]);
     assert!(settle.contains("\"phase\""), "{settle}");
     assert!(settle.contains("\"part\": \"outcome\""), "{settle}");
 
-    let fixture = tempfile::tempdir().expect("fixture");
-    let root = fixture.path().to_str().expect("root path");
-    let bootstrap = Command::new(env!("CARGO_BIN_EXE_concord"))
-        .args(["--root", root, "domain", "bootstrap", "local"])
+    let bootstrap = spawn::concord(root)
+        .args(["--root", text(root), "domain", "bootstrap", "local"])
         .output()
         .expect("bootstrap estate");
     assert!(bootstrap.status.success());
@@ -33,8 +38,12 @@ fn envelope() {
     assert!(settled["error"]["details"]["envelope"]["phase"].is_array());
 }
 
-fn help(arguments: &[&str]) -> String {
-    let output = Command::new(env!("CARGO_BIN_EXE_concord"))
+fn text(root: &Path) -> &str {
+    root.to_str().expect("root path")
+}
+
+fn help(root: &Path, arguments: &[&str]) -> String {
+    let output = spawn::concord(root)
         .args(arguments)
         .output()
         .expect("run Concord");
@@ -42,9 +51,9 @@ fn help(arguments: &[&str]) -> String {
     String::from_utf8_lossy(&output.stdout).to_string()
 }
 
-fn refuse(root: &str, arguments: &[&str], body: &str) -> Value {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_concord"))
-        .args(["--root", root])
+fn refuse(root: &Path, arguments: &[&str], body: &str) -> Value {
+    let mut child = spawn::concord(root)
+        .args(["--root", text(root)])
         .args(arguments)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

@@ -50,12 +50,7 @@ impl Estate {
         let _guard = self.guard()?;
         self.ensure().await?;
         let world = World::load(self).await?;
-        let root = world.domain(domain).ok_or_else(|| {
-            Error::typed(
-                "concord.domain.absent",
-                format!("unknown managed domain {domain}"),
-            )
-        })?;
+        let root = world.domain(domain).ok_or_else(|| world.absent(domain))?;
         let identity = format!("{domain}/{name}");
         if reserved(self, root, name).await? {
             return Err(Error::typed(

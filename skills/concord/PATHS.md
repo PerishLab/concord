@@ -16,6 +16,13 @@ exists; full Task and Phase history stays opt-in.
 Stop ordinary mutation on audit faults. Treat observations as evidence, not
 authorization or blockers.
 
+A refused coordinate answers itself. `concord.task.absent` carries the active
+identities under `details.tasks` with `active` and `retired` counts, or the
+managed `details.domains` when the domain itself is unknown;
+`concord.task.ambiguous` carries the identities that collide and
+`concord.domain.absent` the domains that exist. Read the refusal instead of
+guessing a second name.
+
 A recent-session warning is also observational and non-blocking. Restate its
 operation and time plus any agent and session context without claiming
 authorship or that the other session is still active, then follow the bounded

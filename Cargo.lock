@@ -170,7 +170,7 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
 name = "concord"
-version = "0.12.6"
+version = "0.12.7"
 dependencies = [
  "clap",
  "concord-core",
@@ -187,7 +187,7 @@ dependencies = [
 
 [[package]]
 name = "concord-core"
-version = "0.12.6"
+version = "0.12.7"
 dependencies = [
  "fs2",
  "keel",
@@ -310,7 +310,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -884,9 +884,9 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
 name = "plumb"
-version = "0.19.0"
+version = "0.20.0"
 source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
-checksum = "c9a515d9e9af63b93fd6a599eaef9c98195fb20bbfc2e5164d489ea3e23197cd"
+checksum = "51e200187c85a9b652be9b22a318d5b5a10e60f75affb4f88c2781afd4b89a1d"
 dependencies = [
  "base64",
  "clap",
@@ -904,9 +904,9 @@ dependencies = [
 
 [[package]]
 name = "plumb-macro"
-version = "0.19.0"
+version = "0.20.0"
 source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
-checksum = "dbafce00534e93a276f640d49b6bc96310b36ebac222ab599e7c97267972c3db"
+checksum = "130cc99f3bbbe3f93508d786da78387e103427c905456f580c8684c71eb408b1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1004,7 +1004,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1336,7 +1336,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

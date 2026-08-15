@@ -1,3 +1,6 @@
+#[path = "seat/spawn.rs"]
+mod spawn;
+
 use serde_json::{Value, json};
 use std::path::Path;
 use std::process::{Command, Output};
@@ -160,13 +163,9 @@ fn success(space: &Path, arguments: &[&str]) -> Value {
 }
 
 fn raw(space: &Path, arguments: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_concord"))
+    spawn::concord(space)
         .args(["--root", space.to_str().expect("root path"), "--json"])
         .args(arguments)
-        .env_remove("CONCORD_LOCUS_ENABLED")
-        .env_remove("CLAUDE_CODE_SESSION_ID")
-        .env_remove("GROK_SESSION_ID")
-        .env_remove("CODEX_THREAD_ID")
         .output()
         .expect("run Concord")
 }

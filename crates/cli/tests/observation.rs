@@ -1,6 +1,9 @@
+#[path = "seat/spawn.rs"]
+mod spawn;
+
 use serde_json::Value;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Output;
 
 #[test]
 fn observation() {
@@ -39,15 +42,10 @@ fn observation() {
 }
 
 fn run(root: &Path, arguments: &[&str], environment: &[(&str, &str)]) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_concord"));
+    let mut command = spawn::concord(root);
     command
         .args(["--root", root.to_str().expect("root path")])
-        .args(arguments)
-        .env_remove("CONCORD_LOCUS_ENABLED")
-        .env_remove("CONCORD_LOCUS_REPORT_FILE")
-        .env_remove("CONCORD_LOCUS_TRACE_FILE")
-        .env_remove("CONCORD_LOCUS_TRACE_ID")
-        .env_remove("CODEX_THREAD_ID");
+        .args(arguments);
     for (name, value) in environment {
         command.env(name, value);
     }

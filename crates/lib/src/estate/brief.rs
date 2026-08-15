@@ -67,10 +67,7 @@ impl Estate {
     pub async fn task_brief(&self, domain: &str, after: Option<&str>) -> Result<TaskBriefPage> {
         let world = World::load(self).await?;
         if world.domain(domain).is_none() {
-            return Err(Error::typed(
-                "concord.domain.absent",
-                format!("unknown managed domain {domain}"),
-            ));
+            return Err(world.absent(domain));
         }
         let tasks = active(&world, domain);
         let total = tasks.len();
