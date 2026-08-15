@@ -202,7 +202,9 @@ async fn facts(state: &Estate, tasks: &[super::Node], report: &mut Agreement) {
     for task in tasks {
         let identity = task.identity();
         current(state, task, report).await;
-        phases(state, &identity, report).await;
+        if task.life == Life::Active {
+            phases(state, &identity, report).await;
+        }
     }
 }
 

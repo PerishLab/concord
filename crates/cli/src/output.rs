@@ -76,7 +76,7 @@ pub fn value(value: serde_json::Value, output: bool) {
     if output {
         println!(
             "{}",
-            serde_json::to_string_pretty(&value).expect("JSON value should encode")
+            serde_json::to_string(&value).expect("JSON value should encode")
         );
         return;
     }

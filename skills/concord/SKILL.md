@@ -13,6 +13,15 @@ hand.
 
 - A Domain groups Tasks and Repository annotations.
 - A Task has permanent identity, current facts, immutable Phases, and a revision.
+- A current fact carries one role. Goal, Focus, and Next admit one fact each and
+  omit rank. Constraint, Decision, Question, and Addition admit many and each
+  carries a rank. Addition also carries a title and a nonblank origin.
+- Goal is why the Task exists, Focus is its one current state, Next is the one
+  step after this, Constraint binds how, Decision records what was settled, and
+  Question holds what stays open.
+- Addition is the running ledger of work in flight: one entry per item, titled
+  by name and sourced by origin. Work that has not closed into a Phase belongs
+  here, not inside Focus.
 - A Dependency means `SOURCE depends_on TARGET`; its weight is `unknown`,
   `context`, `sequence`, or `required`.
 - A Graph exposes direct edges, reachability, paths, cycles, and components.

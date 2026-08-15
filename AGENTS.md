@@ -31,6 +31,9 @@ exact sealed model.
   ownership for arbitrary processes or silently clean retained state.
 - MAIN and PHASE are typed estate Resources, never files or projections.
   Addition retains honestly unstructured text without weakening mature roles.
+  It is where work in flight accumulates while no Outcome is yet true, one
+  titled and sourced entry per item, so Focus stays the one current state and a
+  Phase still closes only on a real Outcome.
 - Git owns member payload and repository-specific landing. Concord owns the
   member seat and verifies the four protocol surfaces.
 - Optional Locus observation is one-way. Context and report outcomes never

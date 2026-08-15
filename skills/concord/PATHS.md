@@ -32,7 +32,15 @@ concord phase settle
 
 `task change` carries the Task revision and explicit fact edits. `phase settle`
 carries one nonblank Outcome, optional entries, and explicit current-state
-edits; it never infers carry-forward.
+edits; it never infers carry-forward. Both help surfaces print the exact
+envelope, and a refused decode returns it under `details.envelope`.
+
+Record work in flight as one ranked Addition per item, titled by name and
+sourced by origin, and keep Focus to the one current state. A Phase closes only
+when an Outcome is true, so a line that is waiting, blocked, or delivering in
+parts accumulates Additions until then. Settle drains them: what closed becomes
+Outcome and Evidence, what remains becomes Phase Carry, and the same envelope's
+edits end the Additions it consumed.
 
 ## Coordinate
 
