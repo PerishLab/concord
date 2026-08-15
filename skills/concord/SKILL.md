@@ -13,6 +13,10 @@ hand.
 
 - A Domain groups Tasks and Repository annotations.
 - A Task has permanent identity, current facts, immutable Phases, and a revision.
+- A Task name states what will be true once the Task is done. A standing line
+  that has no terminal state names its function instead, which is correct for
+  that shape and wrong for every other. A name taken from the finding that
+  prompted the work binds nothing, so the work outgrows it.
 - A current fact carries one role. Goal, Focus, and Next admit one fact each and
   omit rank. Constraint, Decision, Question, and Addition admit many and each
   carries a rank. Addition also carries a title and a nonblank origin.

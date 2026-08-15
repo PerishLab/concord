@@ -31,6 +31,17 @@ surfaces overlap or the impact remains unclear, report the facts and impact to
 the caller before writing. Do not infer an owner, lease, heartbeat, takeover,
 current presence, or permission from the warning.
 
+## The deliverable is not clear enough to name
+
+Report it and stop. Do not settle for a name drawn from the finding that opened
+the line, from the tool being touched, or from the activity about to start; each
+reads as a decision that was never made and survives long after the work moves
+past it. Renaming later keeps the permanent identity but leaves every prose
+reference in other Tasks and in frozen Phases pointing at a name that no longer
+exists, which is the first class of drift this estate is audited for. The caller
+owns the vocabulary of their own domain; an unclear shape is theirs to resolve,
+not yours to guess.
+
 ## Retiring a Task
 
 First release every landed Member, or retire an unlanded Member against a

@@ -310,7 +310,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -696,9 +696,9 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "keel"
-version = "0.10.3"
+version = "0.10.4"
 source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
-checksum = "84cfb4a7b78ee7c1e9b21d2af8d5d8a66ecc6a1d8540fff9a38f612de683fceb"
+checksum = "3708dda80f1db17bfe7bc19e61eba6013661bbc2f4706e4e834e3a59c226bf2b"
 dependencies = [
  "getrandom 0.3.4",
  "keel-macro",
@@ -711,9 +711,9 @@ dependencies = [
 
 [[package]]
 name = "keel-macro"
-version = "0.10.3"
+version = "0.10.4"
 source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
-checksum = "2fe79c30fbfd4a59252342232a4558733214f4ee9261cd94faf6fb431aff58c4"
+checksum = "d33ee8207404c19d8c2aed528cda15f3cde65020cabead9be3f28a18707a7c9c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1004,7 +1004,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1336,7 +1336,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
