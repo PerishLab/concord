@@ -22,3 +22,14 @@ attach、prove、narrow、claim、release、retire 的测试完全不可见。
 
 `named` 用任务自己的名字走完 attach、prove、narrow、claim。对着本次发布撤掉修复再跑，
 它在第一个动词上就失败：`member not found: work/repo` —— 那个键少了它被存进去的域名段。
+
+## 发布调用方不再要求派发方早已不发的输入
+
+`plumb ship binary dispatch --version v0.12.8-beta.1` 直接被拒：
+`input required for 'Exact non-stable version'`。当前 Plumb 对 exact 发布从 ref 读取
+channel 与 version，一个输入都不送；而两个调用方仍把 `channel` 与 `version` 声明为
+`required: true`，stable 调用方还在转发一个共享 lane 会忽略的 `version`。
+
+共享 workflow 标注「Ignored; the version is read from the ref. Stop passing it.」
+已经**两个小版本**了，于是调用方早已漂移成「拒绝当前二进制能发出的每一次派发」。
+没有任何一道门说过话，第一个读者是这次发布本身。

@@ -29,3 +29,16 @@ and retire.
 `named` addresses one Task by its own name through attach, prove, narrow and
 claim. Reverted against this release it fails on the first deed with `member not
 found: work/repo` — a key missing the Domain it is stored under.
+
+## The release callers stopped requiring inputs the dispatcher stopped sending
+
+`plumb ship binary dispatch --version v0.12.8-beta.1` refused with `input
+required for 'Exact non-stable version'`. Current Plumb reads channel and
+version from the ref and sends no inputs for an exact release; both callers
+still declared `channel` and `version` as `required: true`, and the stable
+caller still forwarded a `version` the shared lane ignores.
+
+The shared workflow has carried "Ignored; the version is read from the ref. Stop
+passing it." for two minor versions, so the callers had drifted into refusing
+every dispatch the installed binary can make. Nothing reported the drift; the
+first reader was the release itself.

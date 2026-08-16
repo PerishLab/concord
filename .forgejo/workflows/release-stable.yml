@@ -3,10 +3,6 @@ name: release-stable
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: Exact stable version
-        required: true
-        type: string
       promotion_channel:
         description: Exact source channel
         required: true
@@ -24,8 +20,6 @@ jobs:
   release:
     uses: PerishLab/actions/.forgejo/workflows/release-binary.yml@main
     with:
-      channel: stable
-      version: ${{ inputs.version }}
       promotion_channel: ${{ inputs.promotion_channel }}
       promotion_version: ${{ inputs.promotion_version }}
       guard_contexts: '["guard / guard (push)","guard / windows (push)"]'
