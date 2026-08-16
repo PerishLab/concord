@@ -18,7 +18,7 @@ impl Estate {
         let task = world.node(&claiming.task)?;
         active(task.life, &claiming.task)?;
         stale(task.revision, claiming.revision)?;
-        let member = self.member(&claiming.task, &claiming.member).await?;
+        let member = self.member(&task.identity(), &claiming.member).await?;
         let mut union = member.claims.clone();
         union.extend(claiming.claims.clone());
         let claims = crate::claim::normalize(&union)?;
@@ -65,6 +65,6 @@ impl Estate {
             })
             .await
             .map_err(super::fault)?;
-        self.member(&claiming.task, &claiming.member).await
+        self.member(&task.identity(), &claiming.member).await
     }
 }

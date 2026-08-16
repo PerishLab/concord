@@ -25,7 +25,7 @@ impl Estate {
         let task = world.node(&release.task)?;
         active(task.life, &release.task)?;
         stale(task.revision, release.revision)?;
-        let member = self.member(&release.task, &release.member).await?;
+        let member = self.member(&task.identity(), &release.member).await?;
         let proof = member.proof.as_ref().ok_or_else(|| {
             Error::typed(
                 "concord.boundary.absent",
@@ -105,7 +105,7 @@ impl Estate {
         let task = world.node(&retirement.task)?;
         active(task.life, &retirement.task)?;
         stale(task.revision, retirement.revision)?;
-        let member = self.member(&retirement.task, &retirement.member).await?;
+        let member = self.member(&task.identity(), &retirement.member).await?;
         let proof = member.proof.as_ref().ok_or_else(|| {
             Error::typed(
                 "concord.boundary.absent",

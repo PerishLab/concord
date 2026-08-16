@@ -101,6 +101,77 @@ async fn narrow() {
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn named() {
+    let temp = tempfile::tempdir().expect("temporary Space");
+    let source = temp.path().join("source");
+    std::fs::create_dir(&source).expect("source directory");
+    git(&source, &["init", "-b", "main"]);
+    git(&source, &["config", "user.name", "Concord Test"]);
+    git(
+        &source,
+        &["config", "user.email", "concord@example.invalid"],
+    );
+    std::fs::write(source.join("README.md"), "fixture\n").expect("fixture file");
+    git(&source, &["add", "README.md"]);
+    git(&source, &["commit", "-m", "fixture"]);
+
+    let estate = Seat::new(temp.path())
+        .bootstrap()
+        .await
+        .expect("bootstrap estate");
+    estate.manage("local").await.expect("manage Domain");
+    estate.start("local", "work").await.expect("start Task");
+    estate
+        .attach(&Attach {
+            task: "work".to_string(),
+            name: "repo".to_string(),
+            source: source.clone(),
+            branch: None,
+            claims: vec!["crates".to_string(), "docs".to_string()],
+            revision: 0,
+        })
+        .await
+        .expect("attach Member");
+
+    let path = temp.path().join("local/.tasks/work/repo");
+    std::fs::create_dir(path.join("crates")).expect("crates directory");
+    std::fs::write(path.join("crates/note.md"), "delta\n").expect("member delta");
+    git(&path, &["add", "crates/note.md"]);
+    git(&path, &["commit", "-m", "member delta"]);
+
+    estate
+        .prove(&Proving {
+            task: "work".to_string(),
+            member: "repo".to_string(),
+            revision: 1,
+        })
+        .await
+        .expect("prove Boundary by Task name");
+
+    let member = estate
+        .narrow(&Narrowing {
+            task: "work".to_string(),
+            member: "repo".to_string(),
+            claims: vec!["crates".to_string()],
+            revision: 2,
+        })
+        .await
+        .expect("narrow by Task name");
+    assert_eq!(member.claims, vec!["crates"]);
+
+    let member = estate
+        .claim(&Claiming {
+            task: "work".to_string(),
+            member: "repo".to_string(),
+            claims: vec!["docs".to_string()],
+            revision: 3,
+        })
+        .await
+        .expect("claim by Task name");
+    assert_eq!(member.claims, vec!["crates", "docs"]);
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn retire() {
     let temp = tempfile::tempdir().expect("temporary Space");
     let source = temp.path().join("source");

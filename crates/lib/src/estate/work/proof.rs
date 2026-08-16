@@ -17,7 +17,7 @@ impl Estate {
         let task = world.node(&proving.task)?;
         active(task.life, &proving.task)?;
         stale(task.revision, proving.revision)?;
-        let member = self.member(&proving.task, &proving.member).await?;
+        let member = self.member(&task.identity(), &proving.member).await?;
         let source = self.source(&member)?;
         let path = self.path(&task.domain, &task.name, &member.name);
         if !git::at(&source).clean()? {
@@ -52,7 +52,7 @@ impl Estate {
         };
         self.keep(task.key, member.key, task.revision + 1, &proof)
             .await?;
-        self.member(&proving.task, &proving.member).await
+        self.member(&task.identity(), &proving.member).await
     }
 
     async fn keep(&self, task: i64, member: i64, revision: i64, proof: &Proof) -> Result<()> {
