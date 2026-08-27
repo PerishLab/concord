@@ -1,0 +1,17 @@
+schema = 1
+version = "v0.13.0"
+
+[[answer]]
+ecosystem = "cargo"
+name = "keel"
+latest = "0.10.4"
+
+[[answer]]
+ecosystem = "cargo"
+name = "locus"
+latest = "0.2.2"
+
+[[answer]]
+ecosystem = "cargo"
+name = "plumb"
+latest = "0.37.2"
