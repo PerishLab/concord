@@ -13,7 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap.workspace = true
-concord-core = { path = "../lib" }
+concord-core = { path = "../lib" , version = "=0.13.0" }
 locus.workspace = true
 plumb.workspace = true
 serde.workspace = true
