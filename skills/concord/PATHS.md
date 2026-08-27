@@ -16,6 +16,11 @@ exists; full Task and Phase history stays opt-in.
 Stop ordinary mutation on audit faults. Treat observations as evidence, not
 authorization or blockers.
 
+`claim.overlap` names every overlapping active peer that shares the canonical
+Git repository identity and the component-aware intersecting paths. Attach,
+claim, and narrow still succeed. Re-read peer status and coordinate delivery;
+do not infer ownership or weaken either Member's Claim.
+
 A refused coordinate answers itself. `concord.task.absent` carries the active
 identities under `details.tasks` with `active` and `retired` counts, or the
 managed `details.domains` when the domain itself is unknown;
@@ -81,6 +86,9 @@ Release only after delivery makes the proved Member reachable or tree-equivalent
 and leaves it clean. Retire is the unlanded exit: same clean current-proof gates,
 no landed check, and at least one Artifact name must match `--artifacts`
 (`*` matches any name; quote it in the shell). Zero matches refuse.
+
+These checks are local Member lifecycle checks. Concord does not read PR or
+Forgejo state; use the repository's current Plumb flow for guard and landing.
 
 ## Retain or finish
 

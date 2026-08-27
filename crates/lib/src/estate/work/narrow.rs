@@ -1,5 +1,5 @@
 use super::super::World;
-use super::{Estate, Worktree, active, stale};
+use super::{Estate, MemberChange, active, stale};
 use crate::{Error, Result, git};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -11,7 +11,7 @@ pub struct Narrowing {
 }
 
 impl Estate {
-    pub async fn narrow(&self, narrowing: &Narrowing) -> Result<Worktree> {
+    pub async fn narrow(&self, narrowing: &Narrowing) -> Result<MemberChange> {
         let _guard = self.guard()?;
         self.ensure().await?;
         let world = World::load(self).await?;
@@ -21,7 +21,7 @@ impl Estate {
         let member = self.member(&task.identity(), &narrowing.member).await?;
         let claims = crate::claim::normalize(&narrowing.claims)?;
         let source = self.source(&member)?;
-        self.available(Some(member.key), &source, &claims).await?;
+        let observations = self.overlaps(Some(member.key), &source, &claims).await?;
         if claims == member.claims {
             return Err(Error::typed(
                 "concord.claim.unchanged",
@@ -86,6 +86,9 @@ impl Estate {
             })
             .await
             .map_err(super::fault)?;
-        self.member(&task.identity(), &narrowing.member).await
+        Ok(MemberChange {
+            member: self.member(&task.identity(), &narrowing.member).await?,
+            observations,
+        })
     }
 }

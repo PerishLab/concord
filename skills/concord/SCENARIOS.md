@@ -15,10 +15,13 @@ real even if no action should be blocked.
 
 ## Concurrent Members share a Repository
 
-Keep branches, worktrees, and Claims distinct. Expand with `member claim` and
-shrink with `member narrow`; either change invalidates the prior Boundary.
-Narrow refuses a proposed claim that would fail `prove`. If overlap is real,
-serialize delivery instead of weakening the Claim.
+Give every Member a distinct branch and worktree. Claims may overlap: attach,
+claim, narrow, and audit report every peer and intersecting path as a
+non-blocking `claim.overlap` observation. Expand with `member claim` and shrink
+with `member narrow`; either change invalidates the prior Boundary. Narrow
+still refuses a proposed Claim that would fail `prove`. Coordinate experiments
+and delivery from the observations without treating a Claim as ownership or
+adding an overlap override.
 
 ## Another session recently touched the Task
 

@@ -1,3 +1,53 @@
+[layout]
+
+[[layout.seat]]
+path = "crates/*"
+anchor = ["Cargo.toml"]
+note = "The Concord CLI and protocol-kernel Rust workspace members."
+
+[[layout.seat]]
+path = "skills/*"
+anchor = ["SKILL.md"]
+note = "Published agent skill packages."
+
+[[layout.seat]]
+path = "docs/CHANGELOG/*"
+kind = "retired"
+note = "Release notes live in the Plumb depot; this tombstone keeps the retired source seat absent."
+
+[[layout.seat]]
+path = ".cargo"
+note = "Cargo registry configuration."
+
+[[layout.seat]]
+path = ".forgejo"
+note = "The canonical forge namespace."
+
+[[layout.seat]]
+path = ".runseal"
+note = "Committed inert Runseal resources."
+
+[[layout.seat]]
+path = ".plumb"
+note = "Plumb-owned affirmation records."
+
+[[layout.file]]
+name = ["AGENTS.md"]
+rule = ["rule://seat/affirmed"]
+note = "The repository entrypoint is affirmed against its governed faces."
+
+[[layout.file]]
+name = ["LICENSE", ".gitignore", ".gitattributes"]
+note = "Repository identity and Git policy."
+
+[[layout.file]]
+name = ["Cargo.toml", "Cargo.lock"]
+note = "Rust workspace anchors."
+
+[[layout.file]]
+name = ["plumb.toml", "ectropy.toml", "runseal.toml", "locus.toml"]
+note = "Governance and isolated runtime declarations."
+
 [release]
 product = "concord"
 authority = "https://releases.concord.perish.uk"
@@ -9,13 +59,8 @@ targets = [
 ]
 skill = true
 
-[[document]]
-strategy = "agent"
-source = [{ path = ".", seal = "211dee6a827a0cd755bc5735520fde7d61b3131a15c53ca08fc88c99409bd4c7" }]
-target-seal = "2094d74fe1547cb6fb3a0d5cd9fdf93a965771c2964d3991f557253accf60f69"
-
-[[document]]
-strategy = "brief"
-name = "concord"
-source = [{ path = ".", seal = "211dee6a827a0cd755bc5735520fde7d61b3131a15c53ca08fc88c99409bd4c7" }]
-target-seal = "152e7d93f32e0cb358944d6ccdae91bedb2b6d05f53e2d094c84780e058d97a1"
+[workflow.hash.guard]
+"rust" = ["suite://cargo"]
+"test" = ["*"]
+"ectropy" = ["ectropy.toml", "crates", "skills"]
+"plumb" = ["*"]

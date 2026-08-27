@@ -87,6 +87,7 @@ fn estate() {
         ],
     );
     assert_eq!(attached["member"]["task"], "local/alpha");
+    assert_eq!(attached["observations"], json!([]));
     let status = success(fixture.path(), &["member", "status", "alpha", "repo"]);
     assert_eq!(status["status"]["boundary"], "absent");
     assert_eq!(status["status"]["integration"], "reachable");
@@ -113,6 +114,25 @@ fn estate() {
         ],
     );
     assert_eq!(linked["revision"], 1);
+    let peer = success(
+        fixture.path(),
+        &[
+            "member",
+            "attach",
+            "other/beta",
+            "peer",
+            "--source",
+            source.to_str().expect("source path"),
+            "--claim",
+            "README.md",
+            "--revision",
+            "0",
+        ],
+    );
+    assert_eq!(peer["member"]["task"], "other/beta");
+    assert_eq!(peer["observations"][0]["code"], "claim.overlap");
+    assert_eq!(peer["observations"][0]["peer"], "local/alpha/repo");
+    assert_eq!(peer["observations"][0]["paths"], json!(["README.md"]));
     let adjacency = success(fixture.path(), &["graph", "adjacency"]);
     assert_eq!(adjacency["revision"], 1);
     assert_eq!(adjacency["adjacency"][0]["task"], "local/alpha");

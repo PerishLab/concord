@@ -2,6 +2,7 @@ mod artifact;
 mod claim;
 mod copy;
 mod narrow;
+mod overlap;
 mod proof;
 mod release;
 mod status;
@@ -11,11 +12,12 @@ use crate::{Error, Result, component, git};
 pub use artifact::{Artifact, Import, Removal, Survey};
 pub use claim::Claiming;
 pub use narrow::Narrowing;
+pub use overlap::{ClaimOverlap, MemberChange};
 pub use proof::Proving;
 pub use release::{Release, Retirement};
 use serde::Serialize;
 pub use status::{BoundaryState, CheckoutState, IntegrationState, MemberStatus, UpstreamState};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Attach {
@@ -92,7 +94,7 @@ impl Estate {
         Ok(out)
     }
 
-    pub async fn attach(&self, attach: &Attach) -> Result<Worktree> {
+    pub async fn attach(&self, attach: &Attach) -> Result<MemberChange> {
         component("member name", &attach.name)?;
         let source = attach.source.canonicalize().map_err(|error| {
             Error::typed(
@@ -121,7 +123,7 @@ impl Estate {
                 format!("target branch already exists: {branch}"),
             ));
         }
-        self.available(None, &source, &claims).await?;
+        let observations = self.overlaps(None, &source, &claims).await?;
         if self
             .worktrees()
             .await?
@@ -196,7 +198,10 @@ impl Estate {
                 )),
             };
         }
-        self.member(&identity, &attach.name).await
+        Ok(MemberChange {
+            member: self.member(&identity, &attach.name).await?,
+            observations,
+        })
     }
 
     pub(super) async fn member(&self, task: &str, name: &str) -> Result<Worktree> {
@@ -228,28 +233,6 @@ impl Estate {
                 )
             })?;
         crate::path::expand(&member.source, &self.space.join(domain).join(".tasks"))
-    }
-
-    async fn available(&self, owner: Option<i64>, source: &Path, claims: &[String]) -> Result<()> {
-        let identity = git::at(source).identity()?;
-        for member in self.worktrees().await? {
-            if owner == Some(member.key) {
-                continue;
-            }
-            let held = self.source(&member)?;
-            if git::at(&held).identity()? == identity
-                && crate::claim::overlaps(claims, &member.claims)
-            {
-                return Err(Error::typed(
-                    "concord.claim.overlap",
-                    format!(
-                        "write claim overlaps active member {}/{}",
-                        member.task, member.name
-                    ),
-                ));
-            }
-        }
-        Ok(())
     }
 }
 

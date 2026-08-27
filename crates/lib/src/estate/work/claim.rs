@@ -1,5 +1,5 @@
 use super::super::World;
-use super::{Estate, Worktree, active, stale};
+use super::{Estate, MemberChange, active, stale};
 use crate::{Error, Result};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -11,7 +11,7 @@ pub struct Claiming {
 }
 
 impl Estate {
-    pub async fn claim(&self, claiming: &Claiming) -> Result<Worktree> {
+    pub async fn claim(&self, claiming: &Claiming) -> Result<MemberChange> {
         let _guard = self.guard()?;
         self.ensure().await?;
         let world = World::load(self).await?;
@@ -23,7 +23,7 @@ impl Estate {
         union.extend(claiming.claims.clone());
         let claims = crate::claim::normalize(&union)?;
         let source = self.source(&member)?;
-        self.available(Some(member.key), &source, &claims).await?;
+        let observations = self.overlaps(Some(member.key), &source, &claims).await?;
         if claims == member.claims {
             return Err(Error::typed(
                 "concord.claim.unchanged",
@@ -65,6 +65,9 @@ impl Estate {
             })
             .await
             .map_err(super::fault)?;
-        self.member(&task.identity(), &claiming.member).await
+        Ok(MemberChange {
+            member: self.member(&task.identity(), &claiming.member).await?,
+            observations,
+        })
     }
 }

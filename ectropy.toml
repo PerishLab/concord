@@ -1,9 +1,4 @@
 [[boundary]]
-allow = ["fanout"]
-note = "stable changelog history is append-only and its version directories are fixed by release law"
-paths = ["docs/CHANGELOG"]
-
-[[boundary]]
 allow = [
     "path",
     "comment",
@@ -15,7 +10,9 @@ paths = [".forgejo/**"]
 allow = false
 
 [[grant]]
-paths = ["crates/*/tests/**/*.rs"]
+paths = [
+    "crates/*/tests/**/*.rs",
+]
 syntax = "test"
 
 [[grant]]
@@ -32,13 +29,12 @@ fanout = 10
 file = 300
 markup = 8
 param = 4
-path = 4
+path = 3
 
 [module]
 roots = [
     "crates/*/src",
     "crates/*/tests",
-    "docs",
     "skills/*",
 ]
 
@@ -46,7 +42,6 @@ roots = [
 exclude = ["**/target/**"]
 include = [
     "crates/**/*.rs",
-    "docs/**/*.md",
     "skills/**/*.md",
 ]
 
@@ -144,3 +139,11 @@ name = "local_tracking_refs"
 [[vocabulary.term]]
 description = "Reading one Member's local Git health is one product operation."
 name = "member_status"
+
+[[vocabulary.term]]
+description = "One structured coordination observation of intersecting Claims held by a peer Member."
+name = "ClaimOverlap"
+
+[[vocabulary.term]]
+description = "One successful Member mutation paired with its non-gating coordination observations."
+name = "MemberChange"

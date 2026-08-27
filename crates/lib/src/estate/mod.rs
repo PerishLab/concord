@@ -32,9 +32,9 @@ pub use data::{
 };
 pub use task::{Annotate, Rehome, Rename, Repository};
 pub use work::{
-    Artifact, Attach, BoundaryState, CheckoutState, Claiming, Import, IntegrationState,
-    MemberStatus, Narrowing, Proof, Proving, Release, Removal, Retirement, Survey, UpstreamState,
-    Worktree,
+    Artifact, Attach, BoundaryState, CheckoutState, ClaimOverlap, Claiming, Import,
+    IntegrationState, MemberChange, MemberStatus, Narrowing, Proof, Proving, Release, Removal,
+    Retirement, Survey, UpstreamState, Worktree,
 };
 
 pub struct Estate {
@@ -87,7 +87,7 @@ impl Seat {
             return Err(Error::typed(
                 "concord.estate.absent",
                 format!(
-                    "Concord estate is absent at {}; bootstrap a new Space or follow docs/CHANGELOG/v0.11.0/{{en,zh}}/MIGRATION.md for a legacy Space",
+                    "Concord estate is absent at {}; bootstrap a new Space or follow the v0.11.0 release migration contract for a legacy Space",
                     self.root.display()
                 ),
             ));
@@ -180,8 +180,6 @@ fn fault(error: keel::adapt::Error) -> Error {
 fn upgrade(error: keel::adapt::Error) -> Error {
     Error::typed(
         "concord.estate.upgrade_required",
-        format!(
-            "{error}; follow the exact release contract in docs/CHANGELOG/v0.11.0/{{en,zh}}/MIGRATION.md"
-        ),
+        format!("{error}; follow the exact v0.11.0 release migration contract"),
     )
 }

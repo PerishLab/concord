@@ -32,7 +32,8 @@ async fn narrow() {
             revision: 0,
         })
         .await
-        .expect("attach Member");
+        .expect("attach Member")
+        .member;
     assert_eq!(member.claims, vec!["crates", "docs"]);
     let path = temp.path().join("local/.tasks/work/repo");
     std::fs::create_dir(path.join("crates")).expect("crates directory");
@@ -73,7 +74,8 @@ async fn narrow() {
             revision: 2,
         })
         .await
-        .expect("narrow unused path");
+        .expect("narrow unused path")
+        .member;
     assert_eq!(member.claims, vec!["crates"]);
     assert!(member.proof.is_none());
 
@@ -96,7 +98,8 @@ async fn narrow() {
             revision: 3,
         })
         .await
-        .expect("claim still expands");
+        .expect("claim still expands")
+        .member;
     assert_eq!(member.claims, vec!["crates", "docs"]);
 }
 
@@ -156,7 +159,8 @@ async fn named() {
             revision: 2,
         })
         .await
-        .expect("narrow by Task name");
+        .expect("narrow by Task name")
+        .member;
     assert_eq!(member.claims, vec!["crates"]);
 
     let member = estate
@@ -167,7 +171,8 @@ async fn named() {
             revision: 3,
         })
         .await
-        .expect("claim by Task name");
+        .expect("claim by Task name")
+        .member;
     assert_eq!(member.claims, vec!["crates", "docs"]);
 }
 

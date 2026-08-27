@@ -1,6 +1,8 @@
+mod motion;
+mod overlap;
+
 use concord_core::{
-    Attach, BoundaryState, Claiming, Finish, IntegrationState, Life, Proving, Rehome, Release,
-    Rename, Seat,
+    Attach, BoundaryState, Claiming, Finish, IntegrationState, Life, Proving, Release, Seat,
 };
 use std::{path::Path, process::Command};
 
@@ -46,7 +48,7 @@ async fn member() {
         claims: vec!["crates".to_string()],
         revision: 0,
     };
-    let member = estate.attach(&attach).await.expect("attach Member");
+    let member = estate.attach(&attach).await.expect("attach Member").member;
     assert_eq!(member.task, "local/work");
     assert_eq!(member.branch, "work");
     assert_eq!(member.claims, vec!["crates"]);
@@ -96,13 +98,13 @@ async fn member() {
         claims: vec!["docs".to_string()],
         revision: 1,
     };
-    let member = estate.claim(&claiming).await.expect("expand Claim");
+    let member = estate.claim(&claiming).await.expect("expand Claim").member;
     assert_eq!(member.claims, vec!["crates", "docs"]);
     estate
         .start("local", "other")
         .await
         .expect("start peer Task");
-    let error = estate
+    let peer = estate
         .attach(&Attach {
             task: "local/other".to_string(),
             name: "peer".to_string(),
@@ -112,9 +114,34 @@ async fn member() {
             revision: 0,
         })
         .await
-        .expect_err("overlapping Claim across Tasks must refuse");
-    assert_eq!(error.code(), "concord.claim.overlap");
-    assert!(!temp.path().join("local/.tasks/other").exists());
+        .expect("overlapping Claim across Tasks remains attachable");
+    assert_eq!(peer.observations.len(), 1);
+    assert_eq!(peer.observations[0].code, "claim.overlap");
+    assert_eq!(peer.observations[0].peer, "local/work/repo");
+    assert_eq!(peer.observations[0].paths, ["docs/guide"]);
+    let agreement = estate.inspect(None, None).await.expect("audit overlaps");
+    assert!(agreement.faults.is_empty());
+    assert!(agreement.observations.iter().any(|finding| {
+        finding.code == "claim.overlap"
+            && finding.subject == "local/other/peer"
+            && finding.message.contains("local/work/repo")
+    }));
+    estate
+        .prove(&Proving {
+            task: "local/other".to_string(),
+            member: "peer".to_string(),
+            revision: 1,
+        })
+        .await
+        .expect("prove peer Boundary");
+    estate
+        .release(&Release {
+            task: "local/other".to_string(),
+            member: "peer".to_string(),
+            revision: 2,
+        })
+        .await
+        .expect("release unchanged peer");
     let proving = Proving {
         task: "local/work".to_string(),
         member: "repo".to_string(),
@@ -165,7 +192,11 @@ async fn member() {
         claims: vec!["README.md".to_string()],
         revision: 3,
     };
-    let member = estate.claim(&claiming).await.expect("invalidate Boundary");
+    let member = estate
+        .claim(&claiming)
+        .await
+        .expect("invalidate Boundary")
+        .member;
     assert!(member.proof.is_none());
 
     let proving = Proving {
@@ -212,66 +243,6 @@ async fn member() {
     let retired = estate.finish(&finish).await.expect("retire Task");
     assert_eq!(retired.life, Life::Retired);
 }
-
-#[tokio::test(flavor = "current_thread")]
-async fn motion() {
-    let temp = tempfile::tempdir().expect("temporary Space");
-    let source = temp.path().join("source");
-    std::fs::create_dir(&source).expect("source directory");
-    git(&source, &["init", "-b", "main"]);
-    git(&source, &["config", "user.name", "Concord Test"]);
-    git(
-        &source,
-        &["config", "user.email", "concord@example.invalid"],
-    );
-    std::fs::write(source.join("README.md"), "fixture\n").expect("fixture file");
-    git(&source, &["add", "README.md"]);
-    git(&source, &["commit", "-m", "fixture"]);
-    let estate = Seat::new(temp.path())
-        .bootstrap()
-        .await
-        .expect("bootstrap estate");
-    estate.manage("local").await.expect("manage local");
-    estate.manage("other").await.expect("manage other");
-    estate.start("local", "before").await.expect("start Task");
-    estate
-        .attach(&Attach {
-            task: "local/before".to_string(),
-            name: "repo".to_string(),
-            source: source.clone(),
-            branch: None,
-            claims: vec!["crates".to_string()],
-            revision: 0,
-        })
-        .await
-        .expect("attach Member");
-    estate
-        .rename(&Rename {
-            task: "local/before".to_string(),
-            name: "after".to_string(),
-            revision: 1,
-        })
-        .await
-        .expect("rename Task");
-    let renamed = temp.path().join("local/.tasks/after/repo");
-    assert!(renamed.join(".git").is_file());
-    assert!(registered(&source, &renamed));
-    estate
-        .rehome(&Rehome {
-            task: "local/after".to_string(),
-            domain: "other".to_string(),
-            revision: 2,
-        })
-        .await
-        .expect("rehome Task");
-    let moved = temp.path().join("other/.tasks/after/repo");
-    assert!(moved.join(".git").is_file());
-    assert!(registered(&source, &moved));
-    let members = estate.worktrees().await.expect("read Members");
-    assert_eq!(members[0].task, "other/after");
-    assert_eq!(members[0].branch, "before");
-}
-
 fn git(root: &Path, args: &[&str]) {
     let status = Command::new("git")
         .arg("-C")
@@ -280,21 +251,4 @@ fn git(root: &Path, args: &[&str]) {
         .status()
         .expect("run git");
     assert!(status.success(), "git {args:?}");
-}
-
-fn registered(source: &Path, member: &Path) -> bool {
-    let member = member.canonicalize().expect("canonical Member");
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(source)
-        .args(["worktree", "list", "--porcelain"])
-        .output()
-        .expect("list worktrees");
-    assert!(output.status.success());
-    String::from_utf8(output.stdout)
-        .expect("utf8 worktree list")
-        .lines()
-        .filter_map(|line| line.strip_prefix("worktree "))
-        .filter_map(|path| Path::new(path).canonicalize().ok())
-        .any(|path| path == member)
 }

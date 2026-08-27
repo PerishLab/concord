@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-const UNIX: &str = include_str!("../../../docs/CHANGELOG/v0.11.0/artifacts/migration.sh");
-const WINDOWS: &str = include_str!("../../../docs/CHANGELOG/v0.11.0/artifacts/migration.ps1");
+const UNIX: &str = include_str!("fixtures/transition/migration.sh");
+const WINDOWS: &str = include_str!("fixtures/transition/migration.ps1");
 
 fn artifact(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../docs/CHANGELOG/v0.11.0/artifacts")
+        .join("tests/fixtures/transition")
         .join(name)
 }
 

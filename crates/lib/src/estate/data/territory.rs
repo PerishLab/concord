@@ -19,7 +19,7 @@ pub(super) async fn inspect(plane: &Estate, tasks: &[Node], report: &mut Agreeme
             member(plane, task, worktree, report);
         }
     }
-    conflicts(plane, &members, report)?;
+    overlaps(plane, &members, report)?;
     Ok(())
 }
 
@@ -150,16 +150,22 @@ fn member(state: &Estate, task: &Node, member: &super::Worktree, report: &mut Ag
     }
 }
 
-fn conflicts(plane: &Estate, members: &[super::Worktree], report: &mut Agreement) -> Result<()> {
+fn overlaps(plane: &Estate, members: &[super::Worktree], report: &mut Agreement) -> Result<()> {
     for (index, left) in members.iter().enumerate() {
         for right in members.iter().skip(index + 1) {
             let same = git::at(&plane.source(left)?).identity()?
                 == git::at(&plane.source(right)?).identity()?;
-            if same && crate::claim::overlaps(&left.claims, &right.claims) {
-                report.fault(
+            let paths = crate::claim::intersections(&left.claims, &right.claims);
+            if same && !paths.is_empty() {
+                report.observe(
                     "claim.overlap",
                     format!("{}/{}", left.task, left.name),
-                    format!("write Claim overlaps {}/{}", right.task, right.name),
+                    format!(
+                        "write Claim overlaps {}/{} at {}",
+                        right.task,
+                        right.name,
+                        paths.join(", ")
+                    ),
                 );
             }
         }

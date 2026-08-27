@@ -1,6 +1,8 @@
 use super::{emit, explicit};
 use crate::args::member::Command;
-use concord_core::{Attach, Claiming, Estate, Narrowing, Proving, Release, Result, Retirement};
+use concord_core::{
+    Attach, Claiming, Estate, MemberChange, Narrowing, Proving, Release, Result, Retirement,
+};
 use serde_json::json;
 
 pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> {
@@ -29,7 +31,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 claims: claim,
                 revision,
             };
-            emit(json!({"member": estate.attach(&request).await?}), output)
+            changed(estate.attach(&request).await?, output)
         }
         Command::Claim {
             task,
@@ -43,7 +45,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 claims: claim,
                 revision,
             };
-            emit(json!({"member": estate.claim(&request).await?}), output)
+            changed(estate.claim(&request).await?, output)
         }
         Command::Narrow {
             task,
@@ -59,7 +61,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 claims: claim,
                 revision,
             };
-            emit(json!({"member": estate.narrow(&request).await?}), output)
+            changed(estate.narrow(&request).await?, output)
         }
         Command::Prove {
             task,
@@ -104,6 +106,16 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             emit(json!({"revision": estate.retire(&request).await?}), output)
         }
     }
+}
+
+fn changed(change: MemberChange, output: bool) -> Result<()> {
+    if !output {
+        super::output::observations(&change.observations);
+    }
+    emit(
+        json!({"member": change.member, "observations": change.observations}),
+        output,
+    )
 }
 
 async fn status(estate: &Estate, task: &str, member: &str, output: bool) -> Result<()> {

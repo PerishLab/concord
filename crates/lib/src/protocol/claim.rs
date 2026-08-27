@@ -29,12 +29,24 @@ pub fn digest(write: &[String]) -> String {
     format!("{:x}", digest.finalize())
 }
 
-pub fn overlaps(left: &[String], right: &[String]) -> bool {
-    left.iter().any(|left| {
-        right
-            .iter()
-            .any(|right| covers(left, right) || covers(right, left))
-    })
+pub fn intersections(left: &[String], right: &[String]) -> Vec<String> {
+    let mut paths = left
+        .iter()
+        .flat_map(|left| {
+            right.iter().filter_map(move |right| {
+                if covers(left, right) {
+                    Some(right.clone())
+                } else if covers(right, left) {
+                    Some(left.clone())
+                } else {
+                    None
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+    paths.sort();
+    paths.dedup();
+    paths
 }
 
 pub fn covers(boundary: &str, path: &str) -> bool {

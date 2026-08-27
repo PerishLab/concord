@@ -2,7 +2,7 @@ mod member;
 mod task;
 
 use concord_core::activity::Activity;
-use concord_core::{Error, Result};
+use concord_core::{ClaimOverlap, Error, Result};
 use plumb::skill::{Done, Record, Report};
 use serde_json::json;
 
@@ -70,6 +70,16 @@ pub fn unavailable(task: &str, error: &Error, output: bool) {
         "concord: warning: Task activity is unavailable for {task}: {}",
         error.message()
     );
+}
+
+pub fn observations(observations: &[ClaimOverlap]) {
+    for observation in observations {
+        eprintln!(
+            "concord: observation: write Claim overlaps {} at {}",
+            observation.peer,
+            observation.paths.join(", ")
+        );
+    }
 }
 
 pub fn value(value: serde_json::Value, output: bool) {
