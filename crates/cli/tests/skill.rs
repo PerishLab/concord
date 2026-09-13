@@ -1,15 +1,17 @@
 #[path = "skill/fixture.rs"]
 mod fixture;
+#[path = "skill/generation.rs"]
+mod generation;
 #[path = "seat/spawn.rs"]
 mod spawn;
 
-use fixture::{archive, config, run, serve};
+use fixture::{brief, config, run, serve, version};
 use std::fs;
 
 #[test]
 fn lifecycle() {
     let fixture = tempfile::tempdir().expect("fixture");
-    let releases = serve(archive());
+    let releases = serve(brief());
     let settings = config(fixture.path(), &releases);
     let home = fixture.path().join("argument-home");
     let text = home.display().to_string();
@@ -25,7 +27,7 @@ fn lifecycle() {
             "skill",
             "install",
             "--version",
-            "v0.3.0",
+            &version(),
             "--path",
             &target,
         ],
@@ -63,7 +65,7 @@ fn lifecycle() {
     assert!(listed.status.success());
     assert!(String::from_utf8_lossy(&listed.stdout).contains(&target));
 
-    let release = serve(archive());
+    let release = serve(brief());
     let next = config(fixture.path(), &release);
     let status = run(
         &next,
@@ -74,7 +76,7 @@ fn lifecycle() {
             "skill",
             "status",
             "--version",
-            "v0.3.0",
+            &version(),
         ],
     );
     assert!(status.status.success());
@@ -92,7 +94,7 @@ fn lifecycle() {
             "skill",
             "upgrade",
             "--version",
-            "v0.3.0",
+            &version(),
             "--dry-run",
         ],
     );
@@ -110,7 +112,7 @@ fn lifecycle() {
             "skill",
             "upgrade",
             "--version",
-            "v0.3.0",
+            &version(),
         ],
     );
     assert!(
@@ -155,7 +157,7 @@ fn lifecycle() {
 #[test]
 fn unmanaged() {
     let fixture = tempfile::tempdir().expect("fixture");
-    let releases = serve(archive());
+    let releases = serve(brief());
     let settings = config(fixture.path(), &releases);
     let home = fixture.path().join("argument-home");
     let home = home.display().to_string();
@@ -176,7 +178,7 @@ fn unmanaged() {
 #[test]
 fn staging() {
     let fixture = tempfile::tempdir().expect("fixture");
-    let releases = serve(archive());
+    let releases = serve(brief());
     let settings = config(fixture.path(), &releases);
     let home = fixture.path().join("argument-home");
     let staged = fixture.path().join("candidate/skills/concord");
@@ -198,11 +200,10 @@ fn staging() {
     );
 
     assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
+        !output.status.success(),
+        "another binary version must refuse"
     );
-    assert!(staged.join("SKILL.md").is_file());
+    assert!(!staged.exists());
     assert!(!staged.join("references").exists());
     assert!(!home.join("state/skills.json").exists());
 }

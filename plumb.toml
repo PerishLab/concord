@@ -7,8 +7,8 @@ note = "The Concord CLI and protocol-kernel Rust workspace members."
 
 [[layout.seat]]
 path = "skills/*"
-anchor = ["SKILL.md"]
-note = "Published agent skill packages."
+kind = "retired"
+note = "Skill generations are published from explicit temporary media through Depot."
 
 [[layout.seat]]
 path = "docs/CHANGELOG/*"
@@ -21,7 +21,8 @@ note = "Cargo registry configuration."
 
 [[layout.seat]]
 path = ".forgejo"
-note = "The canonical forge namespace."
+kind = "retired"
+note = "Plumb owns the canonical Ship workflow and staged-tree Guard."
 
 [[layout.seat]]
 path = ".runseal"
@@ -57,7 +58,6 @@ targets = [
   "aarch64-apple-darwin",
   "x86_64-pc-windows-msvc",
 ]
-skill = true
 
 [workflow.hash.guard]
 "rust" = ["suite://cargo"]

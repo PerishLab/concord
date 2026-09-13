@@ -34,7 +34,7 @@ pub enum Command {
         #[arg(long = "dry-run")]
         dry: bool,
     },
-    #[command(about = "Compare managed Concord skills with a selected release")]
+    #[command(about = "Compare managed skills with this binary's marker-bound Depot generation")]
     Status {
         #[arg(long, default_value = "stable")]
         channel: String,
@@ -71,6 +71,7 @@ impl Command {
 
 pub fn run(config: &Config, command: Command, output: bool) -> Result<()> {
     let kit = kit(config)?;
+    let kit = kit.depot(&config.depot, "concord", plumb::version!("CONCORD"));
     match command {
         Command::Install {
             channel,

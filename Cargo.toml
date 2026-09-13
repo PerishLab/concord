@@ -14,7 +14,7 @@ fs2 = "0.4"
 flate2 = "1"
 keel = { version = "0", registry = "perish", default-features = false }
 locus = { version = "0", registry = "perish" }
-plumb = { version = "0", registry = "perish", features = ["skill"] }
+plumb = { version = "0.37.37", registry = "perish", features = ["skill"] }
 pulldown-cmark = "0.13"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

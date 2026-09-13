@@ -17,6 +17,7 @@ fn show(config: &Config, json_output: bool) -> Result<()> {
             "domain_space_root": config.domain_space_root.display().to_string(),
             "home": config.home.display().to_string(),
             "releases": config.releases,
+            "depot": config.depot,
         }),
         json_output,
     );
