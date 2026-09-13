@@ -56,3 +56,8 @@ Ask the owning surface instead of copying its answer here.
   do not restate a released workflow or changelog shape here.
 - Historical `docs/CHANGELOG` is a retired source seat. New release notes enter
   the Plumb depot flow and never recreate that directory.
+- Skill source and repository workflows are retired. Publish skill generations
+  from explicit temporary media through Plumb Depot; consume them through
+  `concord skill`. The binary selects its own version, not a floating release.
+  Plumb owns Guard hooks and the central Ship workflow. Remaining governance
+  TOML is an exact Depot-locked transition, not a repository policy override.

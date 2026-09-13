@@ -3,12 +3,14 @@ use plumb::config::Cascade;
 use std::path::{Path, PathBuf};
 
 const RELEASES: &str = "https://releases.concord.perish.uk";
+const DEPOT: &str = "https://depot.concord.perish.uk";
 
 #[derive(Clone, Debug, Cascade)]
 pub struct Config {
     pub domain_space_root: PathBuf,
     pub home: PathBuf,
     pub releases: String,
+    pub depot: String,
 }
 
 impl Default for Config {
@@ -17,6 +19,7 @@ impl Default for Config {
             domain_space_root: PathBuf::new(),
             home: plumb::config::data("concord").unwrap_or_default(),
             releases: RELEASES.to_string(),
+            depot: DEPOT.to_string(),
         }
     }
 }
@@ -35,6 +38,7 @@ impl Config {
                 domain_space_root: root.map(Path::to_path_buf),
                 home: home.map(Path::to_path_buf),
                 releases: releases.map(str::to_string),
+                depot: None,
             },
         )
         .map_err(|error| Error::new(error.to_string()))?;
@@ -69,6 +73,9 @@ impl Config {
         }
         if !self.releases.starts_with("https://") && !self.releases.starts_with("http://") {
             return Err(Error::new("releases must be an http or https URL"));
+        }
+        if !self.depot.starts_with("https://") && !self.depot.starts_with("http://") {
+            return Err(Error::new("depot must be an http or https URL"));
         }
         Ok(self)
     }

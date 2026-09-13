@@ -64,4 +64,5 @@ fn default() {
     );
     let config: Value = serde_json::from_slice(&shown.stdout).expect("config json");
     assert_eq!(config["domain_space_root"], "");
+    assert_eq!(config["depot"], "https://depot.concord.perish.uk");
 }
