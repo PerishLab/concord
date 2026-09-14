@@ -3,7 +3,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub(super) fn concord(scratch: &Path) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_concord"));
+    image(scratch, Path::new(env!("CARGO_BIN_EXE_concord")))
+}
+
+pub(super) fn image(scratch: &Path, binary: &Path) -> Command {
+    let mut command = Command::new(binary);
     for (name, _) in std::env::vars() {
         if name.starts_with("CONCORD_") {
             command.env_remove(name);
