@@ -824,6 +824,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "object"
+version = "0.39.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e5a6c098c7a3b6547378093f5cc30bc54fd361ce711e05293a5cc589562739b"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -884,13 +893,14 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
 name = "plumb"
-version = "0.37.37"
+version = "0.37.39"
 source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
-checksum = "8f7e7fa122e55edcddb2ebb2e48f721aff42185cd82ae3f99c33d83059b39cc0"
+checksum = "37b6e405f70af3217cfdb131430d969e52541535b9a92b3b5b5829f3b470a53e"
 dependencies = [
  "base64",
  "clap",
  "flate2",
+ "object",
  "pin-project-lite",
  "plumb-macro",
  "semver",
@@ -905,9 +915,9 @@ dependencies = [
 
 [[package]]
 name = "plumb-macro"
-version = "0.37.37"
+version = "0.37.39"
 source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
-checksum = "1da3588254d24dc872c6fb52ae461b94f6dc7b4d0bb759dbc5dfa7f187d483cf"
+checksum = "4ab08beef2322b3063831c13ea936d81ee2906942330bf9063403e432440a717"
 dependencies = [
  "proc-macro2",
  "quote",

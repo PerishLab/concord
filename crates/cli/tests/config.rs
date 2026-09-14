@@ -1,6 +1,9 @@
 #[path = "seat/spawn.rs"]
 mod spawn;
 
+#[path = "seat/identity.rs"]
+mod identity;
+
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
