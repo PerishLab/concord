@@ -1,6 +1,8 @@
 use crate::fixture::{brief, config, run, serve, version};
 use std::fs;
 
+const BEHIND: &str = "v0.0.0-rc.1";
+
 #[test]
 fn renewed() {
     let root = tempfile::tempdir().unwrap();
@@ -67,11 +69,11 @@ fn legacy() {
     assert!(installed.status.success(), "{:?}", installed);
     let marker = seat.join("metadata.json");
     let mut held: serde_json::Value = serde_json::from_slice(&fs::read(&marker).unwrap()).unwrap();
-    held["version"] = "v0.0.1".into();
+    held["version"] = BEHIND.into();
     fs::write(&marker, serde_json::to_vec(&held).unwrap()).unwrap();
     let path = root.path().join("home/state/skills.json");
     let mut ledger: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
-    ledger["records"][0]["version"] = "v0.0.1".into();
+    ledger["records"][0]["version"] = BEHIND.into();
     ledger["records"][0]["url"] = "http://127.0.0.1:1/concord-skill.tar.gz".into();
     ledger["records"][0]["sha"] = "b".repeat(64).into();
     fs::write(&path, serde_json::to_vec(&ledger).unwrap()).unwrap();

@@ -6,6 +6,11 @@ anchor = ["Cargo.toml"]
 note = "The Concord CLI and protocol-kernel Rust workspace members."
 
 [[layout.seat]]
+path = "charts/*"
+kind = "retired"
+note = "This product ships no Helm chart; the tombstone keeps the domain seat absent."
+
+[[layout.seat]]
 path = "skills/*"
 kind = "retired"
 note = "Skill generations are published from explicit temporary media through Depot."
@@ -42,8 +47,8 @@ name = ["LICENSE", ".gitignore", ".gitattributes"]
 note = "Repository identity and Git policy."
 
 [[layout.file]]
-name = ["Cargo.toml", "Cargo.lock"]
-note = "Rust workspace anchors."
+name = ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]
+note = "Rust workspace anchors and the toolchain the distribution hub builds with."
 
 [[layout.file]]
 name = ["plumb.toml", "ectropy.toml", "runseal.toml", "locus.toml"]
