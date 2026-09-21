@@ -13,46 +13,23 @@ note = "This product ships no Helm chart; the tombstone keeps the domain seat ab
 [[layout.seat]]
 path = "skills/*"
 kind = "retired"
-note = "Skill generations are published from explicit temporary media through Depot."
-
-[[layout.seat]]
-path = "docs/CHANGELOG/*"
-kind = "retired"
-note = "Release notes live in the Plumb depot; this tombstone keeps the retired source seat absent."
+note = "Concord carries no skill source; its generations are consumed from Depot through `concord skill`."
 
 [[layout.seat]]
 path = ".cargo"
 note = "Cargo registry configuration."
 
 [[layout.seat]]
-path = ".forgejo"
-kind = "retired"
-note = "Plumb owns the canonical Ship workflow and staged-tree Guard."
-
-[[layout.seat]]
 path = ".runseal"
 note = "Committed inert Runseal resources."
 
-[[layout.seat]]
-path = ".plumb"
-note = "Plumb-owned affirmation records."
-
 [[layout.file]]
-name = ["AGENTS.md"]
-rule = ["rule://seat/affirmed"]
-note = "The repository entrypoint is affirmed against its governed faces."
-
-[[layout.file]]
-name = ["LICENSE", ".gitignore", ".gitattributes"]
-note = "Repository identity and Git policy."
+name = [".gitattributes"]
+note = "Git attribute policy."
 
 [[layout.file]]
 name = ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]
 note = "Rust workspace anchors and the toolchain the distribution hub builds with."
-
-[[layout.file]]
-name = ["plumb.toml", "ectropy.toml", "runseal.toml", "locus.toml"]
-note = "Governance and isolated runtime declarations."
 
 [release]
 product = "concord"
