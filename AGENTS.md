@@ -21,7 +21,7 @@ Ask the owning surface instead of copying its answer here.
   Overlap between Members sharing one canonical repository is an observation,
   never a mutation or audit fault.
 - A Boundary proves only that one committed Member delta stays inside that
-  Member's Claim. Concord does not inspect a PR, Forgejo state, or another
+  Member's Claim. Concord does not inspect a PR, forge state, or another
   repository's landing policy. Repository-specific landing belongs to Plumb.
 - Optional Locus facts and the private activity ledger are observations only.
   They never establish authorship, ownership, presence, authorization, or
@@ -51,13 +51,13 @@ Ask the owning surface instead of copying its answer here.
   `cargo clippy --locked --workspace --all-targets -- -D warnings`,
   `cargo check --locked --workspace --all-targets --release`,
   `cargo test --locked --workspace`, and `ectropy .`.
-- Plumb owns governed lanes, product release truth, depot changelog derivatives,
-  skill packaging, and repository landing. Read its current help and rules;
-  do not restate a released workflow or changelog shape here.
-- Historical `docs/CHANGELOG` is a retired source seat. New release notes enter
-  the Plumb depot flow and never recreate that directory.
-- Skill source and repository workflows are retired. Publish skill generations
-  from explicit temporary media through Plumb Depot; consume them through
-  `concord skill`. The binary selects its own version, not a floating release.
-  Plumb owns Guard hooks and the central Ship workflow. Remaining governance
-  TOML is an exact Depot-locked transition, not a repository policy override.
+- Plumb owns repository governance, release markers, and landing; wharf
+  builds, binds, and distributes each release. Read their current help and
+  rules; do not restate a release workflow or changelog shape here.
+- `plumb.toml` and `ectropy.toml` are this repository's own declarations,
+  layered over the base Plumb carries in its binary. Where they depart from
+  that base, `plumb doctor` says so as a noted finding.
+- The repository carries no workflow, no skill source, and no release notes.
+  Release notes and skill generations live on Depot; the binary consumes its
+  own skill generation through `concord skill` and never a floating release.
+  Guard hooks are projected by `plumb configuration install`.
