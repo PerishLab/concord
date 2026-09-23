@@ -697,7 +697,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 [[package]]
 name = "keel"
 version = "0.10.4"
-source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
+source = "sparse+https://cargo.perish.uk/"
 checksum = "3708dda80f1db17bfe7bc19e61eba6013661bbc2f4706e4e834e3a59c226bf2b"
 dependencies = [
  "getrandom 0.3.4",
@@ -712,7 +712,7 @@ dependencies = [
 [[package]]
 name = "keel-macro"
 version = "0.10.4"
-source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
+source = "sparse+https://cargo.perish.uk/"
 checksum = "d33ee8207404c19d8c2aed528cda15f3cde65020cabead9be3f28a18707a7c9c"
 dependencies = [
  "proc-macro2",
@@ -761,7 +761,7 @@ dependencies = [
 [[package]]
 name = "locus"
 version = "0.2.2"
-source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
+source = "sparse+https://cargo.perish.uk/"
 checksum = "d8323dcc2972ffe362db1fc2fa95051f9156672ade8c2d5457dba89397186972"
 dependencies = [
  "getrandom 0.3.4",
@@ -773,7 +773,7 @@ dependencies = [
 [[package]]
 name = "locus-macro"
 version = "0.2.2"
-source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
+source = "sparse+https://cargo.perish.uk/"
 checksum = "990566535ef8dc5a32f1c193d09bde68c4e1492a5bd29a57e0802ece4b038e61"
 dependencies = [
  "proc-macro2",
@@ -894,7 +894,7 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 [[package]]
 name = "plumb"
 version = "0.38.4"
-source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
+source = "sparse+https://cargo.perish.uk/"
 checksum = "6eef5c876dfad5c781f937857d3213fa6be171e742fe9b6d867b1d836cfa8028"
 dependencies = [
  "base64",
@@ -916,7 +916,7 @@ dependencies = [
 [[package]]
 name = "plumb-macro"
 version = "0.38.4"
-source = "sparse+https://git.perish.top/api/packages/PerishLab/cargo/"
+source = "sparse+https://cargo.perish.uk/"
 checksum = "9b400dc0c2f99046c80d21bfeb725031d2b4e67d3e6973e71fd5cd02ccb44c30"
 dependencies = [
  "proc-macro2",
