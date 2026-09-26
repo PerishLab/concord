@@ -12,7 +12,12 @@ impl Estate {
         let world = World::load(self).await?;
         let task = world.node(identity)?.clone();
         let facts = self.facts(task.key).await?;
-        Ok(Current { task, facts })
+        let reference = self.forge(task.key, None).await?;
+        Ok(Current {
+            task,
+            facts,
+            reference,
+        })
     }
 
     pub async fn change(&self, patch: &Patch) -> Result<Current> {
@@ -50,6 +55,7 @@ impl Estate {
         Ok(Current {
             task,
             facts: self.facts(root).await?,
+            reference: self.forge(root, None).await?,
         })
     }
 

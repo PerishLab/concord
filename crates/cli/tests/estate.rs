@@ -1,3 +1,5 @@
+#[path = "seat/reference.rs"]
+mod reference;
 #[path = "seat/spawn.rs"]
 mod spawn;
 

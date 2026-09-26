@@ -1,4 +1,4 @@
-use super::super::Node;
+use super::super::{Node, Reference};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -60,6 +60,8 @@ impl Patch {
 pub struct Current {
     pub task: Node,
     pub facts: Vec<Fact>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reference: Option<Reference>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]

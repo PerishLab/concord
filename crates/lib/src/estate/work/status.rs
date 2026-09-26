@@ -1,4 +1,4 @@
-use super::super::World;
+use super::super::{Reference, World};
 use super::{Estate, Worktree};
 use crate::{PLUMB, Result, git};
 use serde::Serialize;
@@ -59,6 +59,8 @@ pub struct UpstreamState {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct MemberStatus {
     pub member: Worktree,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reference: Option<Reference>,
     pub worktree: CheckoutState,
     pub integration_checkout: CheckoutState,
     pub boundary: BoundaryState,
@@ -73,6 +75,7 @@ impl Estate {
         let task = world.node(task)?;
         let identity = task.identity();
         let member = self.member(&identity, name).await?;
+        let reference = self.forge(task.key, Some(member.key)).await?;
         let path = self.path(&task.domain, &task.name, &member.name);
         let source = self.source(&member)?;
         let worktree = checkout(&path)?;
@@ -83,6 +86,7 @@ impl Estate {
         let local_tracking_refs = git::at(&path).tracking(&worktree.head)?;
         Ok(MemberStatus {
             member,
+            reference,
             worktree,
             integration_checkout,
             boundary,

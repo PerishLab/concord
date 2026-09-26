@@ -1,7 +1,8 @@
 use super::{emit, explicit};
-use crate::args::member::Command;
+use crate::args::member::{Command, Reference};
 use concord_core::{
-    Attach, Claiming, Estate, MemberChange, Narrowing, Proving, Release, Result, Retirement,
+    Attach, Claiming, Estate, ForgeDeclaration, ForgeWithdrawal, MemberChange, Narrowing, Proving,
+    Release, Result, Retirement,
 };
 use serde_json::json;
 
@@ -75,6 +76,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             };
             emit(json!({"member": estate.prove(&request).await?}), output)
         }
+        Command::Reference { command } => reference(estate, command, output).await,
         Command::Release {
             task,
             member,
@@ -104,6 +106,51 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 revision,
             };
             emit(json!({"revision": estate.retire(&request).await?}), output)
+        }
+    }
+}
+
+async fn reference(estate: &Estate, command: Reference, output: bool) -> Result<()> {
+    match command {
+        Reference::Set {
+            task,
+            member,
+            provider,
+            owner,
+            repository,
+            number,
+            revision,
+        } => {
+            let declaration = ForgeDeclaration {
+                task,
+                member: Some(member),
+                provider,
+                owner,
+                repository,
+                number,
+                revision,
+            };
+            emit(
+                json!({"revision": estate.refer(&declaration).await?}),
+                output,
+            )
+        }
+        Reference::Remove {
+            task,
+            member,
+            revision,
+            apply,
+        } => {
+            explicit(apply, "member reference remove")?;
+            let withdrawal = ForgeWithdrawal {
+                task,
+                member: Some(member),
+                revision,
+            };
+            emit(
+                json!({"revision": estate.unrefer(&withdrawal).await?}),
+                output,
+            )
         }
     }
 }
