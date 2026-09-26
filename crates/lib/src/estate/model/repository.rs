@@ -12,6 +12,14 @@ pub(super) struct Repository {
     domain: Domain,
 }
 
+#[resource(frozen)]
+pub(super) struct Tombstone {
+    #[field(string)]
+    reason: string,
+    #[relation(Repository, one2one, root)]
+    repository: Repository,
+}
+
 #[resource]
 pub(super) struct Addition {
     #[field(int, unique = repository, min = 1)]

@@ -22,7 +22,7 @@ pub use estate::{
     Current, Cut, Degree, Edge, Edit, Entry, Estate, Fact, FactBrief, Finding, Finish, Flow, Graph,
     Import, IntegrationState, Life, Link, MemberChange, MemberStatus, Narrowing, Node, Origin,
     Part, Patch, Phase, Proof, Proving, Realm, Rehome, Release, Removal, Rename, Repository,
-    Retirement, Role, RoleBrief, Seat, Settle, Settlement, Survey, TASK_BRIEF_LIMIT,
+    Retire, Retirement, Role, RoleBrief, Seat, Settle, Settlement, Survey, TASK_BRIEF_LIMIT,
     TASK_BRIEF_ROLE_BYTES, TaskBriefEntry, TaskBriefLimits, TaskBriefPage, TextPreview, Tune,
     UpstreamState, Weight, Worktree,
 };
