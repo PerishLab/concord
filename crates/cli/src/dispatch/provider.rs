@@ -2,7 +2,7 @@ use concord_core::{Reference, ReferenceKind};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Stdio;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::process::Command;
 
 const LIMIT: usize = 16 * 1024;
@@ -39,6 +39,12 @@ pub enum Reason {
     Malformed,
 }
 
+#[derive(Clone, Copy)]
+pub enum Projection {
+    Task,
+    Member,
+}
+
 #[derive(Deserialize)]
 struct Reply {
     node: String,
@@ -51,10 +57,18 @@ struct Reply {
 }
 
 pub async fn observe(
+    projection: Projection,
     reference: Option<&Reference>,
     command: Option<&Path>,
     timeout: u64,
 ) -> Observation {
+    let started = Instant::now();
+    let observation = read(reference, command, timeout).await;
+    record(projection, reference, &observation, started.elapsed());
+    observation
+}
+
+async fn read(reference: Option<&Reference>, command: Option<&Path>, timeout: u64) -> Observation {
     let Some(reference) = reference else {
         return unavailable(None, Reason::Reference);
     };
@@ -92,6 +106,15 @@ pub async fn observe(
     };
     available(reference, reply)
         .unwrap_or_else(|| unavailable(Some(reference.clone()), Reason::Malformed))
+}
+
+impl Projection {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Task => "task.current",
+            Self::Member => "member.status",
+        }
+    }
 }
 
 pub fn print(observation: &Observation) {
@@ -172,6 +195,30 @@ fn unavailable(reference: Option<Reference>, reason: Reason) -> Observation {
         observed_at: now(),
         reason,
     }
+}
+
+fn record(
+    projection: Projection,
+    reference: Option<&Reference>,
+    observation: &Observation,
+    duration: Duration,
+) {
+    let provider = reference
+        .map(|reference| reference.provider.as_str())
+        .unwrap_or("none");
+    let kind = reference
+        .map(|reference| reference.kind.name())
+        .unwrap_or("none");
+    let outcome = match observation {
+        Observation::Available { .. } => "fresh",
+        Observation::Unavailable { .. } => "unavailable",
+    };
+    crate::observation::projection(
+        projection.name(),
+        (provider, kind),
+        u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
+        outcome,
+    );
 }
 
 fn now() -> u64 {

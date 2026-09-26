@@ -80,6 +80,7 @@ async fn show(state: &Estate, task: &str, observation: Observe, output: bool) ->
     if observation.observe {
         body["observation"] = json!(
             provider::observe(
+                provider::Projection::Task,
                 current.reference.as_ref(),
                 observation.command.as_deref(),
                 observation.timeout,

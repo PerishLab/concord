@@ -5,6 +5,7 @@ use locus::{Candidate, Config, Context, Engine, Key, Policy, Role};
 use plumb::config::Cascade;
 use serde_json::json;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
 #[derive(Debug, Default, PartialEq, Cascade)]
 struct Settings {
@@ -32,6 +33,8 @@ pub(crate) struct Run {
     context: Context,
 }
 
+static COMMAND: OnceLock<Context> = OnceLock::new();
+
 impl Run {
     pub(crate) fn start(command: &'static str) -> Option<Self> {
         let (engine, context) = load()?;
@@ -40,6 +43,7 @@ impl Run {
             .ensure(Role::span())
             .explicit(Role::new("concord.command").ok()?, Key::new(command).ok()?);
         let cycle = engine.append(&context, candidate).ok()?.context();
+        let _ = COMMAND.set(cycle.clone());
         concord_core::observation::install(engine, context);
         Some(Self { context: cycle })
     }
@@ -61,6 +65,26 @@ impl Run {
         }
         let _ = engine.append(&self.context, candidate);
     }
+}
+
+pub(crate) fn projection(shape: &str, provider: (&str, &str), duration: u64, outcome: &str) {
+    let Some(context) = COMMAND.get() else {
+        return;
+    };
+    let Some((engine, _)) = concord_core::observation::view() else {
+        return;
+    };
+    let candidate = Candidate::event(json!({
+        "event": "provider.projection",
+        "shape": shape,
+        "provider": provider.0,
+        "kind": provider.1,
+        "duration_ms": duration,
+        "outcome": outcome,
+    }))
+    .ensure(Role::trace())
+    .ensure(Role::span());
+    let _ = engine.append(context, candidate);
 }
 
 fn load() -> Option<(Engine, Context)> {
