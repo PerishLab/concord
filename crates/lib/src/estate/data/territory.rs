@@ -8,6 +8,7 @@ use std::path::Path;
 pub(super) async fn inspect(plane: &Estate, tasks: &[Node], report: &mut Agreement) -> Result<()> {
     custody(plane, report)?;
     let members = plane.worktrees().await?;
+    references(plane, report).await?;
     for task in tasks {
         let identity = task.identity();
         let held = members
@@ -20,6 +21,60 @@ pub(super) async fn inspect(plane: &Estate, tasks: &[Node], report: &mut Agreeme
         }
     }
     overlaps(plane, &members, report)?;
+    Ok(())
+}
+
+async fn references(estate: &Estate, report: &mut Agreement) -> Result<()> {
+    let tasks = estate
+        .core
+        .live("Task")
+        .await
+        .map_err(super::fault)?
+        .into_iter()
+        .map(|row| row.key())
+        .collect::<BTreeSet<_>>();
+    let members = estate
+        .core
+        .live("Member")
+        .await
+        .map_err(super::fault)?
+        .into_iter()
+        .map(|row| row.key())
+        .collect::<BTreeSet<_>>();
+    for (unit, relation, kind, parents) in [
+        ("Issue", "task", super::ReferenceKind::Issue, &tasks),
+        ("Change", "member", super::ReferenceKind::Change, &members),
+    ] {
+        let mut seen = BTreeSet::new();
+        for row in estate.core.live(unit).await.map_err(super::fault)? {
+            let subject = format!("{unit}/{}", row.key());
+            let Some(parent) = row.int(relation) else {
+                report.fault(
+                    "reference.dangling",
+                    subject,
+                    "forge reference has no parent",
+                );
+                continue;
+            };
+            if !parents.contains(&parent) {
+                report.fault(
+                    "reference.dangling",
+                    &subject,
+                    format!("forge reference parent {parent} is not live"),
+                );
+            }
+            if !seen.insert(parent) {
+                report.fault(
+                    "reference.duplicate",
+                    &subject,
+                    format!("parent {parent} has multiple forge references"),
+                );
+            }
+            if let Err(error) = super::reference::decode(&row, kind) {
+                report.fault("reference.shape", subject, error.to_string());
+            }
+        }
+    }
     Ok(())
 }
 

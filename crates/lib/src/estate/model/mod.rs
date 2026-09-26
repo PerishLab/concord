@@ -6,6 +6,7 @@ mod dependency;
 mod domain;
 mod member;
 mod phase;
+mod reference;
 mod repository;
 mod reservation;
 
@@ -42,10 +43,10 @@ pub(super) struct Task {
 }
 
 pub(super) fn graph() -> Graph {
-    assemble(true)
+    assemble(true, true)
 }
 
-fn assemble(tombstone: bool) -> Graph {
+fn assemble(tombstone: bool, references: bool) -> Graph {
     let mut graph = Graph::new();
     graph
         .plug::<Space>()
@@ -62,7 +63,11 @@ fn assemble(tombstone: bool) -> Graph {
         .plug::<member::Member>()
         .plug::<member::Addition>()
         .plug::<member::Claim>()
-        .plug::<member::Boundary>()
+        .plug::<member::Boundary>();
+    if references {
+        graph.plug::<reference::Issue>().plug::<reference::Change>();
+    }
+    graph
         .plug::<current::Goal>()
         .plug::<current::Constraint>()
         .plug::<current::Decision>()
@@ -90,7 +95,7 @@ mod tests {
         let temp = tempfile::tempdir().expect("temporary estate");
         let database = temp.path().join("estate.sqlite3");
         let wire = Sqlite::file(&database).await.expect("legacy database");
-        let mut legacy = keel::bootstrap(assemble(false), wire).expect("legacy graph");
+        let mut legacy = keel::bootstrap(assemble(false, false), wire).expect("legacy graph");
         let sudo = legacy.mint().await.expect("legacy sudo");
         let core = legacy.seal(&sudo).await.expect("legacy estate");
         let space = core
@@ -124,6 +129,8 @@ mod tests {
         let wire = Sqlite::file(&database).await.expect("migration database");
         let core = keel::bind(graph(), wire).await.expect("explicit migration");
         assert!(core.live("Tombstone").await.expect("Tombstones").is_empty());
+        assert!(core.live("Issue").await.expect("Issues").is_empty());
+        assert!(core.live("Change").await.expect("Changes").is_empty());
         let row = core
             .live("Repository")
             .await

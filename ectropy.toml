@@ -146,3 +146,15 @@ name = "ClaimOverlap"
 [[vocabulary.term]]
 description = "One successful Member mutation paired with its non-gating coordination observations."
 name = "MemberChange"
+
+[[vocabulary.term]]
+description = "The issue or change kind carried by one declared forge coordinate."
+name = "ReferenceKind"
+
+[[vocabulary.term]]
+description = "One explicit revision-checked declaration or replacement of a forge coordinate."
+name = "ForgeDeclaration"
+
+[[vocabulary.term]]
+description = "One explicit revision-checked removal of a forge coordinate."
+name = "ForgeWithdrawal"

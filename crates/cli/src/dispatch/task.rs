@@ -1,8 +1,9 @@
 use super::activity;
 use super::{emit, explicit};
-use crate::args::task::{Command, Dependency};
+use crate::args::task::{Command, Dependency, Reference};
 use concord_core::{
-    Cut, Estate, Finish, Link, Origin, Patch, Rehome, Rename, Result, Tune, Weight,
+    Cut, Estate, Finish, ForgeDeclaration, ForgeWithdrawal, Link, Origin, Patch, Rehome, Rename,
+    Result, Tune, Weight,
 };
 use serde_json::json;
 
@@ -56,6 +57,7 @@ pub async fn run(
             output,
         ),
         Command::Dependency { command } => dependency(estate, command, output).await,
+        Command::Reference { command } => reference(estate, command, output).await,
         Command::Finish {
             task,
             revision,
@@ -71,6 +73,49 @@ pub async fn run(
                 reason,
             };
             emit(json!({"task": estate.finish(&finish).await?}), output)
+        }
+    }
+}
+
+async fn reference(state: &Estate, command: Reference, output: bool) -> Result<()> {
+    match command {
+        Reference::Set {
+            task,
+            provider,
+            owner,
+            repository,
+            number,
+            revision,
+        } => {
+            let declaration = ForgeDeclaration {
+                task,
+                member: None,
+                provider,
+                owner,
+                repository,
+                number,
+                revision,
+            };
+            emit(
+                json!({"revision": state.refer(&declaration).await?}),
+                output,
+            )
+        }
+        Reference::Remove {
+            task,
+            revision,
+            apply,
+        } => {
+            explicit(apply, "task reference remove")?;
+            let withdrawal = ForgeWithdrawal {
+                task,
+                member: None,
+                revision,
+            };
+            emit(
+                json!({"revision": state.unrefer(&withdrawal).await?}),
+                output,
+            )
         }
     }
 }

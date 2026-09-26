@@ -5,6 +5,17 @@ pub fn status(status: &MemberStatus) {
         "member status: {}/{}",
         status.member.task, status.member.name
     );
+    match &status.reference {
+        Some(reference) => println!(
+            "  reference: {} {}/{}/{}#{}",
+            reference.kind.name(),
+            reference.provider,
+            reference.owner,
+            reference.repository,
+            reference.number
+        ),
+        None => println!("  reference: -"),
+    }
     checkout("worktree", &status.worktree);
     checkout("integration", &status.integration_checkout);
     println!("  boundary: {}", status.boundary.name());
