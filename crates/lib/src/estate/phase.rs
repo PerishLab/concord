@@ -45,6 +45,7 @@ impl Estate {
             current: Current {
                 task,
                 facts: self.facts(root).await?,
+                reference: self.forge(root, None).await?,
             },
             phase: self.phase(phase).await?,
         })

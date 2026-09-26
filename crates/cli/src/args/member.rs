@@ -56,6 +56,11 @@ pub enum Command {
         #[arg(long)]
         revision: i64,
     },
+    #[command(about = "Manage the declared pull or change coordinate")]
+    Reference {
+        #[command(subcommand)]
+        command: Reference,
+    },
     #[command(about = "Remove one clean and landed Member")]
     Release {
         task: String,
@@ -78,6 +83,34 @@ pub enum Command {
     },
 }
 
+#[derive(Subcommand)]
+pub enum Reference {
+    #[command(about = "Declare or replace the Member forge coordinate")]
+    Set {
+        task: String,
+        member: String,
+        #[arg(long)]
+        provider: String,
+        #[arg(long)]
+        owner: String,
+        #[arg(long)]
+        repository: String,
+        #[arg(long)]
+        number: i64,
+        #[arg(long)]
+        revision: i64,
+    },
+    #[command(about = "Remove the Member forge coordinate")]
+    Remove {
+        task: String,
+        member: String,
+        #[arg(long)]
+        revision: i64,
+        #[arg(long)]
+        apply: bool,
+    },
+}
+
 impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
@@ -87,6 +120,7 @@ impl Command {
             Self::Claim { .. } => "member.claim",
             Self::Narrow { .. } => "member.narrow",
             Self::Prove { .. } => "member.prove",
+            Self::Reference { command } => command.name(),
             Self::Release { .. } => "member.release",
             Self::Retire { .. } => "member.retire",
         }
@@ -100,8 +134,24 @@ impl Command {
             Self::Claim { task, .. } => Some(vec![task]),
             Self::Narrow { task, .. } => Some(vec![task]),
             Self::Prove { task, .. } => Some(vec![task]),
+            Self::Reference { command } => Some(command.activity()),
             Self::Release { task, .. } => Some(vec![task]),
             Self::Retire { task, .. } => Some(vec![task]),
+        }
+    }
+}
+
+impl Reference {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Set { .. } => "member.reference.set",
+            Self::Remove { .. } => "member.reference.remove",
+        }
+    }
+
+    fn activity(&self) -> Vec<&str> {
+        match self {
+            Self::Set { task, .. } | Self::Remove { task, .. } => vec![task],
         }
     }
 }

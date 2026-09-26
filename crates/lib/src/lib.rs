@@ -19,11 +19,12 @@ pub use config::Root;
 pub use error::{Error, Result};
 pub use estate::{
     Agreement, Annotate, Artifact, Attach, BoundaryState, CheckoutState, ClaimOverlap, Claiming,
-    Current, Cut, Degree, Edge, Edit, Entry, Estate, Fact, FactBrief, Finding, Finish, Flow, Graph,
-    Import, IntegrationState, Life, Link, MemberChange, MemberStatus, Narrowing, Node, Origin,
-    Part, Patch, Phase, Proof, Proving, Realm, Rehome, Release, Removal, Rename, Repository,
-    Retire, Retirement, Role, RoleBrief, Seat, Settle, Settlement, Survey, TASK_BRIEF_LIMIT,
-    TASK_BRIEF_ROLE_BYTES, TaskBriefEntry, TaskBriefLimits, TaskBriefPage, TextPreview, Tune,
-    UpstreamState, Weight, Worktree,
+    Current, Cut, Degree, Edge, Edit, Entry, Estate, Fact, FactBrief, Finding, Finish, Flow,
+    ForgeDeclaration, ForgeWithdrawal, Graph, Import, IntegrationState, Life, Link, MemberChange,
+    MemberStatus, Narrowing, Node, Origin, Part, Patch, Phase, Proof, Proving, Realm, Reference,
+    ReferenceKind, Rehome, Release, Removal, Rename, Repository, Retire, Retirement, Role,
+    RoleBrief, Seat, Settle, Settlement, Survey, TASK_BRIEF_LIMIT, TASK_BRIEF_ROLE_BYTES,
+    TaskBriefEntry, TaskBriefLimits, TaskBriefPage, TextPreview, Tune, UpstreamState, Weight,
+    Worktree,
 };
 pub use protocol::PLUMB;
