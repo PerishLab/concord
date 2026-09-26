@@ -5,6 +5,7 @@ mod domain;
 mod graph;
 mod input;
 mod member;
+mod provider;
 mod task;
 
 use crate::args::{self, Command};

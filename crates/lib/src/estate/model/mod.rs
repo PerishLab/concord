@@ -89,6 +89,7 @@ fn assemble(tombstone: bool, references: bool) -> Graph {
 mod tests {
     use super::{assemble, graph};
     use keel::adapt::db::Sqlite;
+    use std::time::Duration;
 
     #[tokio::test]
     async fn migration() {
@@ -126,9 +127,17 @@ mod tests {
             .expect("legacy Repository");
         drop(core);
 
+        align();
+        let wire = Sqlite::file(&database).await.expect("tombstone migration");
+        let core = keel::bind(assemble(true, false), wire)
+            .await
+            .expect("explicit tombstone migration");
+        assert!(core.live("Tombstone").await.expect("Tombstones").is_empty());
+        drop(core);
+
+        align();
         let wire = Sqlite::file(&database).await.expect("migration database");
         let core = keel::bind(graph(), wire).await.expect("explicit migration");
-        assert!(core.live("Tombstone").await.expect("Tombstones").is_empty());
         assert!(core.live("Issue").await.expect("Issues").is_empty());
         assert!(core.live("Change").await.expect("Changes").is_empty());
         let row = core
@@ -140,5 +149,12 @@ mod tests {
         assert_eq!(row.text("name"), Some("legacy"));
         assert_eq!(row.text("note"), Some("RETIRED"));
         assert_eq!(row.int("domain"), Some(domain));
+    }
+
+    fn align() {
+        let tick = keel::life::tick();
+        while keel::life::tick() == tick {
+            std::thread::sleep(Duration::from_millis(5));
+        }
     }
 }
