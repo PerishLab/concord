@@ -1,4 +1,6 @@
+use super::provider;
 use super::{emit, explicit};
+use crate::args::Observe;
 use crate::args::member::{Command, Reference};
 use concord_core::{
     Attach, Claiming, Estate, ForgeDeclaration, ForgeWithdrawal, MemberChange, Narrowing, Proving,
@@ -15,7 +17,11 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             }
             emit(json!({"members": members}), output)
         }
-        Command::Status { task, member } => status(estate, &task, &member, output).await,
+        Command::Status {
+            task,
+            member,
+            observation,
+        } => status(estate, (&task, &member), observation, output).await,
         Command::Attach {
             task,
             name,
@@ -165,11 +171,35 @@ fn changed(change: MemberChange, output: bool) -> Result<()> {
     )
 }
 
-async fn status(estate: &Estate, task: &str, member: &str, output: bool) -> Result<()> {
-    let status = estate.member_status(task, member).await?;
+async fn status(
+    estate: &Estate,
+    coordinate: (&str, &str),
+    observation: Observe,
+    output: bool,
+) -> Result<()> {
+    let status = estate.member_status(coordinate.0, coordinate.1).await?;
+    let observed = if observation.observe {
+        Some(
+            provider::observe(
+                status.reference.as_ref(),
+                observation.command.as_deref(),
+                observation.timeout,
+            )
+            .await,
+        )
+    } else {
+        None
+    };
     if output {
-        return emit(json!({"status": status}), true);
+        let mut body = json!({"status": status});
+        if let Some(observed) = &observed {
+            body["observation"] = json!(observed);
+        }
+        return emit(body, true);
     }
     super::output::member_status(&status);
+    if let Some(observed) = &observed {
+        provider::print(observed);
+    }
     Ok(())
 }

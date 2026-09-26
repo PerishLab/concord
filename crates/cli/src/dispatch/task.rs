@@ -1,5 +1,7 @@
 use super::activity;
+use super::provider;
 use super::{emit, explicit};
+use crate::args::Observe;
 use crate::args::task::{Command, Dependency, Reference};
 use concord_core::{
     Cut, Estate, Finish, ForgeDeclaration, ForgeWithdrawal, Link, Origin, Patch, Rehome, Rename,
@@ -23,13 +25,7 @@ pub async fn run(
             emit(json!({"tasks": tasks}), output)
         }
         Command::Brief { domain, after } => brief(estate, &domain, after.as_deref(), output).await,
-        Command::Show { task } => emit(
-            json!({
-                "current": estate.current(&task).await?,
-                "phases": estate.phases(&task).await?,
-            }),
-            output,
-        ),
+        Command::Show { task, observation } => show(estate, &task, observation, output).await,
         Command::Start { domain, name } => {
             let task = estate.start(&domain, &name).await?;
             activity.touch(estate, &task.identity(), operation).await;
@@ -75,6 +71,23 @@ pub async fn run(
             emit(json!({"task": estate.finish(&finish).await?}), output)
         }
     }
+}
+
+async fn show(state: &Estate, task: &str, observation: Observe, output: bool) -> Result<()> {
+    let current = state.current(task).await?;
+    let phases = state.phases(task).await?;
+    let mut body = json!({"current": current, "phases": phases});
+    if observation.observe {
+        body["observation"] = json!(
+            provider::observe(
+                current.reference.as_ref(),
+                observation.command.as_deref(),
+                observation.timeout,
+            )
+            .await
+        );
+    }
+    emit(body, output)
 }
 
 async fn reference(state: &Estate, command: Reference, output: bool) -> Result<()> {
