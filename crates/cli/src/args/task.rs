@@ -24,7 +24,11 @@ pub enum Command {
         after: Option<String>,
     },
     #[command(about = "Read one Task and its current structured facts")]
-    Show { task: String },
+    Show {
+        task: String,
+        #[command(flatten)]
+        observation: super::Observe,
+    },
     #[command(about = "Start an estate-only Task in an existing Domain")]
     Start { domain: String, name: String },
     #[command(
@@ -158,7 +162,7 @@ impl Command {
 
     pub(crate) fn activity(&self) -> Option<Vec<&str>> {
         match self {
-            Self::Show { task } => Some(vec![task]),
+            Self::Show { task, .. } => Some(vec![task]),
             Self::Rename { task, .. } => Some(vec![task]),
             Self::Rehome { task, .. } => Some(vec![task]),
             Self::Dependency { command } => Some(command.activity()),
