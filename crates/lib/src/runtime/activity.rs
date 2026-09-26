@@ -98,7 +98,7 @@ pub(crate) fn record(
         .as_secs();
     let root = space.join(".concord/activity");
     at(&root).directory()?;
-    let _guard = guard(&root, task.key)?;
+    let guard = guard(&root, task.key)?;
     let path = root.join(format!("{}.json", task.key));
     let mut ledger = read(&path)?;
     ledger.version = 2;
@@ -139,12 +139,19 @@ pub(crate) fn record(
     let encoded = serde_json::to_vec_pretty(&ledger)
         .map_err(|error| Error::typed("concord.activity.encode", error.to_string()))?;
     at(&path).write(&encoded, 0o600)?;
-    Ok(Activity {
+    let activity = Activity {
         task: identity,
         current,
         recent,
         window: WINDOW,
-    })
+    };
+    FileExt::unlock(&guard).map_err(|error| {
+        Error::typed(
+            "concord.activity.unlock",
+            format!("cannot release Task activity ledger: {error}"),
+        )
+    })?;
+    Ok(activity)
 }
 
 fn guard(root: &Path, key: i64) -> Result<File> {
