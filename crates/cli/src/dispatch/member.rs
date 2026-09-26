@@ -181,6 +181,7 @@ async fn status(
     let observed = if observation.observe {
         Some(
             provider::observe(
+                provider::Projection::Member,
                 status.reference.as_ref(),
                 observation.command.as_deref(),
                 observation.timeout,
