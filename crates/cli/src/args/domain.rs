@@ -27,6 +27,8 @@ pub enum Repository {
     List {
         #[arg(long)]
         domain: Option<String>,
+        #[arg(long)]
+        retired: bool,
     },
     #[command(about = "Create or replace one Repository annotation")]
     Annotate {
@@ -36,6 +38,17 @@ pub enum Repository {
         note: Option<String>,
         #[arg(long)]
         revision: i64,
+    },
+    #[command(about = "Retire one Repository annotation while retaining its lineage")]
+    Retire {
+        domain: String,
+        name: String,
+        #[arg(long)]
+        revision: i64,
+        #[arg(long)]
+        reason: String,
+        #[arg(long)]
+        apply: bool,
     },
 }
 
@@ -55,6 +68,7 @@ impl Repository {
         match self {
             Self::List { .. } => "domain.repository.list",
             Self::Annotate { .. } => "domain.repository.annotate",
+            Self::Retire { .. } => "domain.repository.retire",
         }
     }
 }
