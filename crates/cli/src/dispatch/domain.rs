@@ -1,6 +1,6 @@
-use super::emit;
+use super::{emit, explicit};
 use crate::args::domain::{Command, Repository as Action};
-use concord_core::{Annotate, Estate, Result};
+use concord_core::{Annotate, Estate, Result, Retire};
 use serde_json::json;
 
 pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> {
@@ -17,8 +17,8 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
 
 async fn repository(estate: &Estate, command: Action, output: bool) -> Result<()> {
     match command {
-        Action::List { domain } => emit(
-            json!({"repositories": estate.repositories(domain.as_deref()).await?}),
+        Action::List { domain, retired } => emit(
+            json!({"repositories": estate.repositories(domain.as_deref(), retired).await?}),
             output,
         ),
         Action::Annotate {
@@ -32,6 +32,27 @@ async fn repository(estate: &Estate, command: Action, output: bool) -> Result<()
                     domain,
                     name,
                     note,
+                    revision,
+                })
+                .await?;
+            emit(
+                json!({"repository": repository, "revision": revision}),
+                output,
+            )
+        }
+        Action::Retire {
+            domain,
+            name,
+            revision,
+            reason,
+            apply,
+        } => {
+            explicit(apply, "domain repository retire")?;
+            let (repository, revision) = estate
+                .tombstone(&Retire {
+                    domain,
+                    name,
+                    reason,
                     revision,
                 })
                 .await?;

@@ -30,7 +30,7 @@ pub use data::{
     Current, Cut, Degree, Edge, Edit, Entry, Fact, Finish, Flow, Graph, Life, Link, Node, Origin,
     Part, Patch, Phase, Realm, Role, Settle, Settlement, Tune, Weight,
 };
-pub use task::{Annotate, Rehome, Rename, Repository};
+pub use task::{Annotate, Rehome, Rename, Repository, Retire};
 pub use work::{
     Artifact, Attach, BoundaryState, CheckoutState, ClaimOverlap, Claiming, Import,
     IntegrationState, MemberChange, MemberStatus, Narrowing, Proof, Proving, Release, Removal,
@@ -180,6 +180,6 @@ fn fault(error: keel::adapt::Error) -> Error {
 fn upgrade(error: keel::adapt::Error) -> Error {
     Error::typed(
         "concord.estate.upgrade_required",
-        format!("{error}; follow the exact v0.11.0 release migration contract"),
+        format!("{error}; follow the exact migration contract for the target Concord release"),
     )
 }

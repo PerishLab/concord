@@ -152,6 +152,90 @@ fn exit() {
     assert_eq!(retired["revision"], 5);
 }
 
+#[test]
+fn repository() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    success(fixture.path(), &["domain", "bootstrap", "local"]);
+    let annotated = success(
+        fixture.path(),
+        &[
+            "domain",
+            "repository",
+            "annotate",
+            "local",
+            "legacy",
+            "--note",
+            "RETIRED",
+            "--revision",
+            "0",
+        ],
+    );
+    assert_eq!(annotated["revision"], 1);
+    let refused = raw(
+        fixture.path(),
+        &[
+            "domain",
+            "repository",
+            "retire",
+            "local",
+            "legacy",
+            "--reason",
+            "product was deleted",
+            "--revision",
+            "1",
+        ],
+    );
+    assert!(!refused.status.success());
+    assert!(
+        String::from_utf8_lossy(&refused.stderr).contains("concord.apply.required"),
+        "{}",
+        String::from_utf8_lossy(&refused.stderr)
+    );
+    let active = success(
+        fixture.path(),
+        &["domain", "repository", "list", "--domain", "local"],
+    );
+    assert_eq!(active["repositories"][0]["name"], "legacy");
+    let retired = success(
+        fixture.path(),
+        &[
+            "domain",
+            "repository",
+            "retire",
+            "local",
+            "legacy",
+            "--reason",
+            "product was deleted",
+            "--revision",
+            "1",
+            "--apply",
+        ],
+    );
+    assert_eq!(retired["revision"], 2);
+    assert_eq!(retired["repository"]["life"], "retired");
+    assert_eq!(
+        success(
+            fixture.path(),
+            &["domain", "repository", "list", "--domain", "local"],
+        )["repositories"],
+        json!([])
+    );
+    let retained = success(
+        fixture.path(),
+        &[
+            "domain",
+            "repository",
+            "list",
+            "--domain",
+            "local",
+            "--retired",
+        ],
+    );
+    assert_eq!(retained["repositories"][0]["name"], "legacy");
+    assert_eq!(retained["repositories"][0]["life"], "retired");
+    assert_eq!(retained["repositories"][0]["reason"], "product was deleted");
+}
+
 fn success(space: &Path, arguments: &[&str]) -> Value {
     let output = raw(space, arguments);
     assert!(

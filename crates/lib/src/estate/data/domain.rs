@@ -1,9 +1,10 @@
-use super::super::{Estate, World, fault};
+use super::super::{Estate, Life, World, fault};
 use crate::component;
 use crate::{Error, Result};
 use keel::Tx;
 use keel::adapt::db::Sqlite;
 use serde::Serialize;
+use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Repository {
@@ -11,6 +12,8 @@ pub struct Repository {
     pub domain: String,
     pub name: String,
     pub note: Option<String>,
+    pub life: Life,
+    pub reason: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -21,13 +24,36 @@ pub struct Annotate {
     pub revision: i64,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Retire {
+    pub domain: String,
+    pub name: String,
+    pub reason: String,
+    pub revision: i64,
+}
+
 impl Estate {
-    pub async fn repositories(&self, domain: Option<&str>) -> Result<Vec<Repository>> {
+    pub async fn repositories(
+        &self,
+        domain: Option<&str>,
+        retired: bool,
+    ) -> Result<Vec<Repository>> {
         let world = World::load(self).await?;
         if let Some(domain) = domain
             && world.domain(domain).is_none()
         {
             return Err(world.absent(domain));
+        }
+        let mut reasons = BTreeMap::new();
+        for row in self.core.live("Tombstone").await.map_err(fault)? {
+            let repository = row.int("repository").ok_or_else(|| malformed(row.key()))?;
+            let reason = row
+                .text("reason")
+                .ok_or_else(|| malformed(row.key()))?
+                .to_string();
+            if reasons.insert(repository, reason).is_some() {
+                return Err(malformed(row.key()));
+            }
         }
         let mut found = Vec::new();
         for row in self.core.live("Repository").await.map_err(fault)? {
@@ -36,7 +62,16 @@ impl Estate {
                 .domains
                 .get(&root)
                 .ok_or_else(|| malformed(row.key()))?;
+            let reason = reasons.remove(&row.key());
+            let life = if reason.is_some() {
+                Life::Retired
+            } else {
+                Life::Active
+            };
             if domain.is_some_and(|wanted| wanted != realm.name) {
+                continue;
+            }
+            if !retired && life == Life::Retired {
                 continue;
             }
             found.push(Repository {
@@ -47,7 +82,15 @@ impl Estate {
                     .ok_or_else(|| malformed(row.key()))?
                     .to_string(),
                 note: row.text("note").map(str::to_string),
+                life,
+                reason,
             });
+        }
+        if !reasons.is_empty() {
+            return Err(Error::typed(
+                "concord.repository.retirement",
+                "Repository retirement references an unknown Repository",
+            ));
         }
         found.sort_by_key(|repo| (repo.domain.clone(), repo.name.clone(), repo.key));
         Ok(found)
@@ -86,10 +129,22 @@ impl Estate {
             ));
         }
         let current = self
-            .repositories(Some(&request.domain))
+            .repositories(Some(&request.domain), true)
             .await?
             .into_iter()
             .find(|repo| repo.name == request.name);
+        if current
+            .as_ref()
+            .is_some_and(|repository| repository.life == Life::Retired)
+        {
+            return Err(Error::typed(
+                "concord.repository.retired",
+                format!(
+                    "Repository annotation is already retired: {}/{}",
+                    request.domain, request.name
+                ),
+            ));
+        }
         let revision = realm.revision + 1;
         let next = revision.to_string();
         let key = self
@@ -108,9 +163,83 @@ impl Estate {
                 domain: request.domain.clone(),
                 name: request.name.clone(),
                 note: request.note.clone(),
+                life: Life::Active,
+                reason: None,
             },
             revision,
         ))
+    }
+
+    pub async fn tombstone(&self, request: &Retire) -> Result<(Repository, i64)> {
+        component("domain name", &request.domain)?;
+        component("repository name", &request.name)?;
+        if request.reason.trim().is_empty() {
+            return Err(Error::typed(
+                "concord.repository.reason",
+                "Repository retirement reason cannot be blank",
+            ));
+        }
+        let _guard = self.guard()?;
+        self.ensure().await?;
+        let world = World::load(self).await?;
+        let domain = world
+            .domain(&request.domain)
+            .ok_or_else(|| world.absent(&request.domain))?;
+        let realm = &world.domains[&domain];
+        if realm.revision != request.revision {
+            return Err(Error::typed(
+                "concord.domain.stale",
+                format!(
+                    "Domain revision changed: expected {}, found {}",
+                    request.revision, realm.revision,
+                ),
+            ));
+        }
+        let mut repository = self
+            .repositories(Some(&request.domain), true)
+            .await?
+            .into_iter()
+            .find(|repository| repository.name == request.name)
+            .ok_or_else(|| {
+                Error::typed(
+                    "concord.repository.absent",
+                    format!(
+                        "Repository annotation not found: {}/{}",
+                        request.domain, request.name
+                    ),
+                )
+            })?;
+        if repository.life == Life::Retired {
+            return Err(Error::typed(
+                "concord.repository.retired",
+                format!(
+                    "Repository annotation is already retired: {}/{}",
+                    request.domain, request.name
+                ),
+            ));
+        }
+        let revision = realm.revision + 1;
+        let next = revision.to_string();
+        let key = repository.key.to_string();
+        self.core
+            .batch(async |tx| {
+                tx.put(
+                    "Tombstone",
+                    &[
+                        ("reason", request.reason.as_str()),
+                        ("repository", key.as_str()),
+                    ],
+                )
+                .await?;
+                tx.set("Domain", domain, &[("revision", next.as_str())])
+                    .await?;
+                Ok(())
+            })
+            .await
+            .map_err(fault)?;
+        repository.life = Life::Retired;
+        repository.reason = Some(request.reason.clone());
+        Ok((repository, revision))
     }
 }
 

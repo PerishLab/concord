@@ -10,7 +10,7 @@ mod coordinate;
 mod domain;
 
 pub use coordinate::{Rehome, Rename};
-pub use domain::{Annotate, Repository};
+pub use domain::{Annotate, Repository, Retire};
 
 impl Estate {
     pub async fn realms(&self) -> Result<Vec<Realm>> {
