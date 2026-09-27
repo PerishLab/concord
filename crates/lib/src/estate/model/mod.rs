@@ -5,10 +5,10 @@ mod current;
 mod dependency;
 mod domain;
 mod member;
+pub mod migration;
 mod phase;
 mod reference;
 mod repository;
-mod reservation;
 
 #[resource]
 pub(super) struct Space {
@@ -42,8 +42,24 @@ pub(super) struct Task {
     depends: Task,
 }
 
+#[resource]
+pub(super) struct Reservation {
+    #[field(string, unique = domain)]
+    name: string,
+    #[relation(Domain, many2one, root)]
+    domain: Domain,
+}
+
 pub(super) fn graph() -> Graph {
     assemble(true, true)
+}
+
+pub(super) fn bridge() -> Graph {
+    assemble(true, false)
+}
+
+pub(super) fn legacy() -> Graph {
+    assemble(false, false)
 }
 
 fn assemble(tombstone: bool, references: bool) -> Graph {
@@ -52,7 +68,7 @@ fn assemble(tombstone: bool, references: bool) -> Graph {
         .plug::<Space>()
         .plug::<Domain>()
         .plug::<Task>()
-        .plug::<reservation::Reservation>()
+        .plug::<Reservation>()
         .plug::<domain::Addition>()
         .plug::<repository::Repository>();
     if tombstone {
@@ -87,7 +103,7 @@ fn assemble(tombstone: bool, references: bool) -> Graph {
 
 #[cfg(test)]
 mod tests {
-    use super::{assemble, graph};
+    use super::{bridge, graph, legacy};
     use keel::adapt::db::Sqlite;
     use std::time::Duration;
 
@@ -96,7 +112,7 @@ mod tests {
         let temp = tempfile::tempdir().expect("temporary estate");
         let database = temp.path().join("estate.sqlite3");
         let wire = Sqlite::file(&database).await.expect("legacy database");
-        let mut legacy = keel::bootstrap(assemble(false, false), wire).expect("legacy graph");
+        let mut legacy = keel::bootstrap(legacy(), wire).expect("legacy graph");
         let sudo = legacy.mint().await.expect("legacy sudo");
         let core = legacy.seal(&sudo).await.expect("legacy estate");
         let space = core
@@ -129,7 +145,7 @@ mod tests {
 
         align();
         let wire = Sqlite::file(&database).await.expect("tombstone migration");
-        let core = keel::bind(assemble(true, false), wire)
+        let core = keel::bind(bridge(), wire)
             .await
             .expect("explicit tombstone migration");
         assert!(core.live("Tombstone").await.expect("Tombstones").is_empty());

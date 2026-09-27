@@ -32,6 +32,7 @@ pub use data::{
     Current, Cut, Degree, Edge, Edit, Entry, Fact, Finish, Flow, Graph, Life, Link, Node, Origin,
     Part, Patch, Phase, Realm, Role, Settle, Settlement, Tune, Weight,
 };
+pub use model::migration;
 pub use reference::{ForgeDeclaration, ForgeWithdrawal, Reference, ReferenceKind};
 pub use task::{Annotate, Rehome, Rename, Repository, Retire};
 pub use work::landing;
