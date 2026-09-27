@@ -35,6 +35,10 @@ Ask the owning surface instead of copying its answer here.
 - Optional Locus facts and the private activity ledger are observations only.
   They never establish authorship, ownership, presence, authorization, or
   lifecycle state and never replace a command result.
+- Issue briefs, relationship graphs and closure readiness are bounded live
+  GitHub projections. They retain exact provider cursors and observation time,
+  distinguish structural parentage from blocking, never cache lifecycle state,
+  and report provider failure or truncation rather than treating it as absence.
 - Occupancy records only successful writes, expires without asserting session
   death, and warns on intersecting Issue, Member, or normalized repository
   write surfaces. It is never a lock or an authorization source.

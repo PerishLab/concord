@@ -1,5 +1,5 @@
 use super::super::{emit, input};
-use super::observe;
+use super::{observe, projection};
 use crate::args::issue::Command;
 use concord_core::{Admission, Anchor, Coordinate, Error, Estate, Reconcile, Result};
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,59 @@ struct Plan {
 
 pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> {
     match command {
+        Command::Brief {
+            issue,
+            command,
+            page_size,
+            sub_issues_after,
+            blocked_by_after,
+            blocking_after,
+            pulls_after,
+            timeout,
+        } => {
+            let coordinate = Coordinate::parse(&issue)?;
+            let brief = projection::Projection::new(&command, page_size, 1, timeout)
+                .brief(
+                    &coordinate,
+                    projection::PageRequest {
+                        size: page_size,
+                        sub_issues_after,
+                        blocked_by_after,
+                        blocking_after,
+                        pulls_after,
+                        comments_after: None,
+                    },
+                )
+                .await?;
+            emit(json!({"brief": brief}), output)
+        }
+        Command::Graph {
+            issue,
+            command,
+            page_size,
+            max_nodes,
+            max_pages,
+            timeout,
+        } => {
+            let coordinate = Coordinate::parse(&issue)?;
+            let graph = projection::Projection::new(&command, page_size, max_pages, timeout)
+                .graph(&coordinate, max_nodes)
+                .await;
+            emit(json!({"graph": graph}), output)
+        }
+        Command::Ready {
+            issue,
+            command,
+            page_size,
+            max_pages,
+            timeout,
+        } => {
+            let coordinate = Coordinate::parse(&issue)?;
+            let readiness = projection::Projection::new(&command, page_size, max_pages, timeout)
+                .ready(&coordinate)
+                .await?;
+            emit(json!({"readiness": readiness}), output)
+        }
         Command::Attach {
             issue,
             command,
