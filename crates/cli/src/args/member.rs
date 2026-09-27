@@ -61,6 +61,11 @@ pub enum Command {
         #[arg(long)]
         revision: i64,
     },
+    #[command(about = "Prepare or revalidate one exact local Member landing")]
+    Landing {
+        #[command(subcommand)]
+        command: Landing,
+    },
     #[command(about = "Manage the declared pull or change coordinate")]
     Reference {
         #[command(subcommand)]
@@ -85,6 +90,36 @@ pub enum Command {
         revision: i64,
         #[arg(long)]
         apply: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum Landing {
+    #[command(about = "Prepare an exact local landing plan")]
+    Prepare {
+        task: String,
+        member: String,
+        #[arg(long, default_value = "main")]
+        base: String,
+        #[arg(long, default_value = "")]
+        title: String,
+        #[arg(long, default_value = "")]
+        body: String,
+        #[arg(long)]
+        guard_schema: String,
+        #[arg(long)]
+        guard_tree: String,
+        #[arg(long)]
+        guard_digest: String,
+        #[arg(long)]
+        revision: i64,
+    },
+    #[command(about = "Revalidate an exact local landing plan")]
+    Ready {
+        task: String,
+        member: String,
+        #[arg(long, default_value = "-")]
+        plan: PathBuf,
     },
 }
 
@@ -125,6 +160,7 @@ impl Command {
             Self::Claim { .. } => "member.claim",
             Self::Narrow { .. } => "member.narrow",
             Self::Prove { .. } => "member.prove",
+            Self::Landing { command } => command.name(),
             Self::Reference { command } => command.name(),
             Self::Release { .. } => "member.release",
             Self::Retire { .. } => "member.retire",
@@ -139,9 +175,25 @@ impl Command {
             Self::Claim { task, .. } => Some(vec![task]),
             Self::Narrow { task, .. } => Some(vec![task]),
             Self::Prove { task, .. } => Some(vec![task]),
+            Self::Landing { command } => Some(vec![command.task()]),
             Self::Reference { command } => Some(command.activity()),
             Self::Release { task, .. } => Some(vec![task]),
             Self::Retire { task, .. } => Some(vec![task]),
+        }
+    }
+}
+
+impl Landing {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Prepare { .. } => "member.landing.prepare",
+            Self::Ready { .. } => "member.landing.ready",
+        }
+    }
+
+    fn task(&self) -> &str {
+        match self {
+            Self::Prepare { task, .. } | Self::Ready { task, .. } => task,
         }
     }
 }

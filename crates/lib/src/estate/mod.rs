@@ -34,6 +34,7 @@ pub use data::{
 };
 pub use reference::{ForgeDeclaration, ForgeWithdrawal, Reference, ReferenceKind};
 pub use task::{Annotate, Rehome, Rename, Repository, Retire};
+pub use work::landing;
 pub use work::{
     Artifact, Attach, BoundaryState, CheckoutState, ClaimOverlap, Claiming, Import,
     IntegrationState, MemberChange, MemberStatus, Narrowing, Proof, Proving, Release, Removal,
