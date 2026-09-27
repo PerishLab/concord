@@ -11,6 +11,11 @@ allow = ["word"]
 note = "the GitHub GraphQL adapter preserves the provider wire dialect"
 paths = ["crates/cli/src/dispatch/forge/github.rs"]
 
+[[boundary]]
+allow = ["path"]
+note = "the exact v0.13 transition protocol stays decomposed beneath the release migration family"
+paths = ["crates/lib/src/estate/model/migration/transition/**"]
+
 [comment]
 allow = false
 
@@ -543,3 +548,31 @@ name = "max_nodes"
 [[vocabulary.term]]
 description = "The exact Issue-and-Member delivery plan composed by Concord over Plumb's delivery kernel."
 name = "issue_delivery"
+
+[[vocabulary.term]]
+description = "The number of frozen Phase entries retained beneath one Task or across one transition inventory."
+name = "phase_entries"
+
+[[vocabulary.term]]
+description = "The canonical integration-checkout path observed for one legacy Member."
+name = "source_path"
+
+[[vocabulary.term]]
+description = "The canonical Git common-directory identity observed for one legacy Member source."
+name = "source_identity"
+
+[[vocabulary.term]]
+description = "The number of active Tasks represented by one v0.13 transition inventory."
+name = "active_tasks"
+
+[[vocabulary.term]]
+description = "The number of retired Tasks represented by one v0.13 transition inventory."
+name = "retired_tasks"
+
+[[vocabulary.term]]
+description = "The number of explicit Member and Artifact seats represented by one transition inventory."
+name = "filesystem_seats"
+
+[[vocabulary.term]]
+description = "The exact v0.13 dependency-graph revision bound into one transition inventory."
+name = "graph_revision"

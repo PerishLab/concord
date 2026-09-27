@@ -35,6 +35,7 @@ pub use data::{
 pub use forge::{Admission, Anchor, Coordinate, Reconcile};
 pub use forge::{ForgeDeclaration, ForgeWithdrawal, Reference, ReferenceKind};
 pub use model::migration;
+pub use model::migration::transition;
 pub use task::{Annotate, Rehome, Rename, Repository, Retire};
 pub use work::{
     Artifact, Attach, BoundaryState, CheckoutState, ClaimOverlap, Claiming, Import,
