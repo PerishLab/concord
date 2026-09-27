@@ -24,7 +24,7 @@ fn cycle() {
     let fixture = tempfile::tempdir().expect("fixture");
     let root = fixture.path();
     super::success(root, &["domain", "bootstrap", "local"]);
-    super::success(root, &["task", "start", "local", "work"]);
+    super::success(root, &["task", "start", "local", "work", "--legacy"]);
     let source = root.join("source");
     let remote = root.join("remote.git");
     std::fs::create_dir(&source).expect("source");

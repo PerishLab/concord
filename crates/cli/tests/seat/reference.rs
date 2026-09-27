@@ -4,7 +4,10 @@ use super::{git, human, raw, success};
 fn declared() {
     let fixture = tempfile::tempdir().expect("fixture");
     success(fixture.path(), &["domain", "bootstrap", "local"]);
-    success(fixture.path(), &["task", "start", "local", "alpha"]);
+    success(
+        fixture.path(),
+        &["task", "start", "local", "alpha", "--legacy"],
+    );
 
     let set = success(
         fixture.path(),

@@ -1,9 +1,10 @@
 # Agents
 
-Concord is the executable control plane for one managed Space. One exact Keel
-estate is the sole authority for structured Domain, Task, Phase, dependency,
-Member, Claim, Boundary, and Artifact state. Git worktrees and Artifact
-directories remain external payload and must agree with that estate.
+Concord is the executable control plane for one managed Space. GitHub Issues
+are the durable work ledger. One exact Keel estate is the sole authority for
+Issue-anchored local execution state; Git worktrees and Artifact directories
+remain external payload and must agree with that estate. Task narrative state
+is migration-only and must not be created for new work.
 
 Four surfaces answer different questions. The source says what Concord does,
 `--help` says how to invoke it, the Concord skill says how to operate its
@@ -12,8 +13,12 @@ Ask the owning surface instead of copying its answer here.
 
 ## Authority
 
-- Ordinary open replays the exact sealed estate model. It never evolves or
-  repairs managed state; only an explicit release migration may change a model.
+- Ordinary open replays either the exact Issue-anchor model or the exact
+  released v0.13 model. It never evolves or repairs managed state; a v0.13
+  estate cannot create Issue anchors until an explicit transition changes it.
+- An Issue anchor retains only stable GitHub node identity, the minimum
+  coordinate needed to observe it again, and a local execution revision. Forge
+  prose, state, type, comments, and relationships remain GitHub truth.
 - Git owns Member payload. Concord owns the Member seat and verifies source
   identity, branch, registered worktree, and derived path agreement.
 - A Claim is a normalized declaration used for coordination and one Member's

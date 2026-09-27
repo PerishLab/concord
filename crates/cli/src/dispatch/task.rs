@@ -1,6 +1,6 @@
 use super::activity;
+use super::forge::provider;
 use super::occupancy;
-use super::provider;
 use super::{emit, explicit};
 use crate::args::Observe;
 use crate::args::task::{Command, Dependency, Reference};
@@ -32,7 +32,11 @@ pub async fn run(
         }
         Command::Brief { domain, after } => brief(estate, &domain, after.as_deref(), output).await,
         Command::Show { task, observation } => show(estate, &task, observation, output).await,
-        Command::Start { domain, name } => {
+        Command::Start {
+            domain,
+            name,
+            legacy: _,
+        } => {
             let task = estate.start(&domain, &name).await?;
             signals
                 .activity

@@ -1,3 +1,5 @@
+#[path = "seat/issue.rs"]
+mod issue;
 #[path = "seat/landing.rs"]
 mod landing;
 #[path = "seat/migration.rs"]
@@ -19,7 +21,10 @@ fn estate() {
     let fixture = tempfile::tempdir().expect("fixture");
     success(fixture.path(), &["domain", "bootstrap", "local"]);
     success(fixture.path(), &["domain", "add", "other"]);
-    let alpha = success(fixture.path(), &["task", "start", "local", "alpha"]);
+    let alpha = success(
+        fixture.path(),
+        &["task", "start", "local", "alpha", "--legacy"],
+    );
     assert_eq!(alpha["task"]["revision"], 0);
 
     let current = pipe(

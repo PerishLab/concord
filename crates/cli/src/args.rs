@@ -2,6 +2,7 @@ pub(crate) mod artifact;
 pub(crate) mod audit;
 pub(crate) mod domain;
 pub(crate) mod graph;
+pub(crate) mod issue;
 pub(crate) mod member;
 pub(crate) mod migration;
 pub(crate) mod phase;
@@ -15,6 +16,7 @@ pub use artifact::Args as Artifact;
 pub use audit::Args as Audit;
 pub use domain::Args as Domain;
 pub use graph::Args as Graph;
+pub use issue::Args as Issue;
 pub use member::Args as Member;
 pub use migration::Args as Migration;
 pub use phase::Args as Phase;
@@ -60,6 +62,8 @@ pub enum Command {
     Domain(Domain),
     #[command(about = "Manage Task lifecycle, facts, and dependencies")]
     Task(Task),
+    #[command(about = "Anchor local execution to typed GitHub Issues")]
+    Issue(Issue),
     #[command(about = "Settle and read frozen Task Phases")]
     Phase(Phase),
     #[command(about = "Manage repository worktree Members")]
@@ -82,6 +86,7 @@ impl Command {
             Self::Config(args) => args.command.name(),
             Self::Domain(args) => args.command.name(),
             Self::Task(args) => args.command.name(),
+            Self::Issue(args) => args.command.name(),
             Self::Phase(args) => args.command.name(),
             Self::Member(args) => args.command.name(),
             Self::Artifact(args) => args.command.name(),
@@ -95,6 +100,7 @@ impl Command {
     pub(crate) fn activity(&self) -> Option<Vec<&str>> {
         match self {
             Self::Task(args) => args.command.activity(),
+            Self::Issue(_) => None,
             Self::Phase(args) => args.command.activity(),
             Self::Member(args) => args.command.activity(),
             Self::Artifact(args) => Some(args.command.activity()),
