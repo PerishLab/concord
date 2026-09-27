@@ -13,9 +13,12 @@ pub enum Command {
     List {
         #[arg(long)]
         task: Option<String>,
+        #[arg(long, conflicts_with = "task")]
+        issue: Option<String>,
     },
     #[command(about = "Inspect one Member's current local Git health")]
     Status {
+        #[arg(value_name = "ISSUE|TASK")]
         task: String,
         member: String,
         #[command(flatten)]
@@ -23,6 +26,7 @@ pub enum Command {
     },
     #[command(about = "Create and attach a Git worktree Member")]
     Attach {
+        #[arg(value_name = "ISSUE|TASK")]
         task: String,
         name: String,
         #[arg(long)]
@@ -36,6 +40,7 @@ pub enum Command {
     },
     #[command(about = "Expand one Member claim")]
     Claim {
+        #[arg(value_name = "ISSUE|TASK")]
         task: String,
         member: String,
         #[arg(long, required = true, num_args = 1..)]
@@ -45,6 +50,7 @@ pub enum Command {
     },
     #[command(about = "Shrink one Member claim to an explicit set")]
     Narrow {
+        #[arg(value_name = "ISSUE|TASK")]
         task: String,
         member: String,
         #[arg(long, required = true, num_args = 1..)]
@@ -56,6 +62,7 @@ pub enum Command {
     },
     #[command(about = "Create a current Plumb Boundary proof")]
     Prove {
+        #[arg(value_name = "ISSUE|TASK")]
         task: String,
         member: String,
         #[arg(long)]
@@ -73,6 +80,7 @@ pub enum Command {
     },
     #[command(about = "Remove one clean and landed Member")]
     Release {
+        #[arg(value_name = "ISSUE|TASK")]
         task: String,
         member: String,
         #[arg(long)]
@@ -82,6 +90,7 @@ pub enum Command {
     },
     #[command(about = "Remove one clean unlanded Member against matching Artifacts")]
     Retire {
+        #[arg(value_name = "ISSUE|TASK")]
         task: String,
         member: String,
         #[arg(long, required = true, num_args = 1..)]
@@ -97,6 +106,7 @@ pub enum Command {
 pub enum Landing {
     #[command(about = "Prepare an exact local landing plan")]
     Prepare {
+        #[arg(value_name = "ISSUE|TASK")]
         task: String,
         member: String,
         #[arg(long, default_value = "main")]
@@ -116,6 +126,7 @@ pub enum Landing {
     },
     #[command(about = "Revalidate an exact local landing plan")]
     Ready {
+        #[arg(value_name = "ISSUE|TASK")]
         task: String,
         member: String,
         #[arg(long, default_value = "-")]
@@ -127,6 +138,7 @@ pub enum Landing {
 pub enum Reference {
     #[command(about = "Declare or replace the Member forge coordinate")]
     Set {
+        #[arg(value_name = "ISSUE|TASK")]
         task: String,
         member: String,
         #[arg(long)]
@@ -142,8 +154,15 @@ pub enum Reference {
     },
     #[command(about = "Remove the Member forge coordinate")]
     Remove {
+        #[arg(value_name = "ISSUE|TASK")]
         task: String,
         member: String,
+        #[arg(long)]
+        owner: Option<String>,
+        #[arg(long)]
+        repository: Option<String>,
+        #[arg(long)]
+        number: Option<i64>,
         #[arg(long)]
         revision: i64,
         #[arg(long)]
@@ -169,7 +188,7 @@ impl Command {
 
     pub(crate) fn activity(&self) -> Option<Vec<&str>> {
         match self {
-            Self::List { task } => task.as_deref().map(|task| vec![task]),
+            Self::List { issue, .. } => issue.as_deref().map(|issue| vec![issue]),
             Self::Status { task, .. } => Some(vec![task]),
             Self::Attach { task, .. } => Some(vec![task]),
             Self::Claim { task, .. } => Some(vec![task]),

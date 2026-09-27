@@ -16,6 +16,9 @@ pub enum Subject {
     Task { task: String },
     Member { task: String, member: String },
     Graph { task: String },
+    Issue { node: String },
+    IssueMember { node: String, member: String },
+    Surface { repository: String, path: String },
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -138,10 +141,40 @@ fn normalized(subjects: &[Subject]) -> Vec<Subject> {
 }
 
 fn intersections(left: &[Subject], right: &[Subject]) -> Vec<Subject> {
-    left.iter()
-        .filter(|subject| right.contains(subject))
-        .cloned()
-        .collect()
+    let mut found = Vec::new();
+    for left in left {
+        for right in right {
+            let overlap = match (left, right) {
+                (
+                    Subject::Surface {
+                        repository: one,
+                        path: left,
+                    },
+                    Subject::Surface {
+                        repository: two,
+                        path: right,
+                    },
+                ) if one == two => crate::claim::intersections(
+                    std::slice::from_ref(left),
+                    std::slice::from_ref(right),
+                )
+                .into_iter()
+                .next()
+                .map(|path| Subject::Surface {
+                    repository: one.clone(),
+                    path,
+                }),
+                _ if left == right => Some(left.clone()),
+                _ => None,
+            };
+            if let Some(overlap) = overlap {
+                found.push(overlap);
+            }
+        }
+    }
+    found.sort();
+    found.dedup();
+    found
 }
 
 fn validate(operator: &Operator, operation: &str, subjects: &[Subject]) -> Result<()> {
@@ -201,4 +234,22 @@ fn read(path: &Path) -> Result<Ledger> {
         ));
     }
     Ok(ledger)
+}
+
+pub(crate) fn readable(space: &Path) -> Result<()> {
+    let path = space.join(".concord/occupancy/ledger.json");
+    let ledger = read(&path)?;
+    for holder in &ledger.holders {
+        validate(&holder.operator(), &holder.operation, &holder.subjects)?;
+    }
+    Ok(())
+}
+
+impl Holder {
+    fn operator(&self) -> Operator {
+        Operator {
+            agent: self.agent,
+            session: self.session.clone(),
+        }
+    }
 }
