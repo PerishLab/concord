@@ -310,7 +310,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -893,9 +893,9 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
 name = "plumb"
-version = "0.38.4"
+version = "0.50.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "6eef5c876dfad5c781f937857d3213fa6be171e742fe9b6d867b1d836cfa8028"
+checksum = "b53922b06ad992c3eded980f39fedc8447ae2911d1a536dba64de8f27c83ba66"
 dependencies = [
  "base64",
  "clap",
@@ -911,17 +911,19 @@ dependencies = [
  "tempfile",
  "toml",
  "ureq",
+ "which",
 ]
 
 [[package]]
 name = "plumb-macro"
-version = "0.38.4"
+version = "0.50.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "9b400dc0c2f99046c80d21bfeb725031d2b4e67d3e6973e71fd5cd02ccb44c30"
+checksum = "2cabcc06bbd716735ba70c06d8283a40a917254287af69ce42b1173ed6ee482f"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+ "toml",
 ]
 
 [[package]]
@@ -1015,7 +1017,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1357,7 +1359,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1622,6 +1624,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7dcd9d09a39985f5344844e66b0c530a33843579125f23e21e9f0f220850f22a"
 dependencies = [
  "rustls-pki-types",
+]
+
+[[package]]
+name = "which"
+version = "8.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bae2f2b2b816647a1cab1acc91f5bd20812d53cb344382635ec2181940c8034f"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

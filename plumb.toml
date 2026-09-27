@@ -6,16 +6,6 @@ anchor = ["Cargo.toml"]
 note = "The Concord CLI and protocol-kernel Rust workspace members."
 
 [[layout.seat]]
-path = "charts/*"
-kind = "retired"
-note = "This product ships no Helm chart; the tombstone keeps the domain seat absent."
-
-[[layout.seat]]
-path = "skills/*"
-kind = "retired"
-note = "Concord carries no skill source; its generations are consumed from Depot through `concord skill`."
-
-[[layout.seat]]
 path = ".cargo"
 note = "Cargo registry configuration."
 
@@ -35,6 +25,7 @@ note = "Rust workspace anchors and the toolchain the distribution hub builds wit
 product = "concord"
 authority = "https://releases.concord.perish.uk"
 binaries = ["concord"]
+skill = true
 targets = [
   "x86_64-unknown-linux-gnu",
   "aarch64-apple-darwin",
