@@ -2,7 +2,7 @@ use crate::path::at;
 use crate::{Error, Result};
 use std::path::Path;
 
-pub(super) fn tree(source: &Path, target: &Path) -> Result<()> {
+pub(in crate::estate::work) fn tree(source: &Path, target: &Path) -> Result<()> {
     for entry in std::fs::read_dir(source)? {
         let entry = entry?;
         let kind = entry.file_type()?;
@@ -28,7 +28,7 @@ pub(super) fn tree(source: &Path, target: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn file(source: &Path, target: &Path) -> Result<()> {
+pub(in crate::estate::work) fn file(source: &Path, target: &Path) -> Result<()> {
     at(target).copy(source, if executable(source)? { 0o700 } else { 0o600 })
 }
 

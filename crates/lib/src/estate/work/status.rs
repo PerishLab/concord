@@ -97,7 +97,7 @@ impl Estate {
     }
 }
 
-fn checkout(path: &std::path::Path) -> Result<CheckoutState> {
+pub(super) fn checkout(path: &std::path::Path) -> Result<CheckoutState> {
     let held = git::at(path);
     let head = held.head()?;
     let (tracked_changes, untracked_files) = held.changes()?;
@@ -131,7 +131,7 @@ fn current(proof: &super::Proof, member: &Worktree, head: &str) -> bool {
     proof.claim == crate::claim::digest(&member.claims)
 }
 
-fn integration(
+pub(super) fn integration(
     path: &std::path::Path,
     source: &std::path::Path,
     member: &CheckoutState,
@@ -148,7 +148,7 @@ fn integration(
     Ok(IntegrationState::Unlanded)
 }
 
-fn upstream(path: &std::path::Path, branch: &str) -> Result<Option<UpstreamState>> {
+pub(super) fn upstream(path: &std::path::Path, branch: &str) -> Result<Option<UpstreamState>> {
     let held = git::at(path);
     let Some(reference) = held.upstream(branch)? else {
         return Ok(None);

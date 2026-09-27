@@ -30,7 +30,11 @@ struct Measure {
     entries: u64,
 }
 
-pub(super) fn inspect(source: &Path, target: &Path, filesystem: &Path) -> Result<Survey> {
+pub(in crate::estate::work) fn inspect(
+    source: &Path,
+    target: &Path,
+    filesystem: &Path,
+) -> Result<Survey> {
     if std::fs::symlink_metadata(source)
         .map(|metadata| metadata.file_type().is_symlink())
         .unwrap_or(false)

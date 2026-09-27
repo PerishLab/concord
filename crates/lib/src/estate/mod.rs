@@ -18,7 +18,7 @@ mod graph;
 mod model;
 mod phase;
 mod task;
-#[path = "data/territory.rs"]
+#[path = "data/territory/mod.rs"]
 mod territory;
 mod work;
 
@@ -39,14 +39,17 @@ pub use task::{Annotate, Rehome, Rename, Repository, Retire};
 pub use work::landing;
 pub use work::{
     Artifact, Attach, BoundaryState, CheckoutState, ClaimOverlap, Claiming, Import,
-    IntegrationState, MemberChange, MemberStatus, Narrowing, Proof, Proving, Release, Removal,
-    Retirement, Survey, UpstreamState, Worktree,
+    IntegrationState, IssueArtifact, IssueAttach, IssueClaiming, IssueDeclaration, IssueImport,
+    IssueMemberChange, IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval,
+    IssueRetirement, IssueWithdrawal, IssueWorktree, MemberChange, MemberStatus, Narrowing, Proof,
+    Proving, Release, Removal, Retirement, Survey, UpstreamState, Worktree, issue_landing,
 };
 
 pub struct Estate {
     core: Core<Sqlite>,
     space: PathBuf,
     anchors: bool,
+    execution: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -84,6 +87,7 @@ impl Seat {
             core,
             space: self.space.clone(),
             anchors: true,
+            execution: true,
         };
         estate.seed().await?;
         estate.verify().await?;
@@ -102,17 +106,21 @@ impl Seat {
         }
         let sudo = std::fs::read_to_string(self.sudo())?;
         let current = self.bind(model::graph, &sudo).await;
-        let (core, anchors) = match current {
-            Ok(core) => (core, true),
-            Err(primary) => match self.bind(model::released, &sudo).await {
-                Ok(core) => (core, false),
-                Err(_) => return Err(primary),
+        let (core, anchors, execution) = match current {
+            Ok(core) => (core, true, true),
+            Err(primary) => match self.bind(model::anchored, &sudo).await {
+                Ok(core) => (core, true, false),
+                Err(_) => match self.bind(model::released, &sudo).await {
+                    Ok(core) => (core, false, false),
+                    Err(_) => return Err(primary),
+                },
             },
         };
         let estate = Estate {
             core,
             space: self.space.clone(),
             anchors,
+            execution,
         };
         estate.verify().await?;
         Ok(estate)
@@ -154,6 +162,27 @@ impl Estate {
         crate::occupancy::record(&self.space, operator, operation, subjects)
     }
 
+    pub fn write_surfaces(
+        &self,
+        source: &Path,
+        claims: &[String],
+    ) -> Result<Vec<crate::occupancy::Subject>> {
+        let source = source.canonicalize().map_err(|error| {
+            Error::typed(
+                "concord.member.source",
+                format!("cannot resolve source {}: {error}", source.display()),
+            )
+        })?;
+        let repository = crate::git::at(&source).identity()?.display().to_string();
+        Ok(crate::claim::normalize(claims)?
+            .into_iter()
+            .map(|path| crate::occupancy::Subject::Surface {
+                repository: repository.clone(),
+                path,
+            })
+            .collect())
+    }
+
     pub fn touch(
         &self,
         task: &Node,
@@ -161,6 +190,15 @@ impl Estate {
         operation: &str,
     ) -> Result<crate::activity::Activity> {
         crate::activity::record(&self.space, task, operator, operation)
+    }
+
+    pub fn touch_issue(
+        &self,
+        issue: &Anchor,
+        operator: Option<&crate::activity::Operator>,
+        operation: &str,
+    ) -> Result<crate::activity::IssueActivity> {
+        crate::activity::record_issue(&self.space, issue, operator, operation)
     }
 
     fn guard(&self) -> Result<File> {

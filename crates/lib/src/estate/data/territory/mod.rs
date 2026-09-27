@@ -5,10 +5,13 @@ use crate::{PLUMB, Result};
 use std::collections::BTreeSet;
 use std::path::Path;
 
+mod anchor;
+
 pub(super) async fn inspect(plane: &Estate, tasks: &[Node], report: &mut Agreement) -> Result<()> {
     custody(plane, report)?;
     let members = plane.worktrees().await?;
     anchors(plane, report).await?;
+    anchor::inspect(plane, report).await?;
     references(plane, report).await?;
     for task in tasks {
         let identity = task.identity();

@@ -1,4 +1,4 @@
-use crate::estate::Node;
+use crate::estate::{Anchor, Node};
 use crate::path::at;
 use crate::{Error, Result};
 use fs2::FileExt;
@@ -38,6 +38,15 @@ pub struct Touch {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Activity {
     pub task: String,
+    pub current: Touch,
+    pub recent: Vec<Touch>,
+    pub window: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct IssueActivity {
+    pub issue: crate::estate::Coordinate,
+    pub node: String,
     pub current: Touch,
     pub recent: Vec<Touch>,
     pub window: u64,
@@ -90,6 +99,21 @@ pub(crate) fn record(
     operator: Option<&Operator>,
     operation: &str,
 ) -> Result<Activity> {
+    let (current, recent) = persist(space, &task.key.to_string(), operator, operation)?;
+    Ok(Activity {
+        task: task.identity(),
+        current,
+        recent,
+        window: WINDOW,
+    })
+}
+
+fn persist(
+    space: &Path,
+    key: &str,
+    operator: Option<&Operator>,
+    operation: &str,
+) -> Result<(Touch, Vec<Touch>)> {
     validate(operation)?;
     let operator = operator.filter(|operator| operator.valid());
     let time = SystemTime::now()
@@ -98,11 +122,10 @@ pub(crate) fn record(
         .as_secs();
     let root = space.join(".concord/activity");
     at(&root).directory()?;
-    let guard = guard(&root, task.key)?;
-    let path = root.join(format!("{}.json", task.key));
+    let guard = guard(&root, key)?;
+    let path = root.join(format!("{key}.json"));
     let mut ledger = read(&path)?;
     ledger.version = 2;
-    let identity = task.identity();
     let current = Touch {
         agent: operator.map(|operator| operator.agent),
         session: operator.map(|operator| operator.session.clone()),
@@ -139,22 +162,32 @@ pub(crate) fn record(
     let encoded = serde_json::to_vec_pretty(&ledger)
         .map_err(|error| Error::typed("concord.activity.encode", error.to_string()))?;
     at(&path).write(&encoded, 0o600)?;
-    let activity = Activity {
-        task: identity,
-        current,
-        recent,
-        window: WINDOW,
-    };
     FileExt::unlock(&guard).map_err(|error| {
         Error::typed(
             "concord.activity.unlock",
-            format!("cannot release Task activity ledger: {error}"),
+            format!("cannot release activity ledger: {error}"),
         )
     })?;
-    Ok(activity)
+    Ok((current, recent))
 }
 
-fn guard(root: &Path, key: i64) -> Result<File> {
+pub(crate) fn record_issue(
+    space: &Path,
+    issue: &Anchor,
+    operator: Option<&Operator>,
+    operation: &str,
+) -> Result<IssueActivity> {
+    let (current, recent) = persist(space, &format!("issue-{}", issue.key), operator, operation)?;
+    Ok(IssueActivity {
+        issue: issue.coordinate.clone(),
+        node: issue.node.clone(),
+        current,
+        recent,
+        window: WINDOW,
+    })
+}
+
+fn guard(root: &Path, key: &str) -> Result<File> {
     let path = root.join(format!("{key}.lock"));
     let file = std::fs::OpenOptions::new()
         .read(true)

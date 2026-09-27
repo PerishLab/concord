@@ -1,6 +1,6 @@
 mod artifact;
 mod claim;
-mod copy;
+mod issue;
 mod narrow;
 mod overlap;
 mod proof;
@@ -11,6 +11,12 @@ use crate::path::at;
 use crate::{Error, Result, component, git};
 pub use artifact::{Artifact, Import, Removal, Survey};
 pub use claim::Claiming;
+pub use issue::landing as issue_landing;
+pub use issue::{
+    IssueArtifact, IssueAttach, IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange,
+    IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval, IssueRetirement,
+    IssueWithdrawal, IssueWorktree,
+};
 pub use narrow::Narrowing;
 pub use overlap::{ClaimOverlap, MemberChange};
 pub use proof::Proving;

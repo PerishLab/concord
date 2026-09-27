@@ -13,14 +13,18 @@ Ask the owning surface instead of copying its answer here.
 
 ## Authority
 
-- Ordinary open replays either the exact Issue-anchor model or the exact
-  released v0.13 model. It never evolves or repairs managed state; a v0.13
-  estate cannot create Issue anchors until an explicit transition changes it.
+- Ordinary open replays the exact Issue-execution model, the prior exact
+  Anchor-only model, or the exact released v0.13 model. It never evolves or
+  repairs managed state; older estates cannot create the next resource family
+  until an explicit transition changes them.
 - An Issue anchor retains only stable GitHub node identity, the minimum
   coordinate needed to observe it again, and a local execution revision. Forge
   prose, state, type, comments, and relationships remain GitHub truth.
 - Git owns Member payload. Concord owns the Member seat and verifies source
-  identity, branch, registered worktree, and derived path agreement.
+  identity, branch, registered worktree, and derived path agreement. New
+  Member, Claim, Boundary and pull-reference state relates directly to one
+  Anchor and uses its stable node identity beneath `.issues`; Issue title and
+  coordinate changes cannot move local payload.
 - A Claim is a normalized declaration used for coordination and one Member's
   Boundary proof. It is not ownership, a lease, or a global exclusion lock.
   Overlap between Members sharing one canonical repository is an observation,
@@ -31,14 +35,17 @@ Ask the owning surface instead of copying its answer here.
 - Optional Locus facts and the private activity ledger are observations only.
   They never establish authorship, ownership, presence, authorization, or
   lifecycle state and never replace a command result.
+- Occupancy records only successful writes, expires without asserting session
+  death, and warns on intersecting Issue, Member, or normalized repository
+  write surfaces. It is never a lock or an authorization source.
 
 ## Boundaries
 
 - Fail closed when the estate, coordinates, external seats, source identity,
   branch, or Git worktree metadata disagree. Read-only diagnosis remains
   available.
-- Keep `.concord`, `.tasks`, Task seats, and Artifacts private. Never edit or
-  infer managed state by hand.
+- Keep `.concord`, `.issues`, `.tasks`, execution seats, and Artifacts private.
+  Never edit or infer managed state by hand.
 - Lock the Space, re-read the relevant revision, compare, and commit one Keel
   batch for every mutation.
 - Keep protocol agreement separate from coordination and health observations.

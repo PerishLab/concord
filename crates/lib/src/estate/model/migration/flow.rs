@@ -214,6 +214,7 @@ impl Migration<'_> {
             core,
             space: self.seat.space.clone(),
             anchors: false,
+            execution: false,
         };
         estate.verify().await?;
         let agreement = estate.inspect(None, None).await?;
