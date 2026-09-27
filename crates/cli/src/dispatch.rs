@@ -5,6 +5,7 @@ mod domain;
 mod graph;
 mod input;
 mod member;
+mod occupancy;
 mod provider;
 mod task;
 
@@ -55,6 +56,7 @@ pub async fn run(cli: args::Cli) -> Result<()> {
                 activity: activity::Run::new(cli.json),
                 estate: seat.open().await?,
                 json: cli.json,
+                occupancy: occupancy::Run::new(cli.json),
             }
             .run(command)
             .await
@@ -66,10 +68,13 @@ struct Dispatch {
     activity: activity::Run,
     estate: Estate,
     json: bool,
+    occupancy: occupancy::Run,
 }
 
 impl Dispatch {
     async fn run(&self, command: Command) -> Result<()> {
+        let operation = command.name();
+        let intent = self.occupancy.prepare(&self.estate, &command).await;
         if let Some(tasks) = command.activity() {
             for task in tasks {
                 self.activity
@@ -77,13 +82,22 @@ impl Dispatch {
                     .await;
             }
         }
-        match command {
+        let result = match command {
             Command::Config(_) | Command::Skill(_) => {
                 unreachable!("handled before estate open")
             }
             Command::Domain(args) => domain::run(&self.estate, args.command, self.json).await,
             Command::Task(args) => {
-                task::run(&self.estate, args.command, &self.activity, self.json).await
+                task::run(
+                    &self.estate,
+                    args.command,
+                    task::Signals {
+                        activity: &self.activity,
+                        occupancy: &self.occupancy,
+                    },
+                    self.json,
+                )
+                .await
             }
             Command::Phase(args) => self.phase(args.command).await,
             Command::Member(args) => member::run(&self.estate, args.command, self.json).await,
@@ -105,7 +119,11 @@ impl Dispatch {
                     ))
                 }
             }
+        };
+        if result.is_ok() {
+            self.occupancy.commit(&self.estate, intent, operation);
         }
+        result
     }
 
     async fn phase(&self, command: args::phase::Command) -> Result<()> {
@@ -120,10 +138,11 @@ impl Dispatch {
                 self.activity
                     .touch(&self.estate, &settle.task, operation)
                     .await;
-                emit(
-                    json!({"settlement": self.estate.settle(&settle).await?}),
-                    self.json,
-                )
+                let settlement = self.estate.settle(&settle).await?;
+                self.occupancy
+                    .task(&self.estate, &settle.task, operation)
+                    .await;
+                emit(json!({"settlement": settlement}), self.json)
             }
         }
     }

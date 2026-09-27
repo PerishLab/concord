@@ -1,3 +1,5 @@
+#[path = "seat/occupancy.rs"]
+mod occupancy;
 #[path = "seat/spawn.rs"]
 mod spawn;
 

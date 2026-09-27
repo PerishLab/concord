@@ -129,6 +129,15 @@ impl Seat {
 }
 
 impl Estate {
+    pub fn occupy(
+        &self,
+        operator: &crate::activity::Operator,
+        operation: &str,
+        subjects: &[crate::occupancy::Subject],
+    ) -> Result<crate::occupancy::Occupancy> {
+        crate::occupancy::record(&self.space, operator, operation, subjects)
+    }
+
     pub fn touch(
         &self,
         task: &Node,

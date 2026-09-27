@@ -1,4 +1,5 @@
 use super::activity;
+use super::occupancy;
 use super::provider;
 use super::{emit, explicit};
 use crate::args::Observe;
@@ -9,10 +10,15 @@ use concord_core::{
 };
 use serde_json::json;
 
+pub struct Signals<'a> {
+    pub activity: &'a activity::Run,
+    pub occupancy: &'a occupancy::Run,
+}
+
 pub async fn run(
     estate: &Estate,
     command: Command,
-    activity: &activity::Run,
+    signals: Signals<'_>,
     output: bool,
 ) -> Result<()> {
     let operation = command.name();
@@ -28,13 +34,18 @@ pub async fn run(
         Command::Show { task, observation } => show(estate, &task, observation, output).await,
         Command::Start { domain, name } => {
             let task = estate.start(&domain, &name).await?;
-            activity.touch(estate, &task.identity(), operation).await;
+            signals
+                .activity
+                .touch(estate, &task.identity(), operation)
+                .await;
             emit(json!({"task": task}), output)
         }
         Command::Change { input } => {
             let patch: Patch = super::input::read(&input, Patch::SHAPE)?;
-            activity.touch(estate, &patch.task, operation).await;
-            emit(json!({"current": estate.change(&patch).await?}), output)
+            signals.activity.touch(estate, &patch.task, operation).await;
+            let current = estate.change(&patch).await?;
+            signals.occupancy.task(estate, &patch.task, operation).await;
+            emit(json!({"current": current}), output)
         }
         Command::Rename {
             task,
