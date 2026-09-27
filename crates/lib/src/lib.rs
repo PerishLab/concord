@@ -17,6 +17,7 @@ pub(crate) use protocol::{claim, component};
 
 pub use config::Root;
 pub use error::{Error, Result};
+pub use estate::landing;
 pub use estate::{
     Agreement, Annotate, Artifact, Attach, BoundaryState, CheckoutState, ClaimOverlap, Claiming,
     Current, Cut, Degree, Edge, Edit, Entry, Estate, Fact, FactBrief, Finding, Finish, Flow,

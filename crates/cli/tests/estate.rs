@@ -1,3 +1,5 @@
+#[path = "seat/landing.rs"]
+mod landing;
 #[path = "seat/provider.rs"]
 mod provider;
 #[path = "seat/reference.rs"]

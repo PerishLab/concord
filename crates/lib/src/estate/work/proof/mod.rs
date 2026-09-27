@@ -1,3 +1,5 @@
+pub mod landing;
+
 use super::super::World;
 use super::{Estate, Proof, Worktree, active, stale};
 use crate::{Error, Result, git};
