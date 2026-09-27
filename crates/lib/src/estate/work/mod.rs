@@ -14,6 +14,7 @@ pub use claim::Claiming;
 pub use narrow::Narrowing;
 pub use overlap::{ClaimOverlap, MemberChange};
 pub use proof::Proving;
+pub use proof::landing;
 pub use release::{Release, Retirement};
 use serde::Serialize;
 pub use status::{BoundaryState, CheckoutState, IntegrationState, MemberStatus, UpstreamState};

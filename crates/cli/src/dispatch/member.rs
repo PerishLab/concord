@@ -1,11 +1,12 @@
-use super::provider;
 use super::{emit, explicit};
+use super::{input, provider};
 use crate::args::Observe;
-use crate::args::member::{Command, Reference};
+use crate::args::member::{Command, Landing, Reference};
 use concord_core::{
     Attach, Claiming, Estate, ForgeDeclaration, ForgeWithdrawal, MemberChange, Narrowing, Proving,
-    Release, Result, Retirement,
+    Release, Result, Retirement, landing,
 };
+use serde::Deserialize;
 use serde_json::json;
 
 pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> {
@@ -82,6 +83,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             };
             emit(json!({"member": estate.prove(&request).await?}), output)
         }
+        Command::Landing { command } => landing(estate, command, output).await,
         Command::Reference { command } => reference(estate, command, output).await,
         Command::Release {
             task,
@@ -115,6 +117,76 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
         }
     }
 }
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Envelope {
+    version: u64,
+    plan: landing::Plan,
+}
+
+async fn landing(plane: &Estate, command: Landing, output: bool) -> Result<()> {
+    match command {
+        Landing::Prepare {
+            task,
+            member,
+            base,
+            title,
+            body,
+            guard_schema,
+            guard_tree,
+            guard_digest,
+            revision,
+        } => {
+            let request = landing::Request {
+                task,
+                member,
+                revision,
+                base,
+                title,
+                body,
+                guard: landing::Guard {
+                    schema: guard_schema,
+                    tree: guard_tree,
+                    digest: guard_digest,
+                },
+            };
+            emit(
+                json!({"plan": landing::prepare(plane, &request).await?}),
+                output,
+            )
+        }
+        Landing::Ready { task, member, plan } => {
+            let envelope: Envelope = input::read(&plan, PLAN)?;
+            if envelope.version != 1
+                || envelope.plan.task != task
+                || envelope.plan.member.name != member
+            {
+                return Err(concord_core::Error::typed(
+                    "concord.landing.coordinate",
+                    "landing plan version, Task, or Member does not match the command",
+                ));
+            }
+            emit(
+                json!({"ready": landing::revalidate(plane, &envelope.plan).await?}),
+                output,
+            )
+        }
+    }
+}
+
+const PLAN: &str = r#"{
+  "version": 1,
+  "plan": {
+    "schema": "concord.member-landing/v1",
+    "task": "DOMAIN/TASK",
+    "revision": 1,
+    "member": {},
+    "boundary": {},
+    "guard": {},
+    "landing": {}
+  }
+}"#;
 
 async fn reference(estate: &Estate, command: Reference, output: bool) -> Result<()> {
     match command {
