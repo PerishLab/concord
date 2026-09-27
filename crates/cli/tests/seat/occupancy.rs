@@ -8,7 +8,7 @@ fn occupancy() {
     success(fixture.path(), &["domain", "bootstrap", "local"]);
     let first = operator(
         fixture.path(),
-        &["task", "start", "local", "alpha"],
+        &["task", "start", "local", "alpha", "--legacy"],
         "CODEX_THREAD_ID",
         "codex-one",
     );
@@ -16,7 +16,7 @@ fn occupancy() {
     assert!(first.stderr.is_empty());
     let disjoint = operator(
         fixture.path(),
-        &["task", "start", "local", "other"],
+        &["task", "start", "local", "other", "--legacy"],
         "GROK_SESSION_ID",
         "grok-one",
     );
@@ -126,8 +126,14 @@ fn occupancy() {
 fn surfaces() {
     let fixture = tempfile::tempdir().expect("fixture");
     success(fixture.path(), &["domain", "bootstrap", "local"]);
-    success(fixture.path(), &["task", "start", "local", "alpha"]);
-    success(fixture.path(), &["task", "start", "local", "beta"]);
+    success(
+        fixture.path(),
+        &["task", "start", "local", "alpha", "--legacy"],
+    );
+    success(
+        fixture.path(),
+        &["task", "start", "local", "beta", "--legacy"],
+    );
     let graph = operator(
         fixture.path(),
         &[

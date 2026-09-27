@@ -1,6 +1,6 @@
 use super::super::legacy;
 use super::{RECEIPT, SCHEMA, SOURCE, TARGET};
-use crate::Seat;
+use crate::{Coordinate, Seat};
 use keel::adapt::db::Sqlite;
 
 #[tokio::test]
@@ -47,7 +47,17 @@ async fn cycle() {
     assert!(receipt.backup.path.is_file());
     assert!(receipt.record.is_file());
     assert_eq!(std::fs::read(&receipt.backup.path).unwrap(), before);
-    seat.open().await.expect("current estate");
+    let released = seat.open().await.expect("current estate");
+    let coordinate = Coordinate::parse("PerishLab/concord#25").expect("coordinate");
+    assert_eq!(
+        released
+            .issue(&coordinate)
+            .await
+            .expect_err("released estate has no Anchor model")
+            .code(),
+        "concord.issue.migration_required"
+    );
+    drop(released);
     let retained: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&receipt.record).unwrap()).unwrap();
     assert_eq!(retained["version"], 1);

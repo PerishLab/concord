@@ -8,6 +8,7 @@ use std::path::Path;
 pub(super) async fn inspect(plane: &Estate, tasks: &[Node], report: &mut Agreement) -> Result<()> {
     custody(plane, report)?;
     let members = plane.worktrees().await?;
+    anchors(plane, report).await?;
     references(plane, report).await?;
     for task in tasks {
         let identity = task.identity();
@@ -21,6 +22,22 @@ pub(super) async fn inspect(plane: &Estate, tasks: &[Node], report: &mut Agreeme
         }
     }
     overlaps(plane, &members, report)?;
+    Ok(())
+}
+
+async fn anchors(estate: &Estate, report: &mut Agreement) -> Result<()> {
+    if !estate.anchors {
+        return Ok(());
+    }
+    for row in estate.core.live("Anchor").await.map_err(super::fault)? {
+        if let Err(error) = super::forge::decode_anchor(&row) {
+            report.fault(
+                "issue.shape",
+                format!("Anchor/{}", row.key()),
+                error.to_string(),
+            );
+        }
+    }
     Ok(())
 }
 
@@ -70,7 +87,7 @@ async fn references(estate: &Estate, report: &mut Agreement) -> Result<()> {
                     format!("parent {parent} has multiple forge references"),
                 );
             }
-            if let Err(error) = super::reference::decode(&row, kind) {
+            if let Err(error) = super::forge::decode_reference(&row, kind) {
                 report.fault("reference.shape", subject, error.to_string());
             }
         }

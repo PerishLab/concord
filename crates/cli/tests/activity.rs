@@ -11,7 +11,10 @@ use std::process::{Command, Output};
 fn activity() {
     let fixture = tempfile::tempdir().expect("fixture");
     success(fixture.path(), &["domain", "bootstrap", "local"]);
-    let started = success(fixture.path(), &["task", "start", "local", "alpha"]);
+    let started = success(
+        fixture.path(),
+        &["task", "start", "local", "alpha", "--legacy"],
+    );
     let key = started["task"]["key"].as_i64().expect("Task key");
 
     let first = operator(
@@ -103,7 +106,10 @@ fn activity() {
 fn context() {
     let fixture = tempfile::tempdir().expect("fixture");
     success(fixture.path(), &["domain", "bootstrap", "local"]);
-    success(fixture.path(), &["task", "start", "local", "alpha"]);
+    success(
+        fixture.path(),
+        &["task", "start", "local", "alpha", "--legacy"],
+    );
     let output = command(fixture.path())
         .args(["task", "show", "local/alpha"])
         .env("CLAUDE_CODE_SESSION_ID", "claude-one")

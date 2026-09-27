@@ -1,5 +1,5 @@
 use super::super::super::{Estate, fault, upgrade};
-use super::super::{bridge, graph, legacy};
+use super::super::{bridge, legacy, released};
 use super::{Migration, Plan, RECEIPT, Receipt, Rollback, SCHEMA, SOURCE, Survey, TARGET};
 use super::{align, exact, storage, validate};
 use crate::{Error, Result};
@@ -201,18 +201,19 @@ impl Migration<'_> {
 
     async fn evolve(&self, database: &Path) -> Result<()> {
         bind(database, bridge).await?;
-        bind(database, graph).await?;
+        bind(database, released).await?;
         Ok(())
     }
 
     async fn verify(&self, database: &Path) -> Result<()> {
         let sudo = std::fs::read_to_string(self.seat.sudo())?;
         let wire = Sqlite::file(database).await.map_err(fault)?;
-        let held = keel::bootstrap(graph(), wire).map_err(fault)?;
+        let held = keel::bootstrap(released(), wire).map_err(fault)?;
         let core = held.seal(&sudo).await.map_err(upgrade)?;
         let estate = Estate {
             core,
             space: self.seat.space.clone(),
+            anchors: false,
         };
         estate.verify().await?;
         let agreement = estate.inspect(None, None).await?;
