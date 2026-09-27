@@ -120,14 +120,27 @@ fn seeds(command: &args::Command) -> Option<Vec<Seed<'_>>> {
         args::Command::Task(args) => task(&args.command),
         args::Command::Phase(_) => None,
         args::Command::Member(args) => member(&args.command),
+        args::Command::Issue(args) => issue(&args.command),
         args::Command::Artifact(args) => artifact(&args.command),
         args::Command::Config(_)
         | args::Command::Domain(_)
-        | args::Command::Issue(_)
         | args::Command::Migration(_)
         | args::Command::Graph(_)
         | args::Command::Audit(_)
         | args::Command::Skill(_) => None,
+    }
+}
+
+fn issue(command: &args::issue::Command) -> Option<Vec<Seed<'_>>> {
+    match command {
+        args::issue::Command::Delivery {
+            command: args::issue::Delivery::Land { issue, member, .. },
+        } => Some(vec![
+            Seed::Issue(issue),
+            Seed::IssueMember(issue, member),
+            Seed::MemberSurfaces(issue, member, None),
+        ]),
+        _ => None,
     }
 }
 

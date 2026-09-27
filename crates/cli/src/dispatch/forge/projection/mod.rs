@@ -1,3 +1,5 @@
+mod page;
+
 use concord_core::{Coordinate, Error, Result};
 use serde::Serialize;
 use std::path::Path;

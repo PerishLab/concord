@@ -5,8 +5,8 @@ use sha2::{Digest as _, Sha256};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const COMMIT: &str = "32b405960cce0d494b3b5c310aefe04a8509e744";
-const DEPOT: &str = "e68b28b6a7a199db88c5b678420dcc961a7d3833eca3137309f75a7a5c88a4a3";
+const COMMIT: &str = "891038814d7365de0fcfad9781864f623a8e728f";
+const DEPOT: &str = "da911e1a1ae27c87f4ef8d9b7f638fcedf222d669798d075aafcaaab045250af";
 
 #[derive(Serialize)]
 struct Claim<'a> {
@@ -196,7 +196,7 @@ fn proof(tree: String) -> Descriptor {
         schema: plumb::guard::SCHEMA.into(),
         repository: "PerishLab/probe".into(),
         tree,
-        plumb: format!("v0.51.0@{COMMIT}"),
+        plumb: format!("v0.53.0@{COMMIT}"),
         depot: DEPOT.into(),
         platform: plumb::config::platform(),
         actions: vec![Action {

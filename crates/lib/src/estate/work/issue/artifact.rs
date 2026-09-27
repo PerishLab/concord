@@ -1,6 +1,6 @@
 use super::super::Estate;
 use super::super::artifact::preflight;
-use super::{direct, issue_stale};
+use super::issue_stale;
 use crate::path::at;
 use crate::{Error, Result, component};
 use serde::Serialize;
@@ -187,6 +187,13 @@ fn vacant(target: &Path) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+fn direct(path: &Path) -> bool {
+    path.is_dir()
+        && std::fs::symlink_metadata(path)
+            .map(|metadata| !metadata.file_type().is_symlink())
+            .unwrap_or(false)
 }
 
 fn foreign(path: &Path) -> Error {

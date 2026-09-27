@@ -30,8 +30,11 @@ Ask the owning surface instead of copying its answer here.
   Overlap between Members sharing one canonical repository is an observation,
   never a mutation or audit fault.
 - A Boundary proves only that one committed Member delta stays inside that
-  Member's Claim. Concord does not inspect a PR, forge state, or another
-  repository's landing policy. Repository-specific landing belongs to Plumb.
+  Member's Claim. Concord composes an exact Issue-led delivery plan from the
+  live Issue, Member and Boundary, delegates repository proof and candidate
+  construction to Plumb's released delivery kernel, and invokes an explicit
+  external provider command for PR mutation. Concord never carries provider
+  credentials or replaces repository policy.
 - Optional Locus facts and the private activity ledger are observations only.
   They never establish authorship, ownership, presence, authorization, or
   lifecycle state and never replace a command result.
@@ -67,9 +70,11 @@ Ask the owning surface instead of copying its answer here.
   `cargo clippy --locked --workspace --all-targets -- -D warnings`,
   `cargo check --locked --workspace --all-targets --release`,
   `cargo test --locked --workspace`, and `ectropy .`.
-- Plumb owns repository governance, release markers, and landing; wharf
-  builds, binds, and distributes each release. Read their current help and
-  rules; do not restate a release workflow or changelog shape here.
+- Plumb owns repository governance, release markers, Guard proof, and the
+  provider-neutral delivery kernel; Concord owns Issue/Member orchestration
+  and the explicit provider adapter. Wharf builds, binds, and distributes each
+  release. Read their current help and rules; do not restate a release workflow
+  or changelog shape here.
 - `plumb.toml` and `ectropy.toml` are this repository's own declarations,
   layered over the base Plumb carries in its binary. Where they depart from
   that base, `plumb doctor` says so as a noted finding.
