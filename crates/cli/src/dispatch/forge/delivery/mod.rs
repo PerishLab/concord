@@ -12,6 +12,7 @@ use serde_json::json;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Envelope {
+    version: u64,
     plan: issue_delivery::Plan,
 }
 
@@ -63,6 +64,7 @@ async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()> {
         ));
     };
     let envelope: Envelope = input::read(&path, SHAPE)?;
+    version(envelope.version)?;
     let plan = envelope.plan;
     if plan.issue != Coordinate::parse(&issue)? || plan.member.name != member {
         return Err(Error::typed(
@@ -136,4 +138,26 @@ async fn attach(estate: &Estate, plan: &issue_delivery::Plan, pull: &pull::Pull)
         .await
 }
 
-const SHAPE: &str = r#"{"plan":{"schema":"concord.issue-member-delivery/v1","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"delivery":{}}}"#;
+fn version(value: u64) -> Result<()> {
+    if value == 1 {
+        return Ok(());
+    }
+    Err(Error::typed(
+        "concord.delivery.envelope",
+        "delivery envelope version must be 1",
+    ))
+}
+
+const SHAPE: &str = r#"{"version":1,"plan":{"schema":"concord.issue-member-delivery/v1","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"delivery":{}}}"#;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn version() {
+        super::version(1).expect("version one");
+        assert_eq!(
+            super::version(2).expect_err("other version").code(),
+            "concord.delivery.envelope"
+        );
+    }
+}
