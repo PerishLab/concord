@@ -2,6 +2,9 @@ mod flow;
 mod storage;
 
 #[cfg(test)]
+pub(super) use flow::bind;
+
+#[cfg(test)]
 mod tests;
 
 use super::super::Seat;
