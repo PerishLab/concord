@@ -539,3 +539,7 @@ name = "BlockedBy"
 [[vocabulary.term]]
 description = "The caller-selected upper bound on Issue graph nodes."
 name = "max_nodes"
+
+[[vocabulary.term]]
+description = "The exact Issue-and-Member delivery plan composed by Concord over Plumb's delivery kernel."
+name = "issue_delivery"

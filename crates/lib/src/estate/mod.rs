@@ -36,7 +36,6 @@ pub use forge::{Admission, Anchor, Coordinate, Reconcile};
 pub use forge::{ForgeDeclaration, ForgeWithdrawal, Reference, ReferenceKind};
 pub use model::migration;
 pub use task::{Annotate, Rehome, Rename, Repository, Retire};
-pub use work::landing;
 pub use work::{
     Artifact, Attach, BoundaryState, CheckoutState, ClaimOverlap, Claiming, Import,
     IntegrationState, IssueArtifact, IssueAttach, IssueClaiming, IssueDeclaration, IssueImport,
@@ -44,6 +43,7 @@ pub use work::{
     IssueRetirement, IssueWithdrawal, IssueWorktree, MemberChange, MemberStatus, Narrowing, Proof,
     Proving, Release, Removal, Retirement, Survey, UpstreamState, Worktree, issue_landing,
 };
+pub use work::{issue_delivery, landing};
 
 pub struct Estate {
     core: Core<Sqlite>,

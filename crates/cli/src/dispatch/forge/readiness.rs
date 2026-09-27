@@ -108,6 +108,12 @@ fn sections(body: &str) -> BTreeMap<String, String> {
     result
 }
 
+pub(super) fn outcome(body: &str) -> Option<String> {
+    sections(body)
+        .remove("outcome")
+        .filter(|outcome| !outcome.trim().is_empty())
+}
+
 fn required_sections(kind: &str) -> &'static [&'static str] {
     match kind.to_ascii_lowercase().as_str() {
         "feature" => &["problem", "outcome", "acceptance", "non-goals"],

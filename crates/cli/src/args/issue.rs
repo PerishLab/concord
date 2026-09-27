@@ -53,6 +53,11 @@ pub enum Command {
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
+    #[command(about = "Prepare and land exact Issue-led pull requests")]
+    Delivery {
+        #[command(subcommand)]
+        command: Delivery,
+    },
     #[command(about = "Attach local execution to one readable typed GitHub Issue")]
     Attach {
         issue: String,
@@ -95,17 +100,55 @@ pub enum Command {
     },
 }
 
+#[derive(Subcommand)]
+pub enum Delivery {
+    #[command(about = "Prepare one exact Issue-led pull-request plan without provider mutation")]
+    Prepare {
+        issue: String,
+        member: String,
+        #[arg(long)]
+        revision: i64,
+        #[arg(long, default_value = "main")]
+        base: String,
+        #[arg(long = "github-command")]
+        command: PathBuf,
+        #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
+        timeout: u64,
+    },
+    #[command(about = "Revalidate and merge one exact Issue-led pull-request plan")]
+    Land {
+        issue: String,
+        member: String,
+        #[arg(long, value_name = "PATH|-", default_value = "-")]
+        plan: PathBuf,
+        #[arg(long = "github-command")]
+        command: PathBuf,
+        #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
+        timeout: u64,
+    },
+}
+
 impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
             Self::Brief { .. } => "issue.brief",
             Self::Graph { .. } => "issue.graph",
             Self::Ready { .. } => "issue.ready",
+            Self::Delivery { command } => command.name(),
             Self::Attach { .. } => "issue.attach",
             Self::Show { .. } => "issue.show",
             Self::Prepare { .. } => "issue.prepare",
             Self::Validate { .. } => "issue.validate",
             Self::Reconcile { .. } => "issue.reconcile",
+        }
+    }
+}
+
+impl Delivery {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Prepare { .. } => "issue.delivery.prepare",
+            Self::Land { .. } => "issue.delivery.land",
         }
     }
 }

@@ -71,6 +71,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 .await?;
             emit(json!({"readiness": readiness}), output)
         }
+        Command::Delivery { command } => super::delivery::run(estate, command, output).await,
         Command::Attach {
             issue,
             command,
