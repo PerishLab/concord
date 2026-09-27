@@ -7,6 +7,7 @@ pub(crate) mod member;
 pub(crate) mod migration;
 pub(crate) mod phase;
 pub(crate) mod task;
+pub(crate) mod transition;
 
 use crate::skill::Args as Skill;
 use clap::{Args, Parser, Subcommand};
@@ -21,6 +22,7 @@ pub use member::Args as Member;
 pub use migration::Args as Migration;
 pub use phase::Args as Phase;
 pub use task::Args as Task;
+pub use transition::Args as Transition;
 
 #[derive(Args)]
 pub struct Observe {
@@ -72,6 +74,8 @@ pub enum Command {
     Artifact(Artifact),
     #[command(about = "Migrate one exact v0.12.10 estate to v0.13.0")]
     Migration(Migration),
+    #[command(about = "Transition one exact v0.13.0 estate to Issue execution")]
+    Transition(Transition),
     #[command(about = "Inspect the Task dependency graph")]
     Graph(Graph),
     #[command(about = "Audit estate, graph, and external agreement")]
@@ -91,6 +95,7 @@ impl Command {
             Self::Member(args) => args.command.name(),
             Self::Artifact(args) => args.command.name(),
             Self::Migration(args) => args.command.name(),
+            Self::Transition(args) => args.command.name(),
             Self::Graph(args) => args.command.name(),
             Self::Audit(_) => "audit",
             Self::Skill(args) => args.command.name(),
@@ -106,7 +111,11 @@ impl Command {
             Self::Artifact(args) => Some(args.command.activity()),
             Self::Graph(args) => args.command.activity(),
             Self::Audit(args) => args.task.as_deref().map(|task| vec![task]),
-            Self::Config(_) | Self::Domain(_) | Self::Migration(_) | Self::Skill(_) => None,
+            Self::Config(_)
+            | Self::Domain(_)
+            | Self::Migration(_)
+            | Self::Transition(_)
+            | Self::Skill(_) => None,
         }
     }
 }

@@ -1,5 +1,6 @@
 mod flow;
 mod storage;
+pub mod transition;
 
 #[cfg(test)]
 pub(super) use flow::bind;

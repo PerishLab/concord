@@ -26,6 +26,22 @@ fn contract() {
     assert_eq!(error["error"]["code"], "concord.apply.required");
 }
 
+#[test]
+fn transition() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    let root = fixture.path();
+    let help = run(root, &["transition", "--help"]);
+    assert!(help.status.success());
+    assert!(String::from_utf8_lossy(&help.stdout).contains("inventory"));
+
+    let bootstrap = run(root, &["domain", "bootstrap", "local"]);
+    assert!(bootstrap.status.success());
+    let refused = run(root, &["--json", "transition", "inventory"]);
+    assert!(!refused.status.success());
+    let error: Value = serde_json::from_slice(&refused.stderr).expect("error JSON");
+    assert_eq!(error["error"]["code"], "concord.transition.source");
+}
+
 fn run(root: &Path, arguments: &[&str]) -> Output {
     command(root).args(arguments).output().expect("run Concord")
 }
