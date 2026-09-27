@@ -240,14 +240,16 @@ impl Migration<'_> {
     }
 }
 
-async fn bind(database: &Path, model: fn() -> keel::Graph) -> Result<()> {
+pub(in crate::estate::model) async fn bind(
+    database: &Path,
+    model: fn() -> keel::Graph,
+) -> Result<keel::Core<Sqlite>> {
     for attempt in 0..8 {
         align();
         let wire = Sqlite::file(database).await.map_err(fault)?;
         match keel::bind(model(), wire).await {
             Ok(core) => {
-                drop(core);
-                return Ok(());
+                return Ok(core);
             }
             Err(keel::adapt::Error::Adapt(note))
                 if note == "lease is not the past" && attempt < 7 => {}
