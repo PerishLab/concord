@@ -1,5 +1,6 @@
 use crate::args::Configure;
 use crate::args::migration::Command;
+use crate::args::transition::Command as TransitionCommand;
 use crate::config::Config;
 use crate::output;
 use concord_core::migration::{Plan as MigrationPlan, Receipt as MigrationReceipt};
@@ -61,6 +62,17 @@ pub(crate) async fn migration(seat: &Seat, command: Command, output: bool) -> Re
             version(envelope.version)?;
             json!({"rollback": seat.migration().rollback(&envelope.receipt).await?})
         }
+    };
+    emit(value, output)
+}
+
+pub(crate) async fn transition(
+    seat: &Seat,
+    command: TransitionCommand,
+    output: bool,
+) -> Result<()> {
+    let value = match command {
+        TransitionCommand::Inventory => json!({"inventory": seat.transition().inventory().await?}),
     };
     emit(value, output)
 }
