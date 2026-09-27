@@ -29,8 +29,13 @@ pub enum Command {
         #[command(flatten)]
         observation: super::Observe,
     },
-    #[command(about = "Start an estate-only Task in an existing Domain")]
-    Start { domain: String, name: String },
+    #[command(about = "Start a migration-only legacy Task in an existing Domain")]
+    Start {
+        domain: String,
+        name: String,
+        #[arg(long, required = true)]
+        legacy: bool,
+    },
     #[command(
         about = "Apply a versioned JSON change-set from stdin by default",
         after_help = concord_core::Patch::SHAPE

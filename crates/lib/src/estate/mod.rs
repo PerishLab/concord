@@ -8,15 +8,15 @@ use std::path::{Path, PathBuf};
 
 #[path = "data/agreement.rs"]
 mod agreement;
+#[path = "current/brief.rs"]
 mod brief;
 mod current;
 mod data;
 mod dependency;
+mod forge;
 mod graph;
 mod model;
 mod phase;
-#[path = "model/forge.rs"]
-mod reference;
 mod task;
 #[path = "data/territory.rs"]
 mod territory;
@@ -32,8 +32,9 @@ pub use data::{
     Current, Cut, Degree, Edge, Edit, Entry, Fact, Finish, Flow, Graph, Life, Link, Node, Origin,
     Part, Patch, Phase, Realm, Role, Settle, Settlement, Tune, Weight,
 };
+pub use forge::{Admission, Anchor, Coordinate, Reconcile};
+pub use forge::{ForgeDeclaration, ForgeWithdrawal, Reference, ReferenceKind};
 pub use model::migration;
-pub use reference::{ForgeDeclaration, ForgeWithdrawal, Reference, ReferenceKind};
 pub use task::{Annotate, Rehome, Rename, Repository, Retire};
 pub use work::landing;
 pub use work::{
@@ -45,6 +46,7 @@ pub use work::{
 pub struct Estate {
     core: Core<Sqlite>,
     space: PathBuf,
+    anchors: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -81,6 +83,7 @@ impl Seat {
         let estate = Estate {
             core,
             space: self.space.clone(),
+            anchors: true,
         };
         estate.seed().await?;
         estate.verify().await?;
@@ -98,12 +101,18 @@ impl Seat {
             ));
         }
         let sudo = std::fs::read_to_string(self.sudo())?;
-        let wire = Sqlite::file(self.database()).await.map_err(fault)?;
-        let held = keel::bootstrap(model::graph(), wire).map_err(fault)?;
-        let core = held.seal(&sudo).await.map_err(upgrade)?;
+        let current = self.bind(model::graph, &sudo).await;
+        let (core, anchors) = match current {
+            Ok(core) => (core, true),
+            Err(primary) => match self.bind(model::released, &sudo).await {
+                Ok(core) => (core, false),
+                Err(_) => return Err(primary),
+            },
+        };
         let estate = Estate {
             core,
             space: self.space.clone(),
+            anchors,
         };
         estate.verify().await?;
         Ok(estate)
@@ -126,6 +135,12 @@ impl Seat {
         let sudo = held.mint().await.map_err(fault)?;
         at(&self.sudo()).file(&sudo)?;
         Ok(sudo)
+    }
+
+    async fn bind(&self, model: fn() -> keel::Graph, sudo: &str) -> Result<Core<Sqlite>> {
+        let wire = Sqlite::file(self.database()).await.map_err(fault)?;
+        let held = keel::bootstrap(model(), wire).map_err(fault)?;
+        held.seal(sudo).await.map_err(upgrade)
     }
 }
 

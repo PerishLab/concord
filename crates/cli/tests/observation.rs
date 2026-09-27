@@ -9,7 +9,11 @@ use std::process::{Command, Output};
 fn observation() {
     let fixture = tempfile::tempdir().expect("fixture");
     run(fixture.path(), &["domain", "bootstrap", "local"], &[]);
-    run(fixture.path(), &["task", "start", "local", "seen"], &[]);
+    run(
+        fixture.path(),
+        &["task", "start", "local", "seen", "--legacy"],
+        &[],
+    );
     run(
         fixture.path(),
         &[

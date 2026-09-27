@@ -51,18 +51,22 @@ pub(super) struct Reservation {
 }
 
 pub(super) fn graph() -> Graph {
-    assemble(true, true)
+    assemble(true, true, true)
+}
+
+pub(super) fn released() -> Graph {
+    assemble(true, true, false)
 }
 
 pub(super) fn bridge() -> Graph {
-    assemble(true, false)
+    assemble(true, false, false)
 }
 
 pub(super) fn legacy() -> Graph {
-    assemble(false, false)
+    assemble(false, false, false)
 }
 
-fn assemble(tombstone: bool, references: bool) -> Graph {
+fn assemble(tombstone: bool, references: bool, anchors: bool) -> Graph {
     let mut graph = Graph::new();
     graph
         .plug::<Space>()
@@ -71,6 +75,9 @@ fn assemble(tombstone: bool, references: bool) -> Graph {
         .plug::<Reservation>()
         .plug::<domain::Addition>()
         .plug::<repository::Repository>();
+    if anchors {
+        graph.plug::<reference::Anchor>();
+    }
     if tombstone {
         graph.plug::<repository::Tombstone>();
     }
@@ -103,7 +110,7 @@ fn assemble(tombstone: bool, references: bool) -> Graph {
 
 #[cfg(test)]
 mod tests {
-    use super::{bridge, graph, legacy, migration};
+    use super::{bridge, legacy, migration, released};
     use keel::adapt::db::Sqlite;
 
     #[tokio::test]
@@ -148,7 +155,7 @@ mod tests {
         assert!(core.live("Tombstone").await.expect("Tombstones").is_empty());
         drop(core);
 
-        let core = migration::bind(&database, graph)
+        let core = migration::bind(&database, released)
             .await
             .expect("explicit migration");
         assert!(core.live("Issue").await.expect("Issues").is_empty());

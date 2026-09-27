@@ -9,7 +9,10 @@ use std::process::{Command, Output};
 fn exit() {
     let fixture = tempfile::tempdir().expect("fixture");
     success(fixture.path(), &["domain", "bootstrap", "local"]);
-    let started = success(fixture.path(), &["task", "start", "local", "work"]);
+    let started = success(
+        fixture.path(),
+        &["task", "start", "local", "work", "--legacy"],
+    );
     assert_eq!(started["task"]["revision"], 0);
     let source = fixture.path().join("source");
     std::fs::create_dir(&source).expect("source directory");

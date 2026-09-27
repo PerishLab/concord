@@ -1,4 +1,4 @@
-use super::{Estate, Life, World, fault};
+use super::super::{Estate, Life, World, fault};
 use crate::{Error, Result, component};
 use keel::Row;
 use serde::Serialize;
@@ -140,7 +140,11 @@ impl Estate {
         Ok(revision)
     }
 
-    pub(super) async fn forge(&self, task: i64, member: Option<i64>) -> Result<Option<Reference>> {
+    pub(in crate::estate) async fn forge(
+        &self,
+        task: i64,
+        member: Option<i64>,
+    ) -> Result<Option<Reference>> {
         let (unit, relation, parent, kind) = match member {
             Some(member) => ("Change", "member", member, ReferenceKind::Change),
             None => ("Issue", "task", task, ReferenceKind::Issue),
@@ -165,7 +169,7 @@ impl Estate {
     }
 }
 
-pub(super) fn decode(row: &Row, kind: ReferenceKind) -> Result<Reference> {
+pub(in crate::estate) fn decode(row: &Row, kind: ReferenceKind) -> Result<Reference> {
     let text = |field| {
         row.text(field)
             .map(str::to_string)
@@ -241,7 +245,7 @@ fn malformed(key: i64, field: &str) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::super::Seat;
+    use crate::Seat;
 
     #[tokio::test]
     async fn invalid() {

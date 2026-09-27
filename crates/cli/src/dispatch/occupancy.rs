@@ -97,6 +97,7 @@ fn seeds(command: &args::Command) -> Option<Vec<Seed<'_>>> {
         args::Command::Artifact(args) => artifact(&args.command),
         args::Command::Config(_)
         | args::Command::Domain(_)
+        | args::Command::Issue(_)
         | args::Command::Migration(_)
         | args::Command::Graph(_)
         | args::Command::Audit(_)
@@ -107,7 +108,7 @@ fn seeds(command: &args::Command) -> Option<Vec<Seed<'_>>> {
 fn task(command: &args::task::Command) -> Option<Vec<Seed<'_>>> {
     use args::task::Command;
     match command {
-        Command::Start { domain, name } => Some(vec![Seed::Exact(Subject::Task {
+        Command::Start { domain, name, .. } => Some(vec![Seed::Exact(Subject::Task {
             task: format!("{domain}/{name}"),
         })]),
         Command::Rename { task, .. }

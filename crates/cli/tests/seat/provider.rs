@@ -10,8 +10,14 @@ use std::path::{Path, PathBuf};
 fn observation() {
     let fixture = tempfile::tempdir().expect("fixture");
     success(fixture.path(), &["domain", "bootstrap", "local"]);
-    success(fixture.path(), &["task", "start", "local", "alpha"]);
-    success(fixture.path(), &["task", "start", "local", "beta"]);
+    success(
+        fixture.path(),
+        &["task", "start", "local", "alpha", "--legacy"],
+    );
+    success(
+        fixture.path(),
+        &["task", "start", "local", "beta", "--legacy"],
+    );
     let unlinked = success(fixture.path(), &["task", "show", "local/beta", "--observe"]);
     assert_eq!(unlinked["observation"]["reason"], "reference");
     success(

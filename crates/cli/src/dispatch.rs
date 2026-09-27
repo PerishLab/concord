@@ -2,11 +2,11 @@ mod activity;
 mod artifact;
 mod configuration;
 mod domain;
+mod forge;
 mod graph;
 mod input;
 mod member;
 mod occupancy;
-mod provider;
 mod task;
 
 use crate::args::{self, Command};
@@ -103,6 +103,7 @@ impl Dispatch {
                 )
                 .await
             }
+            Command::Issue(args) => forge::run(&self.estate, args.command, self.json).await,
             Command::Phase(args) => self.phase(args.command).await,
             Command::Member(args) => member::run(&self.estate, args.command, self.json).await,
             Command::Artifact(args) => artifact::run(&self.estate, args.command, self.json).await,
