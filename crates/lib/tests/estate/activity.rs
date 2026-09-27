@@ -1,4 +1,5 @@
 use concord_core::activity::{Agent, Operator};
+use concord_core::occupancy::{LEASE, Subject};
 use concord_core::{Rename, Seat};
 use fs2::FileExt;
 
@@ -96,4 +97,90 @@ async fn activity() {
             & 0o777;
         assert_eq!(mode, 0o600);
     }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn occupancy() {
+    let temp = tempfile::tempdir().expect("temporary Space");
+    let estate = Seat::new(temp.path())
+        .bootstrap()
+        .await
+        .expect("bootstrap estate");
+    estate.manage("local").await.expect("manage Domain");
+    estate.start("local", "alpha").await.expect("start Task");
+    let codex = Operator {
+        agent: Agent::Codex,
+        session: "codex-one".to_string(),
+    };
+    let claude = Operator {
+        agent: Agent::Claude,
+        session: "claude-one".to_string(),
+    };
+    let grok = Operator {
+        agent: Agent::Grok,
+        session: "grok-one".to_string(),
+    };
+    let task = Subject::Task {
+        task: "local/alpha".to_string(),
+    };
+    let member = Subject::Member {
+        task: "local/alpha".to_string(),
+        member: "repo".to_string(),
+    };
+
+    let first = estate
+        .occupy(&codex, "task.change", std::slice::from_ref(&task))
+        .expect("first holder");
+    assert!(first.conflicts.is_empty());
+    assert_eq!(first.lease, LEASE);
+    let disjoint = estate
+        .occupy(&claude, "member.prove", std::slice::from_ref(&member))
+        .expect("disjoint holder");
+    assert!(disjoint.conflicts.is_empty());
+    let concurrent = estate
+        .occupy(&claude, "task.rename", std::slice::from_ref(&task))
+        .expect("intersecting holder");
+    assert_eq!(concurrent.conflicts.len(), 1);
+    assert_eq!(concurrent.conflicts[0].holder.session, "codex-one");
+    assert_eq!(concurrent.conflicts[0].subjects, vec![task.clone()]);
+    estate
+        .occupy(&claude, "task.rehome", std::slice::from_ref(&task))
+        .expect("renew same holder");
+
+    let path = temp.path().join(".concord/occupancy/ledger.json");
+    let mut ledger: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).expect("occupancy ledger"))
+            .expect("occupancy JSON");
+    assert_eq!(ledger["holders"].as_array().expect("holders").len(), 2);
+    for holder in ledger["holders"].as_array_mut().expect("holders") {
+        holder["heartbeat"] = 0.into();
+    }
+    std::fs::write(&path, serde_json::to_vec_pretty(&ledger).expect("ledger"))
+        .expect("expire holders");
+    let pruned = estate
+        .occupy(&grok, "task.change", std::slice::from_ref(&task))
+        .expect("prune expired holders");
+    assert!(pruned.conflicts.is_empty());
+    let ledger: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).expect("occupancy ledger"))
+            .expect("occupancy JSON");
+    assert_eq!(ledger["holders"].as_array().expect("holders").len(), 1);
+    assert_eq!(estate.node("local/alpha").await.expect("Task").revision, 0);
+
+    let lock = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(temp.path().join(".concord/occupancy/ledger.lock"))
+        .expect("occupancy lock");
+    lock.lock_exclusive().expect("hold occupancy lock");
+    let error = estate
+        .occupy(&codex, "task.change", std::slice::from_ref(&task))
+        .expect_err("busy occupancy must not wait");
+    assert_eq!(error.code(), "concord.occupancy.busy");
+    FileExt::unlock(&lock).expect("release occupancy lock");
+    std::fs::write(&path, b"not json").expect("corrupt occupancy");
+    let error = estate
+        .occupy(&codex, "task.change", &[task])
+        .expect_err("corrupt occupancy is observable");
+    assert_eq!(error.code(), "concord.occupancy.invalid");
 }

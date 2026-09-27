@@ -9,6 +9,8 @@ mod estate;
 mod git;
 #[path = "runtime/observation.rs"]
 pub mod observation;
+#[path = "runtime/occupancy.rs"]
+pub mod occupancy;
 #[path = "runtime/path.rs"]
 mod path;
 mod protocol;
