@@ -11,6 +11,7 @@ use crate::path::at;
 use crate::{Error, Result, component, git};
 pub use artifact::{Artifact, Import, Removal, Survey};
 pub use claim::Claiming;
+pub use issue::delivery as issue_delivery;
 pub use issue::landing as issue_landing;
 pub use issue::{
     IssueArtifact, IssueAttach, IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange,

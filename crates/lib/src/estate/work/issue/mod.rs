@@ -1,5 +1,6 @@
 mod artifact;
 mod claim;
+pub mod delivery;
 pub mod landing;
 mod proof;
 mod reference;
@@ -10,7 +11,7 @@ use super::super::{Anchor, Coordinate, Estate, fault};
 use crate::path::at;
 use crate::{Error, Result, component, git};
 use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub use artifact::{IssueArtifact, IssueImport, IssueRemoval};
 pub use claim::{IssueClaiming, IssueMemberChange, IssueNarrowing};
@@ -290,11 +291,4 @@ pub(super) fn malformed(key: i64, field: &str) -> Error {
         "concord.member.row",
         format!("Issue execution Resource {key} has malformed field {field}"),
     )
-}
-
-pub(super) fn direct(path: &Path) -> bool {
-    path.is_dir()
-        && std::fs::symlink_metadata(path)
-            .map(|metadata| !metadata.file_type().is_symlink())
-            .unwrap_or(false)
 }

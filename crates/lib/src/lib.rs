@@ -33,5 +33,5 @@ pub use estate::{
     TaskBriefEntry, TaskBriefLimits, TaskBriefPage, TextPreview, Tune, UpstreamState, Weight,
     Worktree,
 };
-pub use estate::{issue_landing, landing};
+pub use estate::{issue_delivery, issue_landing, landing};
 pub use protocol::PLUMB;
