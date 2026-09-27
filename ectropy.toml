@@ -6,6 +6,11 @@ allow = [
 note = "release infrastructure is guarded by its native format and syntax checks"
 paths = [".forgejo/**"]
 
+[[boundary]]
+allow = ["word"]
+note = "the GitHub GraphQL adapter preserves the provider wire dialect"
+paths = ["crates/cli/src/dispatch/forge/github.rs"]
+
 [comment]
 allow = false
 
@@ -402,3 +407,135 @@ name = "record_issue"
 [[vocabulary.term]]
 description = "The end-to-end Issue execution contract is one test scenario."
 name = "issue_execution"
+
+[[vocabulary.term]]
+description = "The independent cursors and bound for one GitHub Issue projection request."
+name = "PageRequest"
+
+[[vocabulary.term]]
+description = "The requested continuation cursor for the native sub-issue connection."
+name = "sub_issues_after"
+
+[[vocabulary.term]]
+description = "The requested continuation cursor for the native blocked-by connection."
+name = "blocked_by_after"
+
+[[vocabulary.term]]
+description = "The requested continuation cursor for the native blocking connection."
+name = "blocking_after"
+
+[[vocabulary.term]]
+description = "The requested continuation cursor for pull cross-references."
+name = "pulls_after"
+
+[[vocabulary.term]]
+description = "The requested continuation cursor for Issue comments."
+name = "comments_after"
+
+[[vocabulary.term]]
+description = "The caller-selected bound applied to each provider connection page."
+name = "page_size"
+
+[[vocabulary.term]]
+description = "The caller-selected upper bound on provider pages in one projection."
+name = "max_pages"
+
+[[vocabulary.term]]
+description = "The provider timestamp at which a referenced pull request merged."
+name = "merged_at"
+
+[[vocabulary.term]]
+description = "The exact cursor supplied for one projected provider page."
+name = "requested_after"
+
+[[vocabulary.term]]
+description = "The exact final cursor returned for one projected provider page."
+name = "end_cursor"
+
+[[vocabulary.term]]
+description = "Whether a native provider connection has another page."
+name = "has_next_page"
+
+[[vocabulary.term]]
+description = "The provider-declared total size of one native connection."
+name = "provider_total"
+
+[[vocabulary.term]]
+description = "The native total, completion count and completion percentage for sub-issues."
+name = "SubIssueSummary"
+
+[[vocabulary.term]]
+description = "The provider-derived completion percentage for native sub-issues."
+name = "percent_completed"
+
+[[vocabulary.term]]
+description = "The bounded native summary attached to a projected Issue brief."
+name = "sub_issue_summary"
+
+[[vocabulary.term]]
+description = "The native structural children of one GitHub Issue."
+name = "sub_issues"
+
+[[vocabulary.term]]
+description = "The native GitHub Issues that block one Issue."
+name = "blocked_by"
+
+[[vocabulary.term]]
+description = "The local epoch at which a provider projection completed."
+name = "observed_at"
+
+[[vocabulary.term]]
+description = "The distinction between structural parentage and blocking in an Issue graph."
+name = "EdgeKind"
+
+[[vocabulary.term]]
+description = "The explicit closure conditions evaluated for one GitHub Issue."
+name = "ReadinessChecks"
+
+[[vocabulary.term]]
+description = "Whether every organization-required Issue section is present and nonempty."
+name = "required_sections"
+
+[[vocabulary.term]]
+description = "Whether the Acceptance section contains at least one checkbox."
+name = "acceptance_nonempty"
+
+[[vocabulary.term]]
+description = "Whether every checkbox in the Acceptance section is settled."
+name = "acceptance_settled"
+
+[[vocabulary.term]]
+description = "The count of checkbox items in the Acceptance section."
+name = "acceptance_total"
+
+[[vocabulary.term]]
+description = "The count of unsettled checkbox items in the Acceptance section."
+name = "acceptance_open"
+
+[[vocabulary.term]]
+description = "Whether every native sub-issue is closed."
+name = "sub_issues_closed"
+
+[[vocabulary.term]]
+description = "Whether every native blocking Issue is closed."
+name = "blockers_closed"
+
+[[vocabulary.term]]
+description = "Wharf distribution-record citations found in the Issue body or comments."
+name = "distribution_evidence"
+
+[[vocabulary.term]]
+description = "One fully paged provider Issue used transiently by graph or readiness projection."
+name = "CompleteIssue"
+
+[[vocabulary.term]]
+description = "The sub-issue connection selected for complete pagination."
+name = "SubIssues"
+
+[[vocabulary.term]]
+description = "The blocked-by connection selected for complete pagination."
+name = "BlockedBy"
+
+[[vocabulary.term]]
+description = "The caller-selected upper bound on Issue graph nodes."
+name = "max_nodes"
