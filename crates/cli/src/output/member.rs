@@ -1,4 +1,4 @@
-use concord_core::MemberStatus;
+use concord_core::{IssueMemberStatus, MemberStatus};
 
 pub fn status(status: &MemberStatus) {
     println!(
@@ -15,6 +15,47 @@ pub fn status(status: &MemberStatus) {
             reference.number
         ),
         None => println!("  reference: -"),
+    }
+    checkout("worktree", &status.worktree);
+    checkout("integration", &status.integration_checkout);
+    println!("  boundary: {}", status.boundary.name());
+    println!("  integration relation: {}", status.integration.name());
+    match &status.local_upstream {
+        Some(upstream) => println!(
+            "  local upstream: {} {} ahead={} behind={}",
+            upstream.reference, upstream.head, upstream.ahead, upstream.behind
+        ),
+        None => println!("  local upstream: -"),
+    }
+    if status.local_tracking_refs.is_empty() {
+        println!("  local tracking refs: -");
+    } else {
+        println!(
+            "  local tracking refs: {}",
+            status.local_tracking_refs.join(" ")
+        );
+    }
+}
+
+pub fn issue_status(status: &IssueMemberStatus) {
+    println!(
+        "member status: {}/{}",
+        status.member.issue.identity(),
+        status.member.name
+    );
+    if status.references.is_empty() {
+        println!("  references: -");
+    } else {
+        for reference in &status.references {
+            println!(
+                "  reference: {} {}/{}/{}#{}",
+                reference.kind.name(),
+                reference.provider,
+                reference.owner,
+                reference.repository,
+                reference.number
+            );
+        }
     }
     checkout("worktree", &status.worktree);
     checkout("integration", &status.integration_checkout);

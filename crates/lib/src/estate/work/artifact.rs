@@ -1,4 +1,5 @@
-mod preflight;
+pub(super) mod copy;
+pub(super) mod preflight;
 
 use super::super::World;
 use super::{Estate, active};
@@ -102,12 +103,12 @@ impl Estate {
         at(&root).directory()?;
         at(&target).directory()?;
         let copied = if source.is_dir() {
-            super::copy::tree(&source, &target)
+            copy::tree(&source, &target)
         } else {
             let name = source
                 .file_name()
                 .ok_or_else(|| Error::new("Artifact source has no filename"))?;
-            super::copy::file(&source, &target.join(name))
+            copy::file(&source, &target.join(name))
         };
         if let Err(error) = copied {
             let _ = std::fs::remove_dir_all(&target);

@@ -158,3 +158,247 @@ name = "ForgeDeclaration"
 [[vocabulary.term]]
 description = "One explicit revision-checked removal of a forge coordinate."
 name = "ForgeWithdrawal"
+
+[[vocabulary.term]]
+description = "One worktree Member rooted directly in an Issue Anchor."
+name = "IssueMember"
+
+[[vocabulary.term]]
+description = "One normalized Claim rooted directly in an Issue Anchor."
+name = "IssueClaim"
+
+[[vocabulary.term]]
+description = "One frozen Boundary proof rooted directly in an Issue Anchor."
+name = "IssueBoundary"
+
+[[vocabulary.term]]
+description = "One pull or change coordinate attached to an Issue Member."
+name = "IssueChange"
+
+[[vocabulary.term]]
+description = "One private filesystem Artifact held by an Issue Anchor."
+name = "IssueArtifact"
+
+[[vocabulary.term]]
+description = "One revision-checked import into an Issue Artifact seat."
+name = "IssueImport"
+
+[[vocabulary.term]]
+description = "One revision-checked removal from an Issue Artifact seat."
+name = "IssueRemoval"
+
+[[vocabulary.term]]
+description = "One request to attach a worktree Member to an Issue Anchor."
+name = "IssueAttach"
+
+[[vocabulary.term]]
+description = "One materialized Issue-anchored worktree Member."
+name = "IssueWorktree"
+
+[[vocabulary.term]]
+description = "One revision-checked expansion of an Issue Member Claim."
+name = "IssueClaiming"
+
+[[vocabulary.term]]
+description = "One revision-checked narrowing of an Issue Member Claim."
+name = "IssueNarrowing"
+
+[[vocabulary.term]]
+description = "One Issue Member mutation and its overlap observations."
+name = "IssueMemberChange"
+
+[[vocabulary.term]]
+description = "One request to freeze an Issue Member Boundary proof."
+name = "IssueProving"
+
+[[vocabulary.term]]
+description = "One pull or change declaration for an Issue Member."
+name = "IssueDeclaration"
+
+[[vocabulary.term]]
+description = "One exact pull or change withdrawal from an Issue Member."
+name = "IssueWithdrawal"
+
+[[vocabulary.term]]
+description = "One release request for a landed Issue Member."
+name = "IssueRelease"
+
+[[vocabulary.term]]
+description = "One retirement request for an unlanded Issue Member."
+name = "IssueRetirement"
+
+[[vocabulary.term]]
+description = "One complete local health projection for an Issue Member."
+name = "IssueMemberStatus"
+
+[[vocabulary.term]]
+description = "One recent-session activity projection keyed by an Issue Anchor."
+name = "IssueActivity"
+
+[[vocabulary.term]]
+description = "The typed envelope carrying one Issue Member landing plan."
+name = "AnchorEnvelope"
+
+[[vocabulary.term]]
+description = "The bounded input shape for one Issue Member landing plan."
+name = "ANCHOR_PLAN"
+
+[[vocabulary.term]]
+description = "Preparing one Issue Member landing is one product operation."
+name = "prepare_anchor"
+
+[[vocabulary.term]]
+description = "Preparing one legacy Task Member landing is one compatibility operation."
+name = "prepare_task"
+
+[[vocabulary.term]]
+description = "Revalidating one Issue Member landing is one product operation."
+name = "ready_anchor"
+
+[[vocabulary.term]]
+description = "Revalidating one legacy Task Member landing is one compatibility operation."
+name = "ready_task"
+
+[[vocabulary.term]]
+description = "Emitting one Issue Member mutation result is one CLI operation."
+name = "issue_changed"
+
+[[vocabulary.term]]
+description = "The occupied write surfaces derived from one Issue Member."
+name = "MemberSurfaces"
+
+[[vocabulary.term]]
+description = "Rendering Issue activity is one CLI output operation."
+name = "issue_activity"
+
+[[vocabulary.term]]
+description = "Rendering Issue Member health is one CLI output operation."
+name = "issue_status"
+
+[[vocabulary.term]]
+description = "Deriving normalized repository write surfaces is one coordination operation."
+name = "write_surfaces"
+
+[[vocabulary.term]]
+description = "Recording one Issue-keyed activity touch is one coordination operation."
+name = "touch_issue"
+
+[[vocabulary.term]]
+description = "Opening the exact prior Anchor model is one compatibility proof."
+name = "anchor_compatibility"
+
+[[vocabulary.term]]
+description = "Listing private Artifacts for one Issue Anchor is one product operation."
+name = "issue_artifacts"
+
+[[vocabulary.term]]
+description = "Resolving one private Artifact for an Issue Anchor is one product operation."
+name = "issue_artifact"
+
+[[vocabulary.term]]
+description = "Preflighting one Issue Artifact import is one product operation."
+name = "preflight_issue"
+
+[[vocabulary.term]]
+description = "Importing one private Issue Artifact is one product operation."
+name = "import_issue"
+
+[[vocabulary.term]]
+description = "Removing one private Issue Artifact is one product operation."
+name = "remove_issue"
+
+[[vocabulary.term]]
+description = "The stable filesystem root for one Issue Artifact set."
+name = "issue_artifact_root"
+
+[[vocabulary.term]]
+description = "Expanding one Issue Member Claim is one product operation."
+name = "claim_issue"
+
+[[vocabulary.term]]
+description = "Narrowing one Issue Member Claim is one product operation."
+name = "narrow_issue"
+
+[[vocabulary.term]]
+description = "Replacing the normalized Claim set of one Issue Member is one internal operation."
+name = "change_issue_claim"
+
+[[vocabulary.term]]
+description = "Observing Issue Member Claim overlap is one coordination operation."
+name = "issue_overlaps"
+
+[[vocabulary.term]]
+description = "Listing every Issue-anchored worktree is one product operation."
+name = "issue_worktrees"
+
+[[vocabulary.term]]
+description = "Attaching one worktree to an Issue Anchor is one product operation."
+name = "attach_issue"
+
+[[vocabulary.term]]
+description = "Resolving one worktree Member beneath an Issue Anchor is one product operation."
+name = "issue_member"
+
+[[vocabulary.term]]
+description = "Resolving an Issue Member integration checkout is one coordination operation."
+name = "issue_source_path"
+
+[[vocabulary.term]]
+description = "Deriving the stable local path for an Issue Member is one custody operation."
+name = "issue_path"
+
+[[vocabulary.term]]
+description = "Resolving the integration source of an Issue Member is one custody operation."
+name = "issue_source"
+
+[[vocabulary.term]]
+description = "Decoding a frozen Issue Member Boundary is one custody operation."
+name = "issue_proof"
+
+[[vocabulary.term]]
+description = "Refusing a stale Issue execution revision is one concurrency operation."
+name = "issue_stale"
+
+[[vocabulary.term]]
+description = "Proving one Issue Member Boundary is one product operation."
+name = "prove_issue"
+
+[[vocabulary.term]]
+description = "Persisting one direct Issue Boundary relationship is one custody operation."
+name = "keep_issue_boundary"
+
+[[vocabulary.term]]
+description = "Declaring one pull or change coordinate for an Issue Member is one product operation."
+name = "refer_issue"
+
+[[vocabulary.term]]
+description = "Removing one pull or change coordinate from an Issue Member is one product operation."
+name = "unrefer_issue"
+
+[[vocabulary.term]]
+description = "Reading all pull or change coordinates for an Issue Member is one product operation."
+name = "issue_references"
+
+[[vocabulary.term]]
+description = "Releasing one landed Issue Member is one product operation."
+name = "release_issue"
+
+[[vocabulary.term]]
+description = "Retiring one unlanded Issue Member is one product operation."
+name = "retire_issue"
+
+[[vocabulary.term]]
+description = "Removing one proven Issue Member under release or retirement gates is one operation."
+name = "finish_issue_member"
+
+[[vocabulary.term]]
+description = "Reading complete local health for an Issue Member is one product operation."
+name = "issue_member_status"
+
+[[vocabulary.term]]
+description = "Recording one Issue-keyed activity event is one runtime operation."
+name = "record_issue"
+
+[[vocabulary.term]]
+description = "The end-to-end Issue execution contract is one test scenario."
+name = "issue_execution"

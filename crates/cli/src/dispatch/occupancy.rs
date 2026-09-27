@@ -1,8 +1,10 @@
 use crate::args;
 use crate::output;
+use concord_core::Coordinate;
 use concord_core::activity::Operator;
 use concord_core::occupancy::Subject;
 use concord_core::{Estate, Result};
+use std::path::Path;
 
 pub(crate) struct Run {
     operator: Option<Operator>,
@@ -19,6 +21,10 @@ enum Seed<'a> {
     Task(&'a str),
     Member(&'a str, &'a str),
     Graph(&'a str),
+    Issue(&'a str),
+    IssueMember(&'a str, &'a str),
+    MemberSurfaces(&'a str, &'a str, Option<&'a [String]>),
+    Surfaces(&'a Path, &'a [String]),
     Exact(Subject),
 }
 
@@ -69,20 +75,40 @@ impl Run {
 async fn resolve(estate: &Estate, seeds: Vec<Seed<'_>>) -> Result<Vec<Subject>> {
     let mut subjects = Vec::new();
     for seed in seeds {
-        let subject = match seed {
-            Seed::Task(task) => Subject::Task {
+        let found = match seed {
+            Seed::Task(task) => vec![Subject::Task {
                 task: estate.node(task).await?.identity(),
-            },
-            Seed::Member(task, member) => Subject::Member {
+            }],
+            Seed::Member(task, member) => vec![Subject::Member {
                 task: estate.node(task).await?.identity(),
                 member: member.to_string(),
-            },
-            Seed::Graph(task) => Subject::Graph {
+            }],
+            Seed::Graph(task) => vec![Subject::Graph {
                 task: estate.node(task).await?.identity(),
-            },
-            Seed::Exact(subject) => subject,
+            }],
+            Seed::Issue(issue) => {
+                let anchor = estate.issue(&Coordinate::parse(issue)?).await?;
+                vec![Subject::Issue { node: anchor.node }]
+            }
+            Seed::IssueMember(issue, member) => {
+                let anchor = estate.issue(&Coordinate::parse(issue)?).await?;
+                vec![Subject::IssueMember {
+                    node: anchor.node,
+                    member: member.to_string(),
+                }]
+            }
+            Seed::MemberSurfaces(issue, member, additions) => {
+                let coordinate = Coordinate::parse(issue)?;
+                let held = estate.issue_member(&coordinate, member).await?;
+                let mut claims = held.claims;
+                claims.extend(additions.into_iter().flatten().cloned());
+                let source = estate.issue_source_path(&coordinate, member).await?;
+                estate.write_surfaces(&source, &claims)?
+            }
+            Seed::Surfaces(source, claims) => estate.write_surfaces(source, claims)?,
+            Seed::Exact(subject) => vec![subject],
         };
-        subjects.push(subject);
+        subjects.extend(found);
     }
     subjects.sort();
     subjects.dedup();
@@ -167,12 +193,34 @@ fn member(command: &args::member::Command) -> Option<Vec<Seed<'_>>> {
         | Command::Retire { task, member, .. } => (task, member),
         Command::List { .. } | Command::Status { .. } | Command::Landing { .. } => return None,
     };
+    if task.contains('#') {
+        let mut seeds = vec![Seed::Issue(task), Seed::IssueMember(task, member)];
+        match command {
+            Command::Attach { source, claim, .. } => {
+                seeds.push(Seed::Surfaces(source, claim));
+            }
+            Command::Claim { claim, .. } | Command::Narrow { claim, .. } => {
+                seeds.push(Seed::MemberSurfaces(task, member, Some(claim)));
+            }
+            Command::Prove { .. }
+            | Command::Reference { .. }
+            | Command::Release { .. }
+            | Command::Retire { .. } => {
+                seeds.push(Seed::MemberSurfaces(task, member, None));
+            }
+            Command::List { .. } | Command::Status { .. } | Command::Landing { .. } => {}
+        }
+        return Some(seeds);
+    }
     Some(vec![Seed::Task(task), Seed::Member(task, member)])
 }
 
 fn artifact(command: &args::artifact::Command) -> Option<Vec<Seed<'_>>> {
     use args::artifact::Command;
     match command {
+        Command::Import { task, .. } | Command::Remove { task, .. } if task.contains('#') => {
+            Some(vec![Seed::Issue(task)])
+        }
         Command::Import { task, .. } | Command::Remove { task, .. } => Some(vec![Seed::Task(task)]),
         Command::List { .. } | Command::Show { .. } | Command::Preflight { .. } => None,
     }

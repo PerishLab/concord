@@ -1,13 +1,14 @@
+mod activity;
 mod member;
 mod task;
 
-use concord_core::activity::Activity;
 use concord_core::occupancy::Occupancy;
 use concord_core::{ClaimOverlap, Error, Result};
 use plumb::skill::{Done, Record, Report};
 use serde_json::json;
 
-pub use member::status as member_status;
+pub use activity::{activity, issue_activity, unavailable};
+pub use member::{issue_status as issue_member_status, status as member_status};
 pub use task::brief as task_brief;
 
 pub fn occupancy(occupancy: &Occupancy, output: bool) {
@@ -63,69 +64,6 @@ pub fn blind(error: &Error, output: bool) {
     }
     eprintln!(
         "concord: warning: session occupancy is unavailable: {}",
-        error.message()
-    );
-}
-
-pub fn activity(activity: &Activity, output: bool) {
-    if activity.recent.is_empty() {
-        return;
-    }
-    let warning = json!({
-        "warning": {
-            "code": "concord.activity.concurrent_session",
-            "message": "another session touched this Task within the recent window; take care",
-            "task": activity.task,
-            "window_seconds": activity.window,
-            "current": activity.current,
-            "sessions": activity.recent,
-        }
-    });
-    if output {
-        eprintln!(
-            "{}",
-            serde_json::to_string(&warning).expect("activity warning JSON should encode")
-        );
-        return;
-    }
-    eprintln!(
-        "concord: warning: {} has recent activity from another session; take care",
-        activity.task
-    );
-    for touch in &activity.recent {
-        if let (Some(agent), Some(session)) = (touch.agent, touch.session.as_deref()) {
-            eprintln!(
-                "  {} {} {} at {}",
-                agent.name(),
-                session,
-                touch.operation,
-                touch.time
-            );
-        }
-    }
-}
-
-pub fn unavailable(task: &str, error: &Error, output: bool) {
-    let warning = json!({
-        "warning": {
-            "code": "concord.activity.unavailable",
-            "message": "Task activity is unavailable; the primary command remains unaffected",
-            "task": task,
-            "details": {
-                "code": error.code(),
-                "message": error.message(),
-            },
-        }
-    });
-    if output {
-        eprintln!(
-            "{}",
-            serde_json::to_string(&warning).expect("activity warning JSON should encode")
-        );
-        return;
-    }
-    eprintln!(
-        "concord: warning: Task activity is unavailable for {task}: {}",
         error.message()
     );
 }

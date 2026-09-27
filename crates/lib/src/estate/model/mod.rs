@@ -4,6 +4,7 @@ use keel::{Graph, resource};
 mod current;
 mod dependency;
 mod domain;
+mod execution;
 mod member;
 pub mod migration;
 mod phase;
@@ -51,22 +52,26 @@ pub(super) struct Reservation {
 }
 
 pub(super) fn graph() -> Graph {
-    assemble(true, true, true)
+    assemble(true, true, true, true)
+}
+
+pub(super) fn anchored() -> Graph {
+    assemble(true, true, true, false)
 }
 
 pub(super) fn released() -> Graph {
-    assemble(true, true, false)
+    assemble(true, true, false, false)
 }
 
 pub(super) fn bridge() -> Graph {
-    assemble(true, false, false)
+    assemble(true, false, false, false)
 }
 
 pub(super) fn legacy() -> Graph {
-    assemble(false, false, false)
+    assemble(false, false, false, false)
 }
 
-fn assemble(tombstone: bool, references: bool, anchors: bool) -> Graph {
+fn assemble(tombstone: bool, references: bool, anchors: bool, execution: bool) -> Graph {
     let mut graph = Graph::new();
     graph
         .plug::<Space>()
@@ -77,6 +82,13 @@ fn assemble(tombstone: bool, references: bool, anchors: bool) -> Graph {
         .plug::<repository::Repository>();
     if anchors {
         graph.plug::<reference::Anchor>();
+    }
+    if execution {
+        graph
+            .plug::<execution::IssueMember>()
+            .plug::<execution::IssueClaim>()
+            .plug::<execution::IssueBoundary>()
+            .plug::<execution::IssueChange>();
     }
     if tombstone {
         graph.plug::<repository::Tombstone>();
@@ -110,7 +122,8 @@ fn assemble(tombstone: bool, references: bool, anchors: bool) -> Graph {
 
 #[cfg(test)]
 mod tests {
-    use super::{bridge, legacy, migration, released};
+    use super::{anchored, bridge, legacy, migration, released};
+    use crate::{Coordinate, Seat};
     use keel::adapt::db::Sqlite;
 
     #[tokio::test]
@@ -169,5 +182,56 @@ mod tests {
         assert_eq!(row.text("name"), Some("legacy"));
         assert_eq!(row.text("note"), Some("RETIRED"));
         assert_eq!(row.int("domain"), Some(domain));
+    }
+
+    #[tokio::test]
+    async fn anchor_compatibility() {
+        let temp = tempfile::tempdir().expect("temporary estate");
+        let seat = Seat::new(temp.path());
+        std::fs::create_dir_all(seat.database().parent().expect("estate root"))
+            .expect("estate root");
+        let wire = Sqlite::file(seat.database())
+            .await
+            .expect("anchor database");
+        let mut held = keel::bootstrap(anchored(), wire).expect("anchor graph");
+        let sudo = held.mint().await.expect("anchor sudo");
+        let core = held.seal(&sudo).await.expect("anchor estate");
+        core.put("Space", &[("name", "space"), ("revision", "0")])
+            .await
+            .expect("Space");
+        core.put(
+            "Anchor",
+            &[
+                ("node", "I_anchor"),
+                ("owner", "PerishLab"),
+                ("repository", "concord"),
+                ("number", "25"),
+                ("revision", "0"),
+            ],
+        )
+        .await
+        .expect("Anchor");
+        drop(core);
+        crate::path::at(&seat.sudo())
+            .file(&sudo)
+            .expect("sudo file");
+        crate::path::at(&seat.database())
+            .mode(0o600)
+            .expect("database mode");
+
+        let estate = seat.open().await.expect("open exact anchor estate");
+        let coordinate = Coordinate::parse("PerishLab/concord#25").expect("coordinate");
+        assert_eq!(
+            estate.issue(&coordinate).await.expect("Anchor").node,
+            "I_anchor"
+        );
+        assert_eq!(
+            estate
+                .issue_worktrees()
+                .await
+                .expect_err("execution resources require explicit transition")
+                .code(),
+            "concord.issue.execution_migration_required"
+        );
     }
 }
