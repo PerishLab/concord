@@ -2,12 +2,70 @@ mod member;
 mod task;
 
 use concord_core::activity::Activity;
+use concord_core::occupancy::Occupancy;
 use concord_core::{ClaimOverlap, Error, Result};
 use plumb::skill::{Done, Record, Report};
 use serde_json::json;
 
 pub use member::status as member_status;
 pub use task::brief as task_brief;
+
+pub fn occupancy(occupancy: &Occupancy, output: bool) {
+    if occupancy.conflicts.is_empty() {
+        return;
+    }
+    let warning = json!({
+        "warning": {
+            "code": "concord.occupancy.concurrent_session",
+            "message": "another session has current non-exclusive occupancy on an intersecting managed write subject",
+            "lease_seconds": occupancy.lease,
+            "current": occupancy.current,
+            "conflicts": occupancy.conflicts,
+            "semantics": "a heartbeat proves only a Concord write; expiry does not prove session death",
+        }
+    });
+    if output {
+        eprintln!(
+            "{}",
+            serde_json::to_string(&warning).expect("occupancy warning JSON should encode")
+        );
+        return;
+    }
+    eprintln!(
+        "concord: warning: another session has non-exclusive occupancy on this write surface"
+    );
+    for conflict in &occupancy.conflicts {
+        eprintln!(
+            "  {} {} wrote {} at {} on {:?}",
+            conflict.holder.agent.name(),
+            conflict.holder.session,
+            conflict.holder.operation,
+            conflict.holder.heartbeat,
+            conflict.subjects
+        );
+    }
+}
+
+pub fn blind(error: &Error, output: bool) {
+    let warning = json!({
+        "warning": {
+            "code": "concord.occupancy.unavailable",
+            "message": "session occupancy is unavailable; the primary command remains unaffected",
+            "details": {"code": error.code(), "message": error.message()},
+        }
+    });
+    if output {
+        eprintln!(
+            "{}",
+            serde_json::to_string(&warning).expect("occupancy warning JSON should encode")
+        );
+        return;
+    }
+    eprintln!(
+        "concord: warning: session occupancy is unavailable: {}",
+        error.message()
+    );
+}
 
 pub fn activity(activity: &Activity, output: bool) {
     if activity.recent.is_empty() {
