@@ -6,6 +6,8 @@ mod issue;
 mod landing;
 #[path = "seat/migration.rs"]
 mod migration;
+#[path = "seat/projection.rs"]
+mod projection;
 #[path = "seat/provider.rs"]
 mod provider;
 #[path = "seat/reference.rs"]
