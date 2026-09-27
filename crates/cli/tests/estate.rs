@@ -1,5 +1,7 @@
 #[path = "seat/landing.rs"]
 mod landing;
+#[path = "seat/migration.rs"]
+mod migration;
 #[path = "seat/provider.rs"]
 mod provider;
 #[path = "seat/reference.rs"]
@@ -180,7 +182,7 @@ fn estate() {
             .any(|finding| finding["code"] == "dependency.cross_domain")
     );
 
-    for removed in ["todo", "memory", "resource", "migration"] {
+    for removed in ["todo", "memory", "resource"] {
         let output = raw(fixture.path(), &[removed]);
         assert!(!output.status.success(), "{removed} must stay absent");
         assert!(String::from_utf8_lossy(&output.stderr).contains("unrecognized subcommand"));

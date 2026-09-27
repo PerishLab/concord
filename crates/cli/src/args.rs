@@ -3,6 +3,7 @@ pub(crate) mod audit;
 pub(crate) mod domain;
 pub(crate) mod graph;
 pub(crate) mod member;
+pub(crate) mod migration;
 pub(crate) mod phase;
 pub(crate) mod task;
 
@@ -15,6 +16,7 @@ pub use audit::Args as Audit;
 pub use domain::Args as Domain;
 pub use graph::Args as Graph;
 pub use member::Args as Member;
+pub use migration::Args as Migration;
 pub use phase::Args as Phase;
 pub use task::Args as Task;
 
@@ -64,6 +66,8 @@ pub enum Command {
     Member(Member),
     #[command(about = "Manage direct private Artifact payload")]
     Artifact(Artifact),
+    #[command(about = "Migrate one exact v0.12.10 estate to v0.13.0")]
+    Migration(Migration),
     #[command(about = "Inspect the Task dependency graph")]
     Graph(Graph),
     #[command(about = "Audit estate, graph, and external agreement")]
@@ -81,6 +85,7 @@ impl Command {
             Self::Phase(args) => args.command.name(),
             Self::Member(args) => args.command.name(),
             Self::Artifact(args) => args.command.name(),
+            Self::Migration(args) => args.command.name(),
             Self::Graph(args) => args.command.name(),
             Self::Audit(_) => "audit",
             Self::Skill(args) => args.command.name(),
@@ -95,7 +100,7 @@ impl Command {
             Self::Artifact(args) => Some(args.command.activity()),
             Self::Graph(args) => args.command.activity(),
             Self::Audit(args) => args.task.as_deref().map(|task| vec![task]),
-            Self::Config(_) | Self::Domain(_) | Self::Skill(_) => None,
+            Self::Config(_) | Self::Domain(_) | Self::Migration(_) | Self::Skill(_) => None,
         }
     }
 }

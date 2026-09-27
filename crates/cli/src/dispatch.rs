@@ -36,6 +36,10 @@ pub async fn run(cli: args::Cli) -> Result<()> {
         Command::Config(args) => {
             return configuration::run(&config, args.command, cli.json);
         }
+        Command::Migration(args) => {
+            let root = config.root()?;
+            return configuration::migration(&Seat::new(root.path()), args.command, cli.json).await;
+        }
         command => command,
     };
     let root = config.root()?;
@@ -83,7 +87,7 @@ impl Dispatch {
             }
         }
         let result = match command {
-            Command::Config(_) | Command::Skill(_) => {
+            Command::Config(_) | Command::Migration(_) | Command::Skill(_) => {
                 unreachable!("handled before estate open")
             }
             Command::Domain(args) => domain::run(&self.estate, args.command, self.json).await,
