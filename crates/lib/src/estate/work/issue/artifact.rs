@@ -34,7 +34,6 @@ impl Estate {
         &self,
         issue: &super::super::super::Coordinate,
     ) -> Result<Vec<IssueArtifact>> {
-        self.executable()?;
         let anchor = self.issue(issue).await?;
         let root = self.issue_artifact_root(&anchor)?;
         if !root.exists() {

@@ -32,7 +32,6 @@ impl Estate {
             &request.repository,
             request.number,
         )?;
-        self.executable()?;
         let _guard = self.guard()?;
         self.ensure().await?;
         let anchor = self.issue(&request.issue).await?;
@@ -78,7 +77,6 @@ impl Estate {
     }
 
     pub async fn unrefer_issue(&self, request: &IssueWithdrawal) -> Result<i64> {
-        self.executable()?;
         let _guard = self.guard()?;
         self.ensure().await?;
         let anchor = self.issue(&request.issue).await?;

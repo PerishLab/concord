@@ -44,7 +44,6 @@ pub struct IssueWorktree {
 
 impl Estate {
     pub async fn issue_worktrees(&self) -> Result<Vec<IssueWorktree>> {
-        self.executable()?;
         let anchors = self.core.live("Anchor").await.map_err(fault)?;
         let claims = self.core.live("IssueClaim").await.map_err(fault)?;
         let proofs = self.core.live("IssueBoundary").await.map_err(fault)?;
@@ -86,7 +85,6 @@ impl Estate {
     }
 
     pub async fn attach_issue(&self, request: &IssueAttach) -> Result<IssueMemberChange> {
-        self.executable()?;
         component("member name", &request.name)?;
         let source = request.source.canonicalize().map_err(|error| {
             Error::typed(
@@ -240,16 +238,6 @@ impl Estate {
             &member.source,
             &self.space.join(".issues").join(&member.node),
         )
-    }
-
-    pub(super) fn executable(&self) -> Result<()> {
-        if self.execution {
-            return Ok(());
-        }
-        Err(Error::typed(
-            "concord.issue.execution_migration_required",
-            "this estate has no Issue execution resources; follow the explicit estate transition",
-        ))
     }
 }
 

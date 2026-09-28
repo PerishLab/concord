@@ -11,11 +11,6 @@ allow = ["word"]
 note = "the GitHub GraphQL adapter preserves the provider wire dialect"
 paths = ["crates/cli/src/dispatch/forge/github.rs"]
 
-[[boundary]]
-allow = ["path"]
-note = "the exact v0.13 transition protocol stays decomposed beneath the release migration family"
-paths = ["crates/lib/src/estate/model/migration/transition/**"]
-
 [comment]
 allow = false
 
