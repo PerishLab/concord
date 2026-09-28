@@ -57,46 +57,6 @@ description = "The stable config and environment key for Concord's domain-space 
 name = "domain_space_root"
 
 [[vocabulary.term]]
-description = "The fixed Task count for one bounded Domain projection page."
-name = "TASK_BRIEF_LIMIT"
-
-[[vocabulary.term]]
-description = "The fixed cumulative UTF-8 byte ceiling for one projected current-fact role."
-name = "TASK_BRIEF_ROLE_BYTES"
-
-[[vocabulary.term]]
-description = "One bounded Domain Task projection is one Concord read result atom."
-name = "TaskBriefPage"
-
-[[vocabulary.term]]
-description = "The explicit ceilings and selected roles carried by one Task projection result."
-name = "TaskBriefLimits"
-
-[[vocabulary.term]]
-description = "One current Task and its bounded role facts form one projection entry."
-name = "TaskBriefEntry"
-
-[[vocabulary.term]]
-description = "One current role and its cumulative fact projection form one read atom."
-name = "RoleBrief"
-
-[[vocabulary.term]]
-description = "One typed current Fact with a bounded body forms one read atom."
-name = "FactBrief"
-
-[[vocabulary.term]]
-description = "One UTF-8-safe bounded text projection is one read atom."
-name = "TextPreview"
-
-[[vocabulary.term]]
-description = "The byte ceiling applied independently to each selected current-fact role."
-name = "role_bytes"
-
-[[vocabulary.term]]
-description = "The bounded current Domain portfolio projection command is one product operation."
-name = "task_brief"
-
-[[vocabulary.term]]
 description = "Boundary proof absence, currency, or staleness is one Member health atom."
 name = "BoundaryState"
 
@@ -125,10 +85,6 @@ description = "One local upstream ref and its observed divergence form one healt
 name = "UpstreamState"
 
 [[vocabulary.term]]
-description = "One complete read-only local Member health projection."
-name = "MemberStatus"
-
-[[vocabulary.term]]
 description = "The integration checkout paired with one Member worktree."
 name = "integration_checkout"
 
@@ -141,28 +97,12 @@ description = "Local remote-tracking refs observed to contain one Member HEAD."
 name = "local_tracking_refs"
 
 [[vocabulary.term]]
-description = "Reading one Member's local Git health is one product operation."
-name = "member_status"
-
-[[vocabulary.term]]
 description = "One structured coordination observation of intersecting Claims held by a peer Member."
 name = "ClaimOverlap"
 
 [[vocabulary.term]]
-description = "One successful Member mutation paired with its non-gating coordination observations."
-name = "MemberChange"
-
-[[vocabulary.term]]
-description = "The issue or change kind carried by one declared forge coordinate."
+description = "The pull or change kind carried by one declared forge coordinate."
 name = "ReferenceKind"
-
-[[vocabulary.term]]
-description = "One explicit revision-checked declaration or replacement of a forge coordinate."
-name = "ForgeDeclaration"
-
-[[vocabulary.term]]
-description = "One explicit revision-checked removal of a forge coordinate."
-name = "ForgeWithdrawal"
 
 [[vocabulary.term]]
 description = "One worktree Member rooted directly in an Issue Anchor."
@@ -241,30 +181,6 @@ description = "One recent-session activity projection keyed by an Issue Anchor."
 name = "IssueActivity"
 
 [[vocabulary.term]]
-description = "The typed envelope carrying one Issue Member landing plan."
-name = "AnchorEnvelope"
-
-[[vocabulary.term]]
-description = "The bounded input shape for one Issue Member landing plan."
-name = "ANCHOR_PLAN"
-
-[[vocabulary.term]]
-description = "Preparing one Issue Member landing is one product operation."
-name = "prepare_anchor"
-
-[[vocabulary.term]]
-description = "Preparing one legacy Task Member landing is one compatibility operation."
-name = "prepare_task"
-
-[[vocabulary.term]]
-description = "Revalidating one Issue Member landing is one product operation."
-name = "ready_anchor"
-
-[[vocabulary.term]]
-description = "Revalidating one legacy Task Member landing is one compatibility operation."
-name = "ready_task"
-
-[[vocabulary.term]]
 description = "Emitting one Issue Member mutation result is one CLI operation."
 name = "issue_changed"
 
@@ -287,10 +203,6 @@ name = "write_surfaces"
 [[vocabulary.term]]
 description = "Recording one Issue-keyed activity touch is one coordination operation."
 name = "touch_issue"
-
-[[vocabulary.term]]
-description = "Opening the exact prior Anchor model is one compatibility proof."
-name = "anchor_compatibility"
 
 [[vocabulary.term]]
 description = "Listing private Artifacts for one Issue Anchor is one product operation."
@@ -543,55 +455,3 @@ name = "max_nodes"
 [[vocabulary.term]]
 description = "The exact Issue-and-Member delivery plan composed by Concord over Plumb's delivery kernel."
 name = "issue_delivery"
-
-[[vocabulary.term]]
-description = "The number of frozen Phase entries retained beneath one Task or across one transition inventory."
-name = "phase_entries"
-
-[[vocabulary.term]]
-description = "The canonical integration-checkout path observed for one legacy Member."
-name = "source_path"
-
-[[vocabulary.term]]
-description = "The canonical Git common-directory identity observed for one legacy Member source."
-name = "source_identity"
-
-[[vocabulary.term]]
-description = "The number of active Tasks represented by one v0.13 transition inventory."
-name = "active_tasks"
-
-[[vocabulary.term]]
-description = "The number of retired Tasks represented by one v0.13 transition inventory."
-name = "retired_tasks"
-
-[[vocabulary.term]]
-description = "The number of explicit Member and Artifact seats represented by one transition inventory."
-name = "filesystem_seats"
-
-[[vocabulary.term]]
-description = "The exact v0.13 dependency-graph revision bound into one transition inventory."
-name = "graph_revision"
-
-[[vocabulary.term]]
-description = "One stable Issue node and its provider coordinate selected as a transition destination."
-name = "IssueDestination"
-
-[[vocabulary.term]]
-description = "The explicit disposition that retains a Task only in private transition archive lineage."
-name = "ArchiveOnly"
-
-[[vocabulary.term]]
-description = "One revision-bound destination declaration for a source Task."
-name = "TaskDisposition"
-
-[[vocabulary.term]]
-description = "One node-and-path destination declaration for a source Member or Artifact."
-name = "ResourceDisposition"
-
-[[vocabulary.term]]
-description = "The complete operator-authored mapping bound to one exact transition inventory."
-name = "DispositionPlan"
-
-[[vocabulary.term]]
-description = "One retired Task's current facts and frozen Phases inside private archive lineage."
-name = "ArchiveTask"

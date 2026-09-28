@@ -1,18 +1,15 @@
 mod activity;
 mod artifact;
 mod configuration;
-mod domain;
 mod forge;
-mod graph;
 mod input;
 mod member;
 mod occupancy;
-mod task;
 
 use crate::args::{self, Command};
 use crate::config::Config;
 use crate::{output, skill};
-use concord_core::{Estate, Result, Seat, Settle};
+use concord_core::{Estate, Result, Seat};
 use serde_json::json;
 
 pub async fn run(cli: args::Cli) -> Result<()> {
@@ -41,9 +38,7 @@ pub async fn run(cli: args::Cli) -> Result<()> {
     let root = config.root()?;
     let seat = Seat::new(root.path());
     match command {
-        Command::Domain(args)
-            if matches!(args.command, crate::args::domain::Command::Bootstrap { .. }) =>
-        {
+        Command::Issue(args) if matches!(args.command, crate::args::issue::Command::Bootstrap) => {
             bootstrap(&seat, cli.json).await
         }
         command => {
@@ -75,10 +70,10 @@ impl Dispatch {
     async fn run(&self, command: Command) -> Result<()> {
         let operation = command.name();
         let intent = self.occupancy.prepare(&self.estate, &command).await;
-        if let Some(tasks) = command.activity() {
-            for task in tasks {
+        if let Some(issues) = command.activity() {
+            for issue in issues {
                 self.activity
-                    .touch(&self.estate, task, command.name())
+                    .touch(&self.estate, issue, command.name())
                     .await;
             }
         }
@@ -86,29 +81,11 @@ impl Dispatch {
             Command::Config(_) | Command::Skill(_) => {
                 unreachable!("handled before estate open")
             }
-            Command::Domain(args) => domain::run(&self.estate, args.command, self.json).await,
-            Command::Task(args) => {
-                task::run(
-                    &self.estate,
-                    args.command,
-                    task::Signals {
-                        activity: &self.activity,
-                        occupancy: &self.occupancy,
-                    },
-                    self.json,
-                )
-                .await
-            }
             Command::Issue(args) => forge::run(&self.estate, args.command, self.json).await,
-            Command::Phase(args) => self.phase(args.command).await,
             Command::Member(args) => member::run(&self.estate, args.command, self.json).await,
             Command::Artifact(args) => artifact::run(&self.estate, args.command, self.json).await,
-            Command::Graph(args) => graph::run(&self.estate, args.command, self.json).await,
-            Command::Audit(args) => {
-                let report = self
-                    .estate
-                    .inspect(args.task.as_deref(), args.domain.as_deref())
-                    .await?;
+            Command::Audit(_) => {
+                let report = self.estate.inspect().await?;
                 let agrees = report.agrees();
                 emit(json!({"agreement": report}), self.json)?;
                 if agrees {
@@ -125,27 +102,6 @@ impl Dispatch {
             self.occupancy.commit(&self.estate, intent, operation);
         }
         result
-    }
-
-    async fn phase(&self, command: args::phase::Command) -> Result<()> {
-        let operation = command.name();
-        match command {
-            args::phase::Command::List { task } => emit(
-                json!({"task": task, "phases": self.estate.phases(&task).await?}),
-                self.json,
-            ),
-            args::phase::Command::Settle { input: path } => {
-                let settle: Settle = input::read(&path, Settle::SHAPE)?;
-                self.activity
-                    .touch(&self.estate, &settle.task, operation)
-                    .await;
-                let settlement = self.estate.settle(&settle).await?;
-                self.occupancy
-                    .task(&self.estate, &settle.task, operation)
-                    .await;
-                emit(json!({"settlement": settlement}), self.json)
-            }
-        }
     }
 }
 

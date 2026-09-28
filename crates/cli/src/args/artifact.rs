@@ -9,44 +9,34 @@ pub struct Args {
 
 #[derive(Subcommand)]
 pub enum Command {
-    #[command(about = "List direct filesystem Artifacts")]
-    List {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
-    },
-    #[command(about = "Resolve one direct filesystem Artifact")]
-    Show {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
-        name: String,
-    },
-    #[command(about = "Prove an Artifact import without copying payload")]
+    #[command(about = "List one Issue's direct filesystem Artifacts")]
+    List { issue: String },
+    #[command(about = "Resolve one direct Issue Artifact")]
+    Show { issue: String, name: String },
+    #[command(about = "Prove an Issue Artifact import without copying payload")]
     Preflight {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
+        issue: String,
         name: String,
         #[arg(long)]
         source: PathBuf,
         #[arg(long)]
-        revision: Option<i64>,
+        revision: i64,
     },
-    #[command(about = "Import a file or tree into one Artifact seat")]
+    #[command(about = "Import a file or tree into one Issue Artifact seat")]
     Import {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
+        issue: String,
         name: String,
         #[arg(long)]
         source: PathBuf,
         #[arg(long)]
-        revision: Option<i64>,
+        revision: i64,
     },
-    #[command(about = "Remove one exact Artifact seat")]
+    #[command(about = "Remove one exact Issue Artifact seat")]
     Remove {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
+        issue: String,
         name: String,
         #[arg(long)]
-        revision: Option<i64>,
+        revision: i64,
         #[arg(long)]
         apply: bool,
     },
@@ -62,14 +52,13 @@ impl Command {
             Self::Remove { .. } => "artifact.remove",
         }
     }
-
     pub(crate) fn activity(&self) -> Vec<&str> {
         match self {
-            Self::List { task } => vec![task],
-            Self::Show { task, .. } => vec![task],
-            Self::Preflight { task, .. } => vec![task],
-            Self::Import { task, .. } => vec![task],
-            Self::Remove { task, .. } => vec![task],
+            Self::List { issue }
+            | Self::Show { issue, .. }
+            | Self::Preflight { issue, .. }
+            | Self::Import { issue, .. }
+            | Self::Remove { issue, .. } => vec![issue],
         }
     }
 }

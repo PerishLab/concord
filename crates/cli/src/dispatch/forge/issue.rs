@@ -18,6 +18,7 @@ struct Plan {
 
 pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> {
     match command {
+        Command::Bootstrap => unreachable!("handled before estate open"),
         Command::Brief {
             issue,
             command,

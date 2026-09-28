@@ -1,15 +1,13 @@
 mod activity;
 mod member;
-mod task;
 
 use concord_core::occupancy::Occupancy;
 use concord_core::{ClaimOverlap, Error, Result};
 use plumb::skill::{Done, Record, Report};
 use serde_json::json;
 
-pub use activity::{activity, issue_activity, unavailable};
-pub use member::{issue_status as issue_member_status, status as member_status};
-pub use task::brief as task_brief;
+pub use activity::{issue_activity, unavailable};
+pub use member::issue_status as issue_member_status;
 
 pub fn occupancy(occupancy: &Occupancy, output: bool) {
     if occupancy.conflicts.is_empty() {

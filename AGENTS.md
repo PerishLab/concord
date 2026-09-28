@@ -3,8 +3,8 @@
 Concord is the executable control plane for one managed Space. GitHub Issues
 are the durable work ledger. One exact Keel estate is the sole authority for
 Issue-anchored local execution state; Git worktrees and Artifact directories
-remain external payload and must agree with that estate. Task narrative state
-does not belong to the managed estate.
+remain external payload and must agree with that estate. GitHub Issues and PRs
+are the only work narrative and delivery ledger.
 
 Four surfaces answer different questions. The source says what Concord does,
 `--help` says how to invoke it, the Concord skill says how to operate its
@@ -49,7 +49,7 @@ Ask the owning surface instead of copying its answer here.
 - Fail closed when the estate, coordinates, external seats, source identity,
   branch, or Git worktree metadata disagree. Read-only diagnosis remains
   available.
-- Keep `.concord`, `.issues`, `.tasks`, execution seats, and Artifacts private.
+- Keep `.concord`, `.issues`, execution seats, and Artifacts private.
   Never edit or infer managed state by hand.
 - Lock the Space, re-read the relevant revision, compare, and commit one Keel
   batch for every mutation.

@@ -8,41 +8,21 @@ use std::path::{Path, PathBuf};
 
 #[path = "data/agreement.rs"]
 mod agreement;
-#[path = "current/brief.rs"]
-mod brief;
-mod current;
-mod data;
-mod dependency;
 mod forge;
-mod graph;
 mod model;
-mod phase;
-mod task;
 #[path = "data/territory/mod.rs"]
 mod territory;
 mod work;
 
 pub use agreement::{Agreement, Finding};
-pub use brief::{
-    FactBrief, RoleBrief, TASK_BRIEF_LIMIT, TASK_BRIEF_ROLE_BYTES, TaskBriefEntry, TaskBriefLimits,
-    TaskBriefPage, TextPreview,
-};
-pub(in crate::estate) use data::World;
-pub use data::{
-    Current, Cut, Degree, Edge, Edit, Entry, Fact, Finish, Flow, Graph, Life, Link, Node, Origin,
-    Part, Patch, Phase, Realm, Role, Settle, Settlement, Tune, Weight,
-};
 pub use forge::{Admission, Anchor, Coordinate, Reconcile};
-pub use forge::{ForgeDeclaration, ForgeWithdrawal, Reference, ReferenceKind};
-pub use task::{Annotate, Rehome, Rename, Repository, Retire};
+pub use forge::{Reference, ReferenceKind};
 pub use work::{
-    Artifact, Attach, BoundaryState, CheckoutState, ClaimOverlap, Claiming, Import,
-    IntegrationState, IssueArtifact, IssueAttach, IssueClaiming, IssueDeclaration, IssueImport,
-    IssueMemberChange, IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval,
-    IssueRetirement, IssueWithdrawal, IssueWorktree, MemberChange, MemberStatus, Narrowing, Proof,
-    Proving, Release, Removal, Retirement, Survey, UpstreamState, Worktree, issue_landing,
+    BoundaryState, CheckoutState, ClaimOverlap, IntegrationState, IssueArtifact, IssueAttach,
+    IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange, IssueMemberStatus,
+    IssueNarrowing, IssueProving, IssueRelease, IssueRemoval, IssueRetirement, IssueWithdrawal,
+    IssueWorktree, Proof, UpstreamState, issue_delivery, issue_landing,
 };
-pub use work::{issue_delivery, landing};
 
 pub struct Estate {
     core: Core<Sqlite>,
@@ -160,15 +140,6 @@ impl Estate {
                 path,
             })
             .collect())
-    }
-
-    pub fn touch(
-        &self,
-        task: &Node,
-        operator: Option<&crate::activity::Operator>,
-        operation: &str,
-    ) -> Result<crate::activity::Activity> {
-        crate::activity::record(&self.space, task, operator, operation)
     }
 
     pub fn touch_issue(
