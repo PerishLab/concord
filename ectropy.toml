@@ -11,6 +11,11 @@ allow = ["word"]
 note = "the GitHub GraphQL adapter preserves the provider wire dialect"
 paths = ["crates/cli/src/dispatch/forge/github.rs"]
 
+[[boundary]]
+allow = ["word"]
+note = "the Issue search adapter preserves the GitHub GraphQL wire dialect"
+paths = ["crates/cli/src/dispatch/forge/preflight/github.rs"]
+
 [comment]
 allow = false
 

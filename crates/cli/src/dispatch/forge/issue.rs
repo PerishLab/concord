@@ -45,6 +45,34 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 .await?;
             emit(json!({"brief": brief}), output)
         }
+        Command::Preflight {
+            repository,
+            kind,
+            title,
+            outcome,
+            command,
+            page_size,
+            max_pages,
+            timeout,
+        } => {
+            let preflight = super::preflight::run(
+                estate,
+                super::preflight::Request {
+                    repository: &repository,
+                    kind: &kind,
+                    title: &title,
+                    outcome: &outcome,
+                    bounds: super::preflight::Bounds {
+                        command: &command,
+                        first: page_size,
+                        pages: max_pages,
+                        timeout,
+                    },
+                },
+            )
+            .await?;
+            emit(json!({"preflight": preflight}), output)
+        }
         Command::Graph {
             issue,
             command,
