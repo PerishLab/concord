@@ -1,4 +1,5 @@
 mod activity;
+pub(crate) mod cookbook;
 mod member;
 
 use concord_core::occupancy::Occupancy;
