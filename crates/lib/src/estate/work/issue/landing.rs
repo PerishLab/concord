@@ -1,6 +1,6 @@
 use super::super::{Estate, Proof};
 use super::{IssueWorktree, issue_stale};
-use crate::{Error, PLUMB, Result, claim, git};
+use crate::{Error, Result, claim, git};
 use plumb::guard::{Authority, Expected};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -36,7 +36,7 @@ pub struct Plan {
     pub node: String,
     pub revision: i64,
     pub member: Member,
-    pub boundary: Boundary,
+    pub boundary: Proof,
     pub guard: Guard,
     pub landing: plumb::landing::Preparation,
 }
@@ -49,17 +49,6 @@ pub struct Member {
     pub source: String,
     pub branch: String,
     pub claims: Vec<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct Boundary {
-    pub key: i64,
-    pub schema: String,
-    pub plumb: String,
-    pub base: String,
-    pub head: String,
-    pub claim: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -95,7 +84,7 @@ pub async fn prepare(estate: &Estate, request: &Request) -> Result<Plan> {
         node: context.node,
         revision: context.revision,
         member: member(&context.member),
-        boundary: boundary(&context.boundary),
+        boundary: context.boundary,
         guard: request.guard.clone(),
         landing,
     })
@@ -111,7 +100,7 @@ pub async fn revalidate(estate: &Estate, plan: &Plan) -> Result<Ready> {
     let context = context(estate, &plan.issue, &plan.member.name, plan.revision).await?;
     if context.node != plan.node
         || member(&context.member) != plan.member
-        || boundary(&context.boundary) != plan.boundary
+        || context.boundary != plan.boundary
     {
         return Err(Error::typed(
             "concord.landing.stale",
@@ -186,17 +175,7 @@ fn agreement(source: &Path, path: &Path, member: &IssueWorktree, proof: &Proof) 
     }
     let head = git::at(path).head()?;
     let digest = claim::digest(&member.claims);
-    if (
-        proof.schema.as_str(),
-        proof.plumb.as_str(),
-        proof.head.as_str(),
-        proof.claim.as_str(),
-    ) != (
-        plumb::boundary::SCHEMA,
-        PLUMB,
-        head.as_str(),
-        digest.as_str(),
-    ) {
+    if !proof.current(&head, &digest) {
         return Err(Error::typed(
             "concord.landing.boundary",
             "Member Boundary proof is stale",
@@ -224,17 +203,6 @@ fn member(member: &IssueWorktree) -> Member {
         source: member.source.clone(),
         branch: member.branch.clone(),
         claims: member.claims.clone(),
-    }
-}
-
-fn boundary(proof: &Proof) -> Boundary {
-    Boundary {
-        key: proof.key,
-        schema: proof.schema.clone(),
-        plumb: proof.plumb.clone(),
-        base: proof.base.clone(),
-        head: proof.head.clone(),
-        claim: proof.claim.clone(),
     }
 }
 

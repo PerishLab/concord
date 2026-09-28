@@ -12,10 +12,11 @@ pub use issue::{
     IssueWithdrawal, IssueWorktree,
 };
 pub use overlap::ClaimOverlap;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 pub use status::{BoundaryState, CheckoutState, IntegrationState, UpstreamState};
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Proof {
     pub key: i64,
     pub schema: String,
@@ -23,4 +24,14 @@ pub struct Proof {
     pub base: String,
     pub head: String,
     pub claim: String,
+}
+
+impl Proof {
+    pub fn current(&self, head: &str, claim: &str) -> bool {
+        self.linked() && self.head == head && self.claim == claim
+    }
+
+    fn linked(&self) -> bool {
+        self.schema == plumb::boundary::SCHEMA && self.plumb == crate::PLUMB
+    }
 }
