@@ -135,14 +135,8 @@ fn current(member: &IssueWorktree, head: &str) -> Result<()> {
             "Member has no current Boundary proof",
         )
     })?;
-    let held = (
-        proof.schema.as_str(),
-        proof.plumb.as_str(),
-        proof.head.as_str(),
-        proof.claim.as_str(),
-    );
     let claim = crate::claim::digest(&member.claims);
-    if held != (plumb::boundary::SCHEMA, crate::PLUMB, head, claim.as_str()) {
+    if !proof.current(head, &claim) {
         return Err(Error::typed(
             "concord.boundary.stale",
             "Member Boundary proof is stale",
