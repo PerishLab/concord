@@ -1,5 +1,6 @@
 use super::super::{emit, input};
 use crate::args::member::Landing;
+use concord_core::authority::Plumb;
 use concord_core::{Coordinate, Estate, Result, issue_landing};
 use serde::Deserialize;
 use serde_json::json;
@@ -38,7 +39,7 @@ pub(super) async fn run(estate: &Estate, command: Landing, output: bool) -> Resu
                 },
             };
             emit(
-                json!({"plan": issue_landing::prepare(estate, &request).await?}),
+                json!({"plan": issue_landing::prepare::<Plumb>(estate, &request).await?}),
                 output,
             )
         }
@@ -58,11 +59,11 @@ pub(super) async fn run(estate: &Estate, command: Landing, output: bool) -> Resu
                 ));
             }
             emit(
-                json!({"ready": issue_landing::revalidate(estate, &envelope.plan).await?}),
+                json!({"ready": issue_landing::revalidate::<Plumb>(estate, &envelope.plan).await?}),
                 output,
             )
         }
     }
 }
 
-const PLAN: &str = r#"{"version":1,"plan":{"schema":"concord.issue-member-landing/v1","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"guard":{},"landing":{}}}"#;
+const PLAN: &str = r#"{"version":1,"plan":{"schema":"concord.issue-member-landing/v2","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"guard":{},"authority":{},"landing":{}}}"#;

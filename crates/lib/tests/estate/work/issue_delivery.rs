@@ -1,12 +1,12 @@
-use concord_core::{Admission, Coordinate, IssueAttach, IssueProving, Seat, issue_delivery};
-use plumb::guard::{Action, Descriptor};
+use concord_core::authority::{Plumb, Warrant};
+use concord_core::{
+    Admission, Coordinate, Estate, IssueAttach, IssueProving, Seat, issue_delivery,
+};
+use plumb::guard::{Action, Authority, Descriptor};
 use serde::Serialize;
 use sha2::{Digest as _, Sha256};
 use std::path::Path;
 use std::process::Command;
-
-const COMMIT: &str = "4895048531fada2f4de06877f7ecbac0fcce035c";
-const DEPOT: &str = "da911e1a1ae27c87f4ef8d9b7f638fcedf222d669798d075aafcaaab045250af";
 
 #[derive(Serialize)]
 struct Claim<'a> {
@@ -19,8 +19,29 @@ struct Claim<'a> {
     actions: &'a [Action],
 }
 
-#[tokio::test(flavor = "current_thread")]
-async fn exact() {
+pub(super) struct Fixture {
+    pub(super) estate: Estate,
+    pub(super) issue: Coordinate,
+    pub(super) _temp: tempfile::TempDir,
+}
+
+pub(super) fn released() -> Authority {
+    Authority::released().expect("compiled Plumb authority")
+}
+
+pub(super) fn request(issue: &Coordinate) -> issue_delivery::Request {
+    issue_delivery::Request {
+        issue: issue.clone(),
+        member: "kernel".into(),
+        revision: 2,
+        base: "main".into(),
+        snapshot: snapshot(),
+        observed: 1,
+        outcome: "Concord owns Issue-led delivery.".into(),
+    }
+}
+
+pub(super) async fn fixture(producer: &str, depot: &str) -> Fixture {
     let temp = tempfile::tempdir().expect("temporary Space");
     let source = temp.path().join("source");
     let remote = temp.path().join("remote.git");
@@ -79,7 +100,7 @@ async fn exact() {
         ],
     );
     let tree = text(&member, &["rev-parse", "HEAD^{tree}"]);
-    let proof = proof(tree);
+    let proof = proof(tree, producer, depot);
     let token = proof.encode().expect("proof");
     git(
         &member,
@@ -98,22 +119,32 @@ async fn exact() {
         })
         .await
         .expect("prove Boundary");
+    Fixture {
+        estate,
+        issue,
+        _temp: temp,
+    }
+}
 
+#[tokio::test(flavor = "current_thread")]
+async fn exact() {
+    let compiled = released();
+    let Fixture {
+        estate,
+        issue,
+        _temp,
+    } = fixture(compiled.producer(), compiled.depot()).await;
     let snapshot = snapshot();
-    let plan = issue_delivery::prepare(
-        &estate,
-        &issue_delivery::Request {
-            issue,
-            member: "kernel".into(),
-            revision: 2,
-            base: "main".into(),
-            snapshot: snapshot.clone(),
-            observed: 1,
-            outcome: "Concord owns Issue-led delivery.".into(),
-        },
-    )
-    .await
-    .expect("prepare delivery");
+    let plan = issue_delivery::prepare::<Plumb>(&estate, &request(&issue))
+        .await
+        .expect("prepare delivery");
+    assert_eq!(
+        plan.authority,
+        Warrant {
+            producer: compiled.producer().into(),
+            depot: compiled.depot().into(),
+        }
+    );
     assert_eq!(plan.delivery.issue, snapshot);
     assert!(
         plan.delivery
@@ -140,20 +171,20 @@ async fn exact() {
         plan.boundary
             .current(&plan.boundary.head, &plan.boundary.claim)
     );
-    let ready = issue_delivery::revalidate(&estate, &plan, &snapshot, 2)
+    let ready = issue_delivery::revalidate::<Plumb>(&estate, &plan, &snapshot, 2)
         .await
         .expect("revalidate delivery");
     assert_eq!(ready.preparation.candidate, plan.delivery.candidate);
 
     let mut drifted = snapshot;
     drifted.updated.push_str("-drift");
-    let error = issue_delivery::revalidate(&estate, &plan, &drifted, 3)
+    let error = issue_delivery::revalidate::<Plumb>(&estate, &plan, &drifted, 3)
         .await
         .expect_err("Issue drift");
     assert_eq!(error.code(), "concord.delivery.stale");
 }
 
-fn snapshot() -> plumb::delivery::Snapshot {
+pub(super) fn snapshot() -> plumb::delivery::Snapshot {
     plumb::delivery::Snapshot {
         node: "I_delivery".into(),
         repository: "PerishLab/probe".into(),
@@ -170,13 +201,13 @@ fn snapshot() -> plumb::delivery::Snapshot {
     }
 }
 
-fn proof(tree: String) -> Descriptor {
+fn proof(tree: String, producer: &str, depot: &str) -> Descriptor {
     let mut proof = Descriptor {
         schema: plumb::guard::SCHEMA.into(),
         repository: "PerishLab/probe".into(),
         tree,
-        plumb: format!("v0.56.0@{COMMIT}"),
-        depot: DEPOT.into(),
+        plumb: producer.into(),
+        depot: depot.into(),
         platform: plumb::config::platform(),
         actions: vec![Action {
             name: "guard/test".into(),

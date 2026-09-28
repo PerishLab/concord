@@ -1,11 +1,11 @@
 use super::super::{Estate, Proof};
+use super::authority::{self, Authorities, Warrant};
 use super::{IssueWorktree, issue_stale};
 use crate::{Error, Result, claim, git};
-use plumb::guard::Authority;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA: &str = "concord.issue-member-delivery/v1";
+pub const SCHEMA: &str = "concord.issue-member-delivery/v2";
 pub const READY: &str = "concord.issue-member-delivery-ready/v1";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -29,6 +29,7 @@ pub struct Plan {
     pub revision: i64,
     pub member: Member,
     pub boundary: Proof,
+    pub authority: Warrant,
     pub delivery: plumb::delivery::Plan,
 }
 
@@ -58,12 +59,15 @@ struct Context {
     path: PathBuf,
 }
 
-pub async fn prepare(estate: &Estate, request: &Request) -> Result<Plan> {
+pub async fn prepare<A: Authorities>(estate: &Estate, request: &Request) -> Result<Plan> {
     let context = context(estate, &request.issue, &request.member, request.revision).await?;
     agree(&context, &request.snapshot)?;
     let pull = narrative(&context, &request.snapshot, &request.outcome)?;
-    let authority =
-        Authority::released().map_err(|error| Error::typed("concord.delivery.authority", error))?;
+    let (authority, warrant) = authority::select::<A>(
+        &context.path,
+        &context.boundary.head,
+        "concord.delivery.authority",
+    )?;
     let delivery = plumb::delivery::prepare(
         plumb::delivery::Request {
             root: &context.path,
@@ -83,11 +87,12 @@ pub async fn prepare(estate: &Estate, request: &Request) -> Result<Plan> {
         revision: context.revision,
         member: member(&context.member),
         boundary: context.boundary,
+        authority: warrant,
         delivery,
     })
 }
 
-pub async fn revalidate(
+pub async fn revalidate<A: Authorities>(
     estate: &Estate,
     plan: &Plan,
     snapshot: &plumb::delivery::Snapshot,
@@ -110,8 +115,7 @@ pub async fn revalidate(
             "Issue, Member, or Boundary identity changed after delivery preparation",
         ));
     }
-    let authority =
-        Authority::released().map_err(|error| Error::typed("concord.delivery.authority", error))?;
+    let authority = authority::keep::<A>(&plan.authority, "concord.delivery.authority")?;
     let ready = plumb::delivery::revalidate(
         plumb::delivery::Request {
             root: &context.path,
