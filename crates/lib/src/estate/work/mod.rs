@@ -4,6 +4,7 @@ mod overlap;
 mod status;
 
 use super::{Estate, fault};
+pub use issue::authority;
 pub use issue::delivery as issue_delivery;
 pub use issue::landing as issue_landing;
 pub use issue::{

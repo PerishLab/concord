@@ -34,6 +34,14 @@ of copying its answer here.
   construction to Plumb's released delivery kernel, and invokes an explicit
   external provider command for PR mutation. Concord never carries provider
   credentials or replaces repository policy.
+- A Guard proof is accepted only from the Plumb Concord was compiled against
+  or the current Plumb stable named by its release seal; Plumb's exact
+  producer and depot judgment is unchanged. A plan records the authority it
+  was prepared under and refuses when that authority is no longer accepted.
+  When stable is unreachable only the compiled authority remains, and the
+  refusal names the unreachable authority. The stable location is fixed;
+  tests inject authorities through the `Authorities` trait, never through
+  runtime configuration.
 - Optional Locus facts and the private activity ledger are observations only.
   They never establish authorship, ownership, presence, authorization, or
   lifecycle state and never replace a command result.

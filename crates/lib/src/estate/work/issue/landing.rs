@@ -1,12 +1,14 @@
 use super::super::{Estate, Proof};
+use super::authority::{self, Authorities, Warrant};
 use super::{IssueWorktree, issue_stale};
 use crate::{Error, Result, claim, git};
 use plumb::guard::{Authority, Expected};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA: &str = "concord.issue-member-landing/v1";
+pub const SCHEMA: &str = "concord.issue-member-landing/v2";
 pub const READY: &str = "concord.issue-member-ready/v1";
+const AUTHORITY: &str = "concord.landing.authority";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -38,6 +40,7 @@ pub struct Plan {
     pub member: Member,
     pub boundary: Proof,
     pub guard: Guard,
+    pub authority: Warrant,
     pub landing: plumb::landing::Preparation,
 }
 
@@ -66,7 +69,7 @@ struct Context {
     path: PathBuf,
 }
 
-pub async fn prepare(estate: &Estate, request: &Request) -> Result<Plan> {
+pub async fn prepare<A: Authorities>(estate: &Estate, request: &Request) -> Result<Plan> {
     let context = context(estate, &request.issue, &request.member, request.revision).await?;
     let inspected = plumb::landing::Request {
         root: &context.path,
@@ -76,7 +79,14 @@ pub async fn prepare(estate: &Estate, request: &Request) -> Result<Plan> {
     }
     .inspect()
     .map_err(refused)?;
-    let verified = authority(inspected.root(), inspected.source(), &request.guard)?;
+    let (authority, warrant) =
+        authority::select::<A>(inspected.root(), inspected.source(), AUTHORITY)?;
+    let verified = verify(
+        &authority,
+        inspected.root(),
+        inspected.source(),
+        &request.guard,
+    )?;
     let landing = inspected.prepare(verified).map_err(refused)?;
     Ok(Plan {
         schema: SCHEMA.to_string(),
@@ -86,11 +96,12 @@ pub async fn prepare(estate: &Estate, request: &Request) -> Result<Plan> {
         member: member(&context.member),
         boundary: context.boundary,
         guard: request.guard.clone(),
+        authority: warrant,
         landing,
     })
 }
 
-pub async fn revalidate(estate: &Estate, plan: &Plan) -> Result<Ready> {
+pub async fn revalidate<A: Authorities>(estate: &Estate, plan: &Plan) -> Result<Ready> {
     if plan.schema != SCHEMA {
         return Err(Error::typed(
             "concord.landing.schema",
@@ -107,7 +118,8 @@ pub async fn revalidate(estate: &Estate, plan: &Plan) -> Result<Ready> {
             "Issue, Member or Boundary identity changed after landing preparation",
         ));
     }
-    let verified = authority(&context.path, &plan.landing.source, &plan.guard)?;
+    let authority = authority::keep::<A>(&plan.authority, AUTHORITY)?;
+    let verified = verify(&authority, &context.path, &plan.landing.source, &plan.guard)?;
     let landing = plumb::landing::Request {
         root: &context.path,
         base: &plan.landing.base,
@@ -184,9 +196,12 @@ fn agreement(source: &Path, path: &Path, member: &IssueWorktree, proof: &Proof) 
     Ok(())
 }
 
-fn authority(root: &Path, source: &str, guard: &Guard) -> Result<plumb::guard::Verified> {
-    let authority =
-        Authority::released().map_err(|error| Error::typed("concord.landing.authority", error))?;
+fn verify(
+    authority: &Authority,
+    root: &Path,
+    source: &str,
+    guard: &Guard,
+) -> Result<plumb::guard::Verified> {
     authority
         .verify(
             root,
