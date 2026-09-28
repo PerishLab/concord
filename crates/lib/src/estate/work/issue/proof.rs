@@ -11,7 +11,6 @@ pub struct IssueProving {
 
 impl Estate {
     pub async fn prove_issue(&self, request: &IssueProving) -> Result<IssueWorktree> {
-        self.executable()?;
         let _guard = self.guard()?;
         self.ensure().await?;
         let anchor = self.issue(&request.issue).await?;

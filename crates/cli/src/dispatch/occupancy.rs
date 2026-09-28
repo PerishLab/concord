@@ -124,8 +124,6 @@ fn seeds(command: &args::Command) -> Option<Vec<Seed<'_>>> {
         args::Command::Artifact(args) => artifact(&args.command),
         args::Command::Config(_)
         | args::Command::Domain(_)
-        | args::Command::Migration(_)
-        | args::Command::Transition(_)
         | args::Command::Graph(_)
         | args::Command::Audit(_)
         | args::Command::Skill(_) => None,

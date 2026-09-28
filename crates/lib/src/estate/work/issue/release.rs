@@ -40,7 +40,6 @@ impl Estate {
         revision: i64,
         artifacts: Option<&[String]>,
     ) -> Result<i64> {
-        self.executable()?;
         let _guard = self.guard()?;
         self.ensure().await?;
         let anchor = self.issue(issue).await?;

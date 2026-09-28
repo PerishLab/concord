@@ -58,7 +58,6 @@ impl Estate {
     }
 
     async fn change_issue_claim(&self, change: Change<'_>) -> Result<IssueMemberChange> {
-        self.executable()?;
         let _guard = self.guard()?;
         self.ensure().await?;
         let anchor = self.issue(change.issue).await?;

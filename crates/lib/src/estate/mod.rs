@@ -34,8 +34,6 @@ pub use data::{
 };
 pub use forge::{Admission, Anchor, Coordinate, Reconcile};
 pub use forge::{ForgeDeclaration, ForgeWithdrawal, Reference, ReferenceKind};
-pub use model::migration;
-pub use model::migration::transition;
 pub use task::{Annotate, Rehome, Rename, Repository, Retire};
 pub use work::{
     Artifact, Attach, BoundaryState, CheckoutState, ClaimOverlap, Claiming, Import,
@@ -49,8 +47,6 @@ pub use work::{issue_delivery, landing};
 pub struct Estate {
     core: Core<Sqlite>,
     space: PathBuf,
-    anchors: bool,
-    execution: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -87,11 +83,7 @@ impl Seat {
         let estate = Estate {
             core,
             space: self.space.clone(),
-            anchors: true,
-            execution: true,
         };
-        estate.seed().await?;
-        estate.verify().await?;
         Ok(estate)
     }
 
@@ -100,31 +92,17 @@ impl Seat {
             return Err(Error::typed(
                 "concord.estate.absent",
                 format!(
-                    "Concord estate is absent at {}; bootstrap a new Space or follow the v0.11.0 release migration contract for a legacy Space",
+                    "Concord estate is absent at {}; bootstrap a fresh Issue estate",
                     self.root.display()
                 ),
             ));
         }
         let sudo = std::fs::read_to_string(self.sudo())?;
-        let current = self.bind(model::graph, &sudo).await;
-        let (core, anchors, execution) = match current {
-            Ok(core) => (core, true, true),
-            Err(primary) => match self.bind(model::anchored, &sudo).await {
-                Ok(core) => (core, true, false),
-                Err(_) => match self.bind(model::released, &sudo).await {
-                    Ok(core) => (core, false, false),
-                    Err(_) => return Err(primary),
-                },
-            },
-        };
-        let estate = Estate {
+        let core = self.bind(model::graph, &sudo).await?;
+        Ok(Estate {
             core,
             space: self.space.clone(),
-            anchors,
-            execution,
-        };
-        estate.verify().await?;
-        Ok(estate)
+        })
     }
 
     async fn possession(
@@ -214,31 +192,6 @@ impl Estate {
         file.lock_exclusive()?;
         Ok(file)
     }
-
-    async fn seed(&self) -> Result<()> {
-        let rows = self.core.live("Space").await.map_err(fault)?;
-        if rows.is_empty() {
-            self.core
-                .put("Space", &[("name", "space"), ("revision", "0")])
-                .await
-                .map_err(fault)?;
-        }
-        Ok(())
-    }
-
-    async fn verify(&self) -> Result<()> {
-        let rows = self.core.live("Space").await.map_err(fault)?;
-        if rows.len() != 1 {
-            return Err(Error::typed(
-                "concord.estate.space",
-                format!(
-                    "Concord estate needs exactly one Space, found {}",
-                    rows.len()
-                ),
-            ));
-        }
-        Ok(())
-    }
 }
 
 fn fault(error: keel::adapt::Error) -> Error {
@@ -248,6 +201,6 @@ fn fault(error: keel::adapt::Error) -> Error {
 fn upgrade(error: keel::adapt::Error) -> Error {
     Error::typed(
         "concord.estate.upgrade_required",
-        format!("{error}; follow the exact migration contract for the target Concord release"),
+        format!("{error}; this Concord release opens only its exact Issue estate"),
     )
 }

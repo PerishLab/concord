@@ -142,7 +142,6 @@ async fn context(
     name: &str,
     revision: i64,
 ) -> Result<Context> {
-    estate.executable()?;
     estate.ensure().await?;
     let anchor = estate.issue(issue).await?;
     issue_stale(anchor.revision, revision)?;
