@@ -128,6 +128,18 @@ async fn exact() {
     let decoded: issue_delivery::Plan =
         serde_json::from_slice(&serde_json::to_vec(&plan).expect("encode")).expect("decode");
     assert_eq!(decoded, plan);
+    let boundary = serde_json::to_value(&plan.boundary).expect("boundary");
+    let fields = boundary
+        .as_object()
+        .expect("boundary object")
+        .keys()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    assert_eq!(fields, ["base", "claim", "head", "key", "plumb", "schema"]);
+    assert!(
+        plan.boundary
+            .current(&plan.boundary.head, &plan.boundary.claim)
+    );
     let ready = issue_delivery::revalidate(&estate, &plan, &snapshot, 2)
         .await
         .expect("revalidate delivery");
