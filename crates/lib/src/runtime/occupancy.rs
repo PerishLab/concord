@@ -40,6 +40,19 @@ pub struct Occupancy {
     pub lease: u64,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct Observation {
+    pub holder: Holder,
+    pub fresh: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct Snapshot {
+    pub observations: Vec<Observation>,
+    pub lease: u64,
+    pub observed_at: u64,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct Ledger {
     version: u32,
@@ -240,6 +253,27 @@ pub(crate) fn readable(space: &Path) -> Result<()> {
         validate(&holder.operator(), &holder.operation, &holder.subjects)?;
     }
     Ok(())
+}
+
+pub(crate) fn inspect(path: &Path) -> Result<Snapshot> {
+    let observed_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| Error::typed("concord.occupancy.clock", error.to_string()))?
+        .as_secs();
+    let earliest = observed_at.saturating_sub(LEASE);
+    let ledger = read(path)?;
+    Ok(Snapshot {
+        observations: ledger
+            .holders
+            .into_iter()
+            .map(|holder| Observation {
+                fresh: holder.heartbeat >= earliest,
+                holder,
+            })
+            .collect(),
+        lease: LEASE,
+        observed_at,
+    })
 }
 
 impl Holder {

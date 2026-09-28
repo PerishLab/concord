@@ -73,6 +73,19 @@ impl Coordinate {
 }
 
 impl Estate {
+    pub async fn issues(&self) -> Result<Vec<Anchor>> {
+        let mut anchors = self
+            .core
+            .live("Anchor")
+            .await
+            .map_err(fault)?
+            .iter()
+            .map(decode)
+            .collect::<Result<Vec<_>>>()?;
+        anchors.sort_by_key(|anchor| anchor.key);
+        Ok(anchors)
+    }
+
     pub async fn admit(&self, request: &Admission) -> Result<Anchor> {
         node(&request.node)?;
         request.coordinate.validate()?;

@@ -44,6 +44,19 @@ pub struct IssueActivity {
     pub window: u64,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct Observation {
+    pub touch: Touch,
+    pub fresh: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct Snapshot {
+    pub observations: Vec<Observation>,
+    pub window: u64,
+    pub observed_at: u64,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct Ledger {
     version: u32,
@@ -162,6 +175,31 @@ pub(crate) fn record_issue(
         recent,
         window: WINDOW,
     })
+}
+
+pub(crate) fn snapshot(space: &Path, issue: &Anchor) -> Result<Snapshot> {
+    let observed_at = now()?;
+    let ledger = read(&space.join(format!(".concord/activity/issue-{}.json", issue.key)))?;
+    let earliest = observed_at.saturating_sub(WINDOW);
+    Ok(Snapshot {
+        observations: ledger
+            .touches
+            .into_iter()
+            .map(|touch| Observation {
+                fresh: touch.time >= earliest,
+                touch,
+            })
+            .collect(),
+        window: WINDOW,
+        observed_at,
+    })
+}
+
+fn now() -> Result<u64> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| Error::typed("concord.activity.clock", error.to_string()))
+        .map(|duration| duration.as_secs())
 }
 
 fn guard(root: &Path, key: &str) -> Result<File> {
