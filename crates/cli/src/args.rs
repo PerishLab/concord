@@ -33,6 +33,8 @@ pub struct Cli {
 pub enum Command {
     #[command(about = "Inspect Concord configuration")]
     Config(Config),
+    #[command(about = "Read code-addressed recovery guidance")]
+    Cookbook(Cookbook),
     #[command(about = "Anchor local execution to typed GitHub Issues")]
     Issue(Issue),
     #[command(about = "Manage repository worktree Members")]
@@ -49,6 +51,7 @@ impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
             Self::Config(args) => args.command.name(),
+            Self::Cookbook(_) => "cookbook",
             Self::Issue(args) => args.command.name(),
             Self::Member(args) => args.command.name(),
             Self::Artifact(args) => args.command.name(),
@@ -62,9 +65,14 @@ impl Command {
             Self::Issue(_) => None,
             Self::Member(args) => args.command.activity(),
             Self::Artifact(args) => Some(args.command.activity()),
-            Self::Audit(_) | Self::Config(_) | Self::Skill(_) => None,
+            Self::Audit(_) | Self::Config(_) | Self::Cookbook(_) | Self::Skill(_) => None,
         }
     }
+}
+
+#[derive(Args)]
+pub struct Cookbook {
+    pub code: Option<String>,
 }
 
 #[derive(Args)]

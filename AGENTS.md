@@ -6,10 +6,11 @@ Issue-anchored local execution state; Git worktrees and Artifact directories
 remain external payload and must agree with that estate. GitHub Issues and PRs
 are the only work narrative and delivery ledger.
 
-Four surfaces answer different questions. The source says what Concord does,
+Five surfaces answer different questions. The source says what Concord does,
 `--help` says how to invoke it, the Concord skill says how to operate its
-objects, and this file records repository constraints those surfaces cannot.
-Ask the owning surface instead of copying its answer here.
+objects, `concord cookbook CODE` owns bounded recovery, and this file records
+repository constraints those surfaces cannot. Ask the owning surface instead
+of copying its answer here.
 
 ## Authority
 
@@ -68,11 +69,12 @@ Ask the owning surface instead of copying its answer here.
   `cargo clippy --locked --workspace --all-targets -- -D warnings`,
   `cargo check --locked --workspace --all-targets --release`,
   `cargo test --locked --workspace`, and `ectropy .`.
-- Plumb owns repository governance, release markers, Guard proof, and the
-  provider-neutral delivery kernel; Concord owns Issue/Member orchestration
-  and the explicit provider adapter. Wharf builds, binds, and distributes each
-  release. Read their current help and rules; do not restate a release workflow
-  or changelog shape here.
+- Plumb owns repository governance, release markers, Guard proof, the shared
+  Cookbook model, and the provider-neutral delivery kernel; Concord owns its
+  compiled recovery entries, Issue/Member orchestration, and the explicit
+  provider adapter. Wharf builds, binds, and distributes each release. Read
+  their current help and rules; do not restate a release workflow or changelog
+  shape here.
 - `plumb.toml` and `ectropy.toml` are this repository's own declarations,
   layered over the base Plumb carries in its binary. Where they depart from
   that base, `plumb doctor` says so as a noted finding.
