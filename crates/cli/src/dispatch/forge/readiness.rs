@@ -108,9 +108,13 @@ fn sections(body: &str) -> BTreeMap<String, String> {
     result
 }
 
-pub(super) fn outcome(body: &str) -> Option<String> {
+pub(super) fn outcome(body: &str, kind: &str) -> Option<String> {
+    let name = match kind.to_ascii_lowercase().as_str() {
+        "bug" => "expected outcome",
+        _ => "outcome",
+    };
     sections(body)
-        .remove("outcome")
+        .remove(name)
         .filter(|outcome| !outcome.trim().is_empty())
 }
 
@@ -165,7 +169,7 @@ fn distribution_evidence(body: &str, evidence: &mut BTreeSet<String>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{checkboxes, distribution_evidence, sections};
+    use super::{checkboxes, distribution_evidence, outcome, sections};
     use std::collections::BTreeSet;
 
     #[test]
@@ -181,5 +185,16 @@ mod tests {
             &mut evidence,
         );
         assert_eq!(evidence.len(), 1);
+    }
+
+    #[test]
+    fn kinds() {
+        let task = "## Outcome\nDone\n\n## Scope\nAll\n";
+        let bug = "## Problem\nBroken\n\n## Expected outcome\nFixed\n";
+        assert_eq!(outcome(task, "Task").as_deref(), Some("Done"));
+        assert_eq!(outcome(task, "Feature").as_deref(), Some("Done"));
+        assert_eq!(outcome(bug, "Bug").as_deref(), Some("Fixed"));
+        assert_eq!(outcome(task, "Bug"), None);
+        assert_eq!(outcome(bug, "Task"), None);
     }
 }

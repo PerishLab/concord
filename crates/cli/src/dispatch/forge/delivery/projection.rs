@@ -37,7 +37,7 @@ impl Projection<'_> {
                 )
             })?
             .to_string();
-        let outcome = super::super::readiness::outcome(&raw.body).ok_or_else(|| {
+        let outcome = super::super::readiness::outcome(&raw.body, &kind).ok_or_else(|| {
             Error::typed(
                 "concord.delivery.outcome",
                 "GitHub Issue has no non-empty Outcome section",
