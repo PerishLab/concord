@@ -1,4 +1,5 @@
 mod collect;
+mod preflight;
 mod source;
 
 use self::source::{agree, evidence, exact, fingerprint, settled};
@@ -10,11 +11,18 @@ use serde::Serialize;
 use std::path::PathBuf;
 
 #[cfg(test)]
+mod fixture;
+#[cfg(test)]
 mod tests;
 
 pub const SCHEMA: &str = "concord.v0.13-transition-inventory/v1";
 pub const SOURCE: &str = "v0.13.0";
 pub const TARGET: &str = "issue-execution";
+
+pub use preflight::{
+    Archive, ArchiveTask, Capacity, Disposition, DispositionPlan, IssueDestination, Mapping,
+    Observation, Preflight, ResourceDisposition, TaskDisposition,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Evidence {
@@ -159,5 +167,13 @@ impl Transition<'_> {
         exact("sudo", &sudo, &evidence(&self.seat.sudo())?)?;
         inventory.fingerprint = fingerprint(&inventory)?;
         Ok(inventory)
+    }
+
+    pub async fn preflight(
+        &self,
+        plan: &DispositionPlan,
+        observations: &[Observation],
+    ) -> Result<Preflight> {
+        preflight::read(self.seat, plan, observations).await
     }
 }

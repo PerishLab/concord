@@ -22,6 +22,10 @@ pub use error::{Error, Result};
 pub use estate::migration;
 pub use estate::transition;
 pub use estate::transition::Inventory as TransitionInventory;
+pub use estate::transition::{
+    DispositionPlan as TransitionDispositionPlan, Observation as TransitionObservation,
+    Preflight as TransitionPreflight,
+};
 pub use estate::{
     Admission, Agreement, Anchor, Annotate, Artifact, Attach, BoundaryState, CheckoutState,
     ClaimOverlap, Claiming, Coordinate, Current, Cut, Degree, Edge, Edit, Entry, Estate, Fact,
