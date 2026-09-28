@@ -1,14 +1,10 @@
-use super::{SCHEMA, SOURCE, TARGET};
-use crate::estate::model::released;
-use crate::{Attach, Edit, Fact, Import, Part, Patch, Role, Seat, Settle};
-use keel::adapt::db::Sqlite;
-use std::path::Path;
-use std::process::Command;
+use super::{Observation, SCHEMA, SOURCE, TARGET};
+use crate::{Coordinate, Seat};
 
 #[tokio::test]
 async fn inventory() {
     let temp = tempfile::tempdir().expect("temporary Space");
-    let seat = source(temp.path()).await;
+    let seat = super::fixture::source(temp.path()).await;
     let database = std::fs::read(seat.database()).expect("source database");
     let sudo = std::fs::read(seat.sudo()).expect("source sudo");
     let payload = temp.path().join("payload.txt");
@@ -30,10 +26,10 @@ async fn inventory() {
     assert_eq!(first.target, TARGET);
     assert_eq!(first.counts.domains, 1);
     assert_eq!(first.counts.active_tasks, 1);
-    assert_eq!(first.counts.retired_tasks, 0);
-    assert_eq!(first.counts.facts, 1);
-    assert_eq!(first.counts.phases, 1);
-    assert_eq!(first.counts.phase_entries, 1);
+    assert_eq!(first.counts.retired_tasks, 1);
+    assert_eq!(first.counts.facts, 2);
+    assert_eq!(first.counts.phases, 2);
+    assert_eq!(first.counts.phase_entries, 2);
     assert_eq!(first.counts.members, 1);
     assert_eq!(first.counts.claims, 1);
     assert_eq!(first.counts.boundaries, 0);
@@ -62,6 +58,87 @@ async fn inventory() {
 }
 
 #[tokio::test]
+async fn preflight() {
+    let temp = tempfile::tempdir().expect("temporary Space");
+    let seat = super::fixture::source(temp.path()).await;
+    let database = std::fs::read(seat.database()).expect("source database");
+    let sudo = std::fs::read(seat.sudo()).expect("source sudo");
+    let payload = std::fs::read(temp.path().join("payload.txt")).expect("Artifact payload");
+    let inventory = seat.transition().inventory().await.expect("inventory");
+    let plan = super::fixture::plan(temp.path(), &inventory);
+    let observation = Observation {
+        node: "I_node".to_string(),
+        coordinate: Coordinate {
+            owner: "PerishLab".to_string(),
+            repository: "concord".to_string(),
+            number: 37,
+        },
+    };
+
+    let first = seat
+        .transition()
+        .preflight(&plan, std::slice::from_ref(&observation))
+        .await
+        .expect("preflight");
+    let second = seat
+        .transition()
+        .preflight(&plan, std::slice::from_ref(&observation))
+        .await
+        .expect("repeat preflight");
+    assert_eq!(first.inventory, second.inventory);
+    assert_eq!(first.archive, second.archive);
+    assert_eq!(first.tasks, second.tasks);
+    assert_eq!(first.issues, second.issues);
+    assert_eq!(first.members, second.members);
+    assert_eq!(first.artifacts, second.artifacts);
+    assert_eq!(first.capacity.required, second.capacity.required);
+    assert_eq!(first.archive.tasks.len(), 1);
+    assert_eq!(first.members.len(), 1);
+    assert_eq!(first.artifacts.len(), 1);
+    assert_eq!(std::fs::read(seat.database()).unwrap(), database);
+    assert_eq!(std::fs::read(seat.sudo()).unwrap(), sudo);
+    assert_eq!(
+        std::fs::read(temp.path().join("payload.txt")).unwrap(),
+        payload
+    );
+
+    let mut drift = plan.clone();
+    drift.inventory = "changed".to_string();
+    let error = seat
+        .transition()
+        .preflight(&drift, std::slice::from_ref(&observation))
+        .await
+        .expect_err("inventory drift");
+    assert_eq!(error.code(), "concord.transition.inventory_drift");
+
+    let mut provider = observation.clone();
+    provider.node = "I_other".to_string();
+    let error = seat
+        .transition()
+        .preflight(&plan, &[provider])
+        .await
+        .expect_err("provider drift");
+    assert_eq!(error.code(), "concord.transition.provider_node_drift");
+
+    let mut missing = plan.clone();
+    missing.tasks.pop();
+    let error = seat
+        .transition()
+        .preflight(&missing, std::slice::from_ref(&observation))
+        .await
+        .expect_err("missing disposition");
+    assert_eq!(error.code(), "concord.transition.disposition_missing");
+
+    std::fs::create_dir_all(&plan.members[0].path).expect("occupy target");
+    let error = seat
+        .transition()
+        .preflight(&plan, &[observation])
+        .await
+        .expect_err("occupied target");
+    assert_eq!(error.code(), "concord.transition.target_occupied");
+}
+
+#[tokio::test]
 async fn refusal() {
     let temp = tempfile::tempdir().expect("temporary Space");
     let seat = Seat::new(temp.path());
@@ -80,7 +157,7 @@ async fn symlink() {
     use std::os::unix::fs::symlink;
 
     let temp = tempfile::tempdir().expect("temporary Space");
-    let seat = source(temp.path()).await;
+    let seat = super::fixture::source(temp.path()).await;
     let inventory = seat.transition().inventory().await.expect("inventory");
     symlink(
         temp.path().join("payload.txt"),
@@ -93,110 +170,4 @@ async fn symlink() {
         .await
         .expect_err("symlink must refuse");
     assert_eq!(error.code(), "concord.transition.artifact");
-}
-
-async fn source(space: &Path) -> Seat {
-    let seat = Seat::new(space);
-    std::fs::create_dir_all(seat.database().parent().unwrap()).expect("estate directory");
-    let wire = Sqlite::file(seat.database())
-        .await
-        .expect("source database");
-    let mut held = keel::bootstrap(released(), wire).expect("released graph");
-    let sudo = held.mint().await.expect("source sudo");
-    let core = held.seal(&sudo).await.expect("released estate");
-    core.put("Space", &[("name", "space"), ("revision", "0")])
-        .await
-        .expect("source Space");
-    drop(core);
-    crate::path::at(&seat.sudo())
-        .file(&sudo)
-        .expect("sudo file");
-    crate::path::at(&seat.database())
-        .mode(0o600)
-        .expect("database mode");
-
-    let estate = seat.open().await.expect("released estate");
-    estate.manage("local").await.expect("Domain");
-    let task = estate.start("local", "alpha").await.expect("Task");
-    let current = estate
-        .change(&Patch {
-            version: 1,
-            task: task.identity(),
-            revision: 0,
-            edits: vec![Edit::Create {
-                fact: Fact {
-                    key: None,
-                    role: Role::Goal,
-                    rank: None,
-                    title: None,
-                    body: "Preserve the source".to_string(),
-                    origin: None,
-                },
-            }],
-        })
-        .await
-        .expect("current fact");
-    let settled = estate
-        .settle(&Settle {
-            version: 1,
-            task: task.identity(),
-            revision: current.task.revision,
-            phase: vec![crate::Entry {
-                key: None,
-                part: Part::Outcome,
-                rank: None,
-                title: None,
-                body: "Source fixture exists".to_string(),
-                origin: None,
-            }],
-            edits: Vec::new(),
-        })
-        .await
-        .expect("Phase");
-
-    let repository = space.join("repository");
-    std::fs::create_dir(&repository).expect("repository directory");
-    git(&repository, &["init", "-b", "main"]);
-    git(&repository, &["config", "user.name", "Concord Test"]);
-    git(
-        &repository,
-        &["config", "user.email", "concord@example.invalid"],
-    );
-    std::fs::write(repository.join("README.md"), "source\n").expect("repository payload");
-    git(&repository, &["add", "README.md"]);
-    git(&repository, &["commit", "-m", "source"]);
-    estate
-        .attach(&Attach {
-            task: task.identity(),
-            name: "worker".to_string(),
-            source: repository,
-            branch: Some("feature".to_string()),
-            claims: vec!["README.md".to_string()],
-            revision: settled.current.task.revision,
-        })
-        .await
-        .expect("Member");
-
-    let payload = space.join("payload.txt");
-    std::fs::write(&payload, "evidence\n").expect("Artifact source");
-    estate
-        .import(&Import {
-            task: task.identity(),
-            name: "evidence".to_string(),
-            source: payload,
-        })
-        .await
-        .expect("Artifact");
-    drop(estate);
-    seat
-}
-
-fn git(root: &Path, arguments: &[&str]) {
-    let status = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(arguments)
-        .status()
-        .expect("run Git");
-    assert!(status.success(), "git {}", arguments.join(" "));
 }

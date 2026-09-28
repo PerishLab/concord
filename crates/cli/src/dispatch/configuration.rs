@@ -73,9 +73,47 @@ pub(crate) async fn transition(
 ) -> Result<()> {
     let value = match command {
         TransitionCommand::Inventory => json!({"inventory": seat.transition().inventory().await?}),
+        TransitionCommand::Preflight {
+            plan,
+            command,
+            timeout,
+        } => {
+            let plan: concord_core::TransitionDispositionPlan = input::read(&plan, DISPOSITION)?;
+            let destinations = destinations(&plan);
+            let mut observations = Vec::with_capacity(destinations.len());
+            for coordinate in destinations.into_values() {
+                let observed = super::forge::observe::issue(&coordinate, &command, timeout).await?;
+                observations.push(concord_core::TransitionObservation {
+                    node: observed.node,
+                    coordinate,
+                });
+            }
+            json!({"preflight": seat.transition().preflight(&plan, &observations).await?})
+        }
     };
     emit(value, output)
 }
+
+fn destinations(
+    plan: &concord_core::TransitionDispositionPlan,
+) -> std::collections::BTreeMap<String, concord_core::Coordinate> {
+    plan.tasks
+        .iter()
+        .filter_map(|task| match &task.disposition {
+            concord_core::transition::Disposition::Issue { issue } => Some(issue),
+            concord_core::transition::Disposition::ArchiveOnly => None,
+        })
+        .map(|issue| (issue.coordinate.identity(), issue.coordinate.clone()))
+        .collect()
+}
+
+const DISPOSITION: &str = r#"{
+  "schema": "concord.v0.13-disposition-plan/v1",
+  "inventory": "SHA256",
+  "tasks": [{"task":"DOMAIN/NAME","revision":0,"disposition":{"kind":"issue","node":"I_NODE","owner":"OWNER","repository":"REPOSITORY","number":1}}],
+  "members": [],
+  "artifacts": []
+}"#;
 
 fn version(version: u64) -> Result<()> {
     if version == 1 {

@@ -576,3 +576,27 @@ name = "filesystem_seats"
 [[vocabulary.term]]
 description = "The exact v0.13 dependency-graph revision bound into one transition inventory."
 name = "graph_revision"
+
+[[vocabulary.term]]
+description = "One stable Issue node and its provider coordinate selected as a transition destination."
+name = "IssueDestination"
+
+[[vocabulary.term]]
+description = "The explicit disposition that retains a Task only in private transition archive lineage."
+name = "ArchiveOnly"
+
+[[vocabulary.term]]
+description = "One revision-bound destination declaration for a source Task."
+name = "TaskDisposition"
+
+[[vocabulary.term]]
+description = "One node-and-path destination declaration for a source Member or Artifact."
+name = "ResourceDisposition"
+
+[[vocabulary.term]]
+description = "The complete operator-authored mapping bound to one exact transition inventory."
+name = "DispositionPlan"
+
+[[vocabulary.term]]
+description = "One retired Task's current facts and frozen Phases inside private archive lineage."
+name = "ArchiveTask"
