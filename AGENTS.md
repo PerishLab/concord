@@ -4,7 +4,7 @@ Concord is the executable control plane for one managed Space. GitHub Issues
 are the durable work ledger. One exact Keel estate is the sole authority for
 Issue-anchored local execution state; Git worktrees and Artifact directories
 remain external payload and must agree with that estate. Task narrative state
-is migration-only and must not be created for new work.
+does not belong to the managed estate.
 
 Four surfaces answer different questions. The source says what Concord does,
 `--help` says how to invoke it, the Concord skill says how to operate its
@@ -13,10 +13,8 @@ Ask the owning surface instead of copying its answer here.
 
 ## Authority
 
-- Ordinary open replays the exact Issue-execution model, the prior exact
-  Anchor-only model, or the exact released v0.13 model. It never evolves or
-  repairs managed state; older estates cannot create the next resource family
-  until an explicit transition changes them.
+- Ordinary open replays exactly the current Issue-execution model. It never
+  evolves, repairs, migrates, or falls back to an older managed shape.
 - An Issue anchor retains only stable GitHub node identity, the minimum
   coordinate needed to observe it again, and a local execution revision. Forge
   prose, state, type, comments, and relationships remain GitHub truth.

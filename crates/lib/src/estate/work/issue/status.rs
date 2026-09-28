@@ -21,7 +21,6 @@ impl Estate {
         issue: &super::super::super::Coordinate,
         name: &str,
     ) -> Result<IssueMemberStatus> {
-        self.executable()?;
         let anchor = self.issue(issue).await?;
         let member = self.issue_member(issue, name).await?;
         let references = self.issue_references(member.key, anchor.key).await?;

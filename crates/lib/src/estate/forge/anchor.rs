@@ -74,7 +74,6 @@ impl Coordinate {
 
 impl Estate {
     pub async fn admit(&self, request: &Admission) -> Result<Anchor> {
-        self.anchored()?;
         node(&request.node)?;
         request.coordinate.validate()?;
         let _guard = self.guard()?;
@@ -122,7 +121,6 @@ impl Estate {
     }
 
     pub async fn issue(&self, coordinate: &Coordinate) -> Result<Anchor> {
-        self.anchored()?;
         coordinate.validate()?;
         let anchors = self.core.live("Anchor").await.map_err(fault)?;
         anchors
@@ -139,7 +137,6 @@ impl Estate {
     }
 
     pub async fn reconcile(&self, request: &Reconcile) -> Result<Anchor> {
-        self.anchored()?;
         node(&request.node)?;
         request.anchor.validate()?;
         request.coordinate.validate()?;
@@ -208,16 +205,6 @@ impl Estate {
             coordinate: request.coordinate.clone(),
             revision,
         })
-    }
-
-    fn anchored(&self) -> Result<()> {
-        if self.anchors {
-            return Ok(());
-        }
-        Err(Error::typed(
-            "concord.issue.migration_required",
-            "this v0.13 estate has no Issue execution anchors; follow the explicit estate transition",
-        ))
     }
 }
 

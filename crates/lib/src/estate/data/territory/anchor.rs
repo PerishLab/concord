@@ -4,9 +4,6 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 pub(super) async fn inspect(plane: &Estate, report: &mut Agreement) -> Result<()> {
-    if !plane.execution {
-        return Ok(());
-    }
     let anchors = plane.core.live("Anchor").await.map_err(fault)?;
     let members = plane.issue_worktrees().await?;
     for row in &anchors {
