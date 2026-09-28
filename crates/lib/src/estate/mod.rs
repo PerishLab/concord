@@ -151,6 +151,14 @@ impl Estate {
         crate::activity::record_issue(&self.space, issue, operator, operation)
     }
 
+    pub fn activity(&self, issue: &Anchor) -> Result<crate::activity::Snapshot> {
+        crate::activity::snapshot(&self.space, issue)
+    }
+
+    pub fn occupancy(&self) -> Result<crate::occupancy::Snapshot> {
+        crate::occupancy::inspect(&self.space.join(".concord/occupancy/ledger.json"))
+    }
+
     fn guard(&self) -> Result<File> {
         let path = self.space.join(".concord.lock");
         let file = std::fs::OpenOptions::new()
