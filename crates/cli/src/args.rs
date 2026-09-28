@@ -12,21 +12,6 @@ pub use audit::Args as Audit;
 pub use issue::Args as Issue;
 pub use member::Args as Member;
 
-#[derive(Args)]
-pub struct Observe {
-    #[arg(long)]
-    pub observe: bool,
-    #[arg(long = "github-command", requires = "observe")]
-    pub command: Option<PathBuf>,
-    #[arg(
-        long = "observe-timeout",
-        default_value_t = 10,
-        value_parser = clap::value_parser!(u64).range(1..=60),
-        requires = "observe"
-    )]
-    pub timeout: u64,
-}
-
 #[derive(Parser)]
 #[command(version = plumb::version!("CONCORD"), about)]
 pub struct Cli {
