@@ -68,6 +68,10 @@ fn legacy() {
     );
     assert!(installed.status.success(), "{:?}", installed);
     let marker = seat.join("metadata.json");
+    fs::write(seat.join("PATHS.md"), "legacy paths\n").unwrap();
+    fs::write(seat.join("SCENARIOS.md"), "legacy scenarios\n").unwrap();
+    fs::create_dir(seat.join("references")).unwrap();
+    fs::write(seat.join("references/legacy.md"), "legacy reference\n").unwrap();
     let mut held: serde_json::Value = serde_json::from_slice(&fs::read(&marker).unwrap()).unwrap();
     held["version"] = BEHIND.into();
     fs::write(&marker, serde_json::to_vec(&held).unwrap()).unwrap();
@@ -79,6 +83,11 @@ fn legacy() {
     fs::write(&path, serde_json::to_vec(&ledger).unwrap()).unwrap();
     let upgraded = run(&settings, &["skill", "upgrade"]);
     assert!(upgraded.status.success(), "{:?}", upgraded);
+    assert!(!seat.join("PATHS.md").exists());
+    assert!(!seat.join("SCENARIOS.md").exists());
+    assert!(!seat.join("references").exists());
+    assert!(seat.join("SKILL.md").is_file());
+    assert!(seat.join("metadata.json").is_file());
     let ledger: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     assert_eq!(ledger["records"][0]["version"], version());
     assert!(
