@@ -1,4 +1,5 @@
 mod artifact;
+pub mod authority;
 mod claim;
 pub mod delivery;
 pub mod landing;

@@ -5,6 +5,7 @@ mod pull;
 use super::super::{emit, input};
 use super::projection::Projection;
 use crate::args::issue::Delivery;
+use concord_core::authority::Plumb;
 use concord_core::{Coordinate, Error, Estate, IssueDeclaration, Result, issue_delivery};
 use serde::Deserialize;
 use serde_json::json;
@@ -30,7 +31,7 @@ pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<()>
             let observed = Projection::new(&command, 100, 1, timeout)
                 .delivery(&issue)
                 .await?;
-            let plan = issue_delivery::prepare(
+            let plan = issue_delivery::prepare::<Plumb>(
                 estate,
                 &issue_delivery::Request {
                     issue,
@@ -77,7 +78,8 @@ async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()> {
         .delivery(&plan.issue)
         .await?;
     let ready =
-        issue_delivery::revalidate(estate, &plan, &observed.snapshot, observed.observed).await?;
+        issue_delivery::revalidate::<Plumb>(estate, &plan, &observed.snapshot, observed.observed)
+            .await?;
     let mut report = pull::land(
         &ready.preparation,
         &plan.delivery.repository,
@@ -148,7 +150,7 @@ fn version(value: u64) -> Result<()> {
     ))
 }
 
-const SHAPE: &str = r#"{"version":1,"plan":{"schema":"concord.issue-member-delivery/v1","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"delivery":{}}}"#;
+const SHAPE: &str = r#"{"version":1,"plan":{"schema":"concord.issue-member-delivery/v2","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"authority":{},"delivery":{}}}"#;
 
 #[cfg(test)]
 mod tests {
