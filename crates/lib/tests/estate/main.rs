@@ -9,7 +9,7 @@ async fn genesis() {
     let temp = tempfile::tempdir().expect("temporary Space");
     let seat = Seat::new(temp.path());
     let estate = seat.bootstrap().await.expect("bootstrap Issue estate");
-    assert!(estate.inspect(None, None).await.expect("audit").agrees());
+    assert!(estate.inspect().await.expect("audit").agrees());
     drop(estate);
     drop(seat.open().await.expect("exact replay"));
     assert!(seat.database().is_file());

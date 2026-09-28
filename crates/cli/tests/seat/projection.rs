@@ -9,7 +9,7 @@ mod unix {
     #[test]
     fn projections() {
         let fixture = tempfile::tempdir().expect("fixture");
-        success(fixture.path(), &["domain", "bootstrap", "local"]);
+        success(fixture.path(), &["issue", "bootstrap"]);
         let command = tool(fixture.path(), "projection", reply());
         let command = command.to_str().expect("provider path");
         let brief = success(

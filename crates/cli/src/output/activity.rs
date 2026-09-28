@@ -1,26 +1,6 @@
 use concord_core::Error;
-use concord_core::activity::{Activity, IssueActivity};
+use concord_core::activity::IssueActivity;
 use serde_json::json;
-
-pub fn activity(activity: &Activity, output: bool) {
-    if activity.recent.is_empty() {
-        return;
-    }
-    let warning = json!({
-        "warning": {
-            "code": "concord.activity.concurrent_session",
-            "message": "another session touched this Task within the recent window; take care",
-            "task": activity.task,
-            "window_seconds": activity.window,
-            "current": activity.current,
-            "sessions": activity.recent,
-        }
-    });
-    show(&warning, output);
-    if !output {
-        detail(&activity.task, &activity.recent);
-    }
-}
 
 pub fn issue_activity(activity: &IssueActivity, output: bool) {
     if activity.recent.is_empty() {

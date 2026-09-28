@@ -1,6 +1,6 @@
 [package]
 name = "concord"
-description = "Task protocol control plane for perish.code."
+description = "Issue execution control plane for perish.code."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

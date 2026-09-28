@@ -55,7 +55,7 @@ impl Config {
     pub fn root(&self) -> Result<Root> {
         if self.domain_space_root.as_os_str().is_empty() {
             return Err(Error::new(
-                "domain_space_root is required for task operations; set it in config, \
+                "domain_space_root is required for Issue operations; set it in config, \
                  CONCORD_DOMAIN_SPACE_ROOT, or --root",
             ));
         }

@@ -169,14 +169,6 @@ impl Checkout<'_> {
         Ok(false)
     }
 
-    pub fn repair(&self, member: &Path) -> Result<()> {
-        let member = native(member);
-        let member = member
-            .to_str()
-            .ok_or_else(|| Error::new("member path is not utf8"))?;
-        self.run(&["worktree", "repair", member])
-    }
-
     pub fn add(&self, path: &Path, branch: &str, orphan: bool) -> Result<()> {
         let source = native(self.root);
         let source = source

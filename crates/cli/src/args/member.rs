@@ -9,25 +9,16 @@ pub struct Args {
 
 #[derive(Subcommand)]
 pub enum Command {
-    #[command(about = "List estate-managed worktree Members")]
+    #[command(about = "List Issue-anchored worktree Members")]
     List {
         #[arg(long)]
-        task: Option<String>,
-        #[arg(long, conflicts_with = "task")]
         issue: Option<String>,
     },
-    #[command(about = "Inspect one Member's current local Git health")]
-    Status {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
-        member: String,
-        #[command(flatten)]
-        observation: super::Observe,
-    },
-    #[command(about = "Create and attach a Git worktree Member")]
+    #[command(about = "Inspect one Issue Member's local Git health")]
+    Status { issue: String, member: String },
+    #[command(about = "Create and attach an Issue worktree Member")]
     Attach {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
+        issue: String,
         name: String,
         #[arg(long)]
         source: PathBuf,
@@ -38,20 +29,18 @@ pub enum Command {
         #[arg(long)]
         revision: i64,
     },
-    #[command(about = "Expand one Member claim")]
+    #[command(about = "Expand one Issue Member claim")]
     Claim {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
+        issue: String,
         member: String,
         #[arg(long, required = true, num_args = 1..)]
         claim: Vec<String>,
         #[arg(long)]
         revision: i64,
     },
-    #[command(about = "Shrink one Member claim to an explicit set")]
+    #[command(about = "Shrink one Issue Member claim to an explicit set")]
     Narrow {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
+        issue: String,
         member: String,
         #[arg(long, required = true, num_args = 1..)]
         claim: Vec<String>,
@@ -62,36 +51,33 @@ pub enum Command {
     },
     #[command(about = "Create a current Plumb Boundary proof")]
     Prove {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
+        issue: String,
         member: String,
         #[arg(long)]
         revision: i64,
     },
-    #[command(about = "Prepare or revalidate one exact local Member landing")]
+    #[command(about = "Prepare or revalidate one exact Issue Member landing")]
     Landing {
         #[command(subcommand)]
         command: Landing,
     },
-    #[command(about = "Manage the declared pull or change coordinate")]
+    #[command(about = "Manage one Issue Member pull coordinate")]
     Reference {
         #[command(subcommand)]
         command: Reference,
     },
-    #[command(about = "Remove one clean and landed Member")]
+    #[command(about = "Remove one clean and landed Issue Member")]
     Release {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
+        issue: String,
         member: String,
         #[arg(long)]
         revision: i64,
         #[arg(long)]
         apply: bool,
     },
-    #[command(about = "Remove one clean unlanded Member against matching Artifacts")]
+    #[command(about = "Remove one clean unlanded Issue Member against matching Artifacts")]
     Retire {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
+        issue: String,
         member: String,
         #[arg(long, required = true, num_args = 1..)]
         artifacts: Vec<String>,
@@ -104,10 +90,9 @@ pub enum Command {
 
 #[derive(Subcommand)]
 pub enum Landing {
-    #[command(about = "Prepare an exact local landing plan")]
+    #[command(about = "Prepare an exact Issue Member landing plan")]
     Prepare {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
+        issue: String,
         member: String,
         #[arg(long, default_value = "main")]
         base: String,
@@ -124,10 +109,9 @@ pub enum Landing {
         #[arg(long)]
         revision: i64,
     },
-    #[command(about = "Revalidate an exact local landing plan")]
+    #[command(about = "Revalidate an exact Issue Member landing plan")]
     Ready {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
+        issue: String,
         member: String,
         #[arg(long, default_value = "-")]
         plan: PathBuf,
@@ -136,10 +120,9 @@ pub enum Landing {
 
 #[derive(Subcommand)]
 pub enum Reference {
-    #[command(about = "Declare or replace the Member forge coordinate")]
+    #[command(about = "Declare an Issue Member pull coordinate")]
     Set {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
+        issue: String,
         member: String,
         #[arg(long)]
         provider: String,
@@ -152,17 +135,16 @@ pub enum Reference {
         #[arg(long)]
         revision: i64,
     },
-    #[command(about = "Remove the Member forge coordinate")]
+    #[command(about = "Remove an Issue Member pull coordinate")]
     Remove {
-        #[arg(value_name = "ISSUE|TASK")]
-        task: String,
+        issue: String,
         member: String,
         #[arg(long)]
-        owner: Option<String>,
+        owner: String,
         #[arg(long)]
-        repository: Option<String>,
+        repository: String,
         #[arg(long)]
-        number: Option<i64>,
+        number: i64,
         #[arg(long)]
         revision: i64,
         #[arg(long)]
@@ -188,16 +170,16 @@ impl Command {
 
     pub(crate) fn activity(&self) -> Option<Vec<&str>> {
         match self {
-            Self::List { issue, .. } => issue.as_deref().map(|issue| vec![issue]),
-            Self::Status { task, .. } => Some(vec![task]),
-            Self::Attach { task, .. } => Some(vec![task]),
-            Self::Claim { task, .. } => Some(vec![task]),
-            Self::Narrow { task, .. } => Some(vec![task]),
-            Self::Prove { task, .. } => Some(vec![task]),
-            Self::Landing { command } => Some(vec![command.task()]),
-            Self::Reference { command } => Some(command.activity()),
-            Self::Release { task, .. } => Some(vec![task]),
-            Self::Retire { task, .. } => Some(vec![task]),
+            Self::List { issue } => issue.as_deref().map(|held| vec![held]),
+            Self::Status { issue, .. }
+            | Self::Attach { issue, .. }
+            | Self::Claim { issue, .. }
+            | Self::Narrow { issue, .. }
+            | Self::Prove { issue, .. }
+            | Self::Release { issue, .. }
+            | Self::Retire { issue, .. } => Some(vec![issue]),
+            Self::Landing { command } => Some(vec![command.issue()]),
+            Self::Reference { command } => Some(vec![command.issue()]),
         }
     }
 }
@@ -209,10 +191,9 @@ impl Landing {
             Self::Ready { .. } => "member.landing.ready",
         }
     }
-
-    fn task(&self) -> &str {
+    pub(crate) fn issue(&self) -> &str {
         match self {
-            Self::Prepare { task, .. } | Self::Ready { task, .. } => task,
+            Self::Prepare { issue, .. } | Self::Ready { issue, .. } => issue,
         }
     }
 }
@@ -224,10 +205,9 @@ impl Reference {
             Self::Remove { .. } => "member.reference.remove",
         }
     }
-
-    fn activity(&self) -> Vec<&str> {
+    pub(crate) fn issue(&self) -> &str {
         match self {
-            Self::Set { task, .. } | Self::Remove { task, .. } => vec![task],
+            Self::Set { issue, .. } | Self::Remove { issue, .. } => issue,
         }
     }
 }

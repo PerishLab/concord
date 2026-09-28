@@ -13,9 +13,6 @@ const CAPACITY: usize = 64;
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum Subject {
-    Task { task: String },
-    Member { task: String, member: String },
-    Graph { task: String },
     Issue { node: String },
     IssueMember { node: String, member: String },
     Surface { repository: String, path: String },
