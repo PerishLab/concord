@@ -13,6 +13,9 @@ use concord_core::{Estate, Result, Seat};
 use serde_json::json;
 
 pub async fn run(cli: args::Cli) -> Result<()> {
+    if let Command::Cookbook(args) = &cli.command {
+        return output::cookbook::run(args.code.as_deref(), cli.json);
+    }
     if let Command::Config(config) = &cli.command
         && matches!(config.command, args::Configure::Path)
     {
@@ -78,7 +81,7 @@ impl Dispatch {
             }
         }
         let result = match command {
-            Command::Config(_) | Command::Skill(_) => {
+            Command::Config(_) | Command::Cookbook(_) | Command::Skill(_) => {
                 unreachable!("handled before estate open")
             }
             Command::Issue(args) => forge::run(&self.estate, args.command, self.json).await,

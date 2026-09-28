@@ -32,18 +32,46 @@ async fn main() {
             eprintln!("{}", failure(&error));
         } else {
             eprintln!("concord: {error}");
+            if let Some(code) = output::cookbook::reference(error.code()) {
+                eprintln!("concord: see: concord cookbook {code}");
+            }
         }
         std::process::exit(1);
     }
 }
 
 fn failure(error: &concord_core::Error) -> String {
-    let body = serde_json::json!({
+    let reference = output::cookbook::reference(error.code());
+    let mut body = serde_json::json!({
         "error": {
             "code": error.code(),
             "message": error.message(),
             "details": error.details(),
         }
     });
+    if let Some(reference) = reference {
+        body["error"]
+            .as_object_mut()
+            .expect("error body")
+            .insert("cookbook".into(), reference.into());
+    }
     serde_json::to_string(&body).expect("error JSON should encode")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::failure;
+
+    #[test]
+    fn references() {
+        let complex = concord_core::Error::typed("concord.boundary.refused", "refused");
+        let complex: serde_json::Value =
+            serde_json::from_str(&failure(&complex)).expect("complex error JSON");
+        assert_eq!(complex["error"]["cookbook"], "concord.boundary.refused");
+
+        let simple = concord_core::Error::typed("concord.coordinate.invalid", "invalid");
+        let simple: serde_json::Value =
+            serde_json::from_str(&failure(&simple)).expect("simple error JSON");
+        assert!(simple["error"].get("cookbook").is_none());
+    }
 }
