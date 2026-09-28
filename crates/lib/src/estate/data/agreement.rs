@@ -51,13 +51,7 @@ impl Agreement {
 
 impl Estate {
     #[locus::trace(with = crate::observation::view())]
-    pub async fn inspect(&self, task: Option<&str>, domain: Option<&str>) -> Result<Agreement> {
-        if task.is_some() || domain.is_some() {
-            return Err(Error::typed(
-                "concord.audit.scope",
-                "the Issue estate has no Task or Domain audit scope",
-            ));
-        }
+    pub async fn inspect(&self) -> Result<Agreement> {
         let mut report = Agreement {
             target: self.space.display().to_string(),
             revision: 0,
@@ -71,7 +65,7 @@ impl Estate {
     }
 
     pub(super) async fn ensure(&self) -> Result<()> {
-        let report = self.inspect(None, None).await?;
+        let report = self.inspect().await?;
         if report.agrees() {
             return Ok(());
         }

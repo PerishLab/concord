@@ -10,10 +10,7 @@ mod unix {
     #[test]
     fn lifecycle() {
         let fixture = tempfile::tempdir().expect("fixture");
-        success(fixture.path(), &["domain", "bootstrap", "local"]);
-        let legacy = raw(fixture.path(), &["task", "start", "local", "new"]);
-        assert!(!legacy.status.success());
-        assert!(String::from_utf8_lossy(&legacy.stderr).contains("--legacy"));
+        success(fixture.path(), &["issue", "bootstrap"]);
         let command = tool(
             fixture.path(),
             "issue",
@@ -92,7 +89,7 @@ mod unix {
     #[test]
     fn reconcile() {
         let fixture = tempfile::tempdir().expect("fixture");
-        success(fixture.path(), &["domain", "bootstrap", "local"]);
+        success(fixture.path(), &["issue", "bootstrap"]);
         let before = tool(
             fixture.path(),
             "before",
@@ -166,7 +163,7 @@ mod unix {
     #[test]
     fn failures() {
         let fixture = tempfile::tempdir().expect("fixture");
-        success(fixture.path(), &["domain", "bootstrap", "local"]);
+        success(fixture.path(), &["issue", "bootstrap"]);
         for (name, body, code) in [
             ("missing", "printf 'null\\n'".to_string(), "missing"),
             ("malformed", "printf 'broken\\n'".to_string(), "malformed"),

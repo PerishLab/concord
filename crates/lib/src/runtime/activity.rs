@@ -1,4 +1,4 @@
-use crate::estate::{Anchor, Node};
+use crate::estate::Anchor;
 use crate::path::at;
 use crate::{Error, Result};
 use fs2::FileExt;
@@ -33,14 +33,6 @@ pub struct Touch {
     pub session: Option<String>,
     pub operation: String,
     pub time: u64,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct Activity {
-    pub task: String,
-    pub current: Touch,
-    pub recent: Vec<Touch>,
-    pub window: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -91,21 +83,6 @@ impl Operator {
                     || matches!(character, '-' | '_' | '.' | ':' | '/')
             })
     }
-}
-
-pub(crate) fn record(
-    space: &Path,
-    task: &Node,
-    operator: Option<&Operator>,
-    operation: &str,
-) -> Result<Activity> {
-    let (current, recent) = persist(space, &task.key.to_string(), operator, operation)?;
-    Ok(Activity {
-        task: task.identity(),
-        current,
-        recent,
-        window: WINDOW,
-    })
 }
 
 fn persist(
@@ -199,7 +176,7 @@ fn guard(root: &Path, key: &str) -> Result<File> {
     file.try_lock_exclusive().map_err(|error| {
         Error::typed(
             "concord.activity.busy",
-            format!("Task activity ledger is busy: {error}"),
+            format!("Issue activity ledger is busy: {error}"),
         )
     })?;
     Ok(file)
@@ -212,10 +189,10 @@ fn read(path: &Path) -> Result<Ledger> {
     let bytes = std::fs::read(path)?;
     let ledger = serde_json::from_slice::<Ledger>(&bytes)
         .map_err(|error| Error::typed("concord.activity.invalid", error.to_string()))?;
-    if !matches!(ledger.version, 1 | 2) {
+    if ledger.version != 2 {
         return Err(Error::typed(
             "concord.activity.version",
-            format!("unsupported Task activity version {}", ledger.version),
+            format!("unsupported Issue activity version {}", ledger.version),
         ));
     }
     Ok(ledger)
@@ -249,7 +226,7 @@ fn validate(operation: &str) -> Result<()> {
     if operation.is_empty() || operation.len() > 128 {
         return Err(Error::typed(
             "concord.activity.operation",
-            "Task activity operation must be 1..=128 bytes",
+            "Issue activity operation must be 1..=128 bytes",
         ));
     }
     Ok(())

@@ -192,7 +192,7 @@ async fn lifecycle() {
             .len(),
         1
     );
-    let audit = estate.inspect(None, None).await.expect("audit estate");
+    let audit = estate.inspect().await.expect("audit estate");
     assert!(audit.faults.is_empty(), "{:?}", audit.faults);
 }
 

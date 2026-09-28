@@ -9,7 +9,7 @@ mod unix {
     #[test]
     fn execution() {
         let fixture = tempfile::tempdir().expect("fixture");
-        success(fixture.path(), &["domain", "bootstrap", "local"]);
+        success(fixture.path(), &["issue", "bootstrap"]);
         let provider = fixture.path().join("provider");
         let reply = json!({
             "node": "I_execution",

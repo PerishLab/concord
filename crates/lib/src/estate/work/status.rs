@@ -1,6 +1,4 @@
-use super::super::{Reference, World};
-use super::{Estate, Worktree};
-use crate::{PLUMB, Result, git};
+use crate::{Result, git};
 use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -56,47 +54,6 @@ pub struct UpstreamState {
     pub behind: usize,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct MemberStatus {
-    pub member: Worktree,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reference: Option<Reference>,
-    pub worktree: CheckoutState,
-    pub integration_checkout: CheckoutState,
-    pub boundary: BoundaryState,
-    pub integration: IntegrationState,
-    pub local_upstream: Option<UpstreamState>,
-    pub local_tracking_refs: Vec<String>,
-}
-
-impl Estate {
-    pub async fn member_status(&self, task: &str, name: &str) -> Result<MemberStatus> {
-        let world = World::load(self).await?;
-        let task = world.node(task)?;
-        let identity = task.identity();
-        let member = self.member(&identity, name).await?;
-        let reference = self.forge(task.key, Some(member.key)).await?;
-        let path = self.path(&task.domain, &task.name, &member.name);
-        let source = self.source(&member)?;
-        let worktree = checkout(&path)?;
-        let integration_checkout = checkout(&source)?;
-        let boundary = boundary(&member, &worktree.head);
-        let integration = integration(&path, &source, &worktree, &integration_checkout)?;
-        let local_upstream = upstream(&path, &member.branch)?;
-        let local_tracking_refs = git::at(&path).tracking(&worktree.head)?;
-        Ok(MemberStatus {
-            member,
-            reference,
-            worktree,
-            integration_checkout,
-            boundary,
-            integration,
-            local_upstream,
-            local_tracking_refs,
-        })
-    }
-}
-
 pub(super) fn checkout(path: &std::path::Path) -> Result<CheckoutState> {
     let held = git::at(path);
     let head = held.head()?;
@@ -108,27 +65,6 @@ pub(super) fn checkout(path: &std::path::Path) -> Result<CheckoutState> {
         untracked_files,
         clean: tracked_changes == 0 && untracked_files == 0,
     })
-}
-
-fn boundary(member: &Worktree, head: &str) -> BoundaryState {
-    let Some(proof) = &member.proof else {
-        return BoundaryState::Absent;
-    };
-    if current(proof, member, head) {
-        BoundaryState::Current
-    } else {
-        BoundaryState::Stale
-    }
-}
-
-fn current(proof: &super::Proof, member: &Worktree, head: &str) -> bool {
-    if proof.schema != plumb::boundary::SCHEMA || proof.plumb != PLUMB {
-        return false;
-    }
-    if proof.head != head {
-        return false;
-    }
-    proof.claim == crate::claim::digest(&member.claims)
 }
 
 pub(super) fn integration(

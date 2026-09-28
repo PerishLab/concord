@@ -9,6 +9,8 @@ pub struct Args {
 
 #[derive(Subcommand)]
 pub enum Command {
+    #[command(about = "Bootstrap a fresh Issue-execution estate")]
+    Bootstrap,
     #[command(about = "Project one bounded GitHub Issue brief without persisting it")]
     Brief {
         issue: String,
@@ -131,6 +133,7 @@ pub enum Delivery {
 impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
+            Self::Bootstrap => "issue.bootstrap",
             Self::Brief { .. } => "issue.brief",
             Self::Graph { .. } => "issue.graph",
             Self::Ready { .. } => "issue.ready",
