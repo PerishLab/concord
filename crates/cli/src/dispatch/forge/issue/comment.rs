@@ -12,6 +12,8 @@ use tokio::process::Command;
 const BODY: usize = 65_536;
 const REPLY: usize = 16 * 1024;
 const MUTATION: &str = "mutation($subject:ID!,$body:String!){addComment(input:{subjectId:$subject,body:$body}){commentEdge{node{id url body createdAt}}}}";
+const SEMANTICS: &str =
+    "execution fields are caller-environment observations, not identity or authority";
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Execution {
@@ -27,6 +29,7 @@ pub struct Declared {
     pub created: String,
     pub issue: String,
     pub execution: Execution,
+    pub semantics: String,
 }
 
 #[derive(Deserialize)]
@@ -78,6 +81,7 @@ pub async fn declare(
         created: reply.created,
         issue: coordinate.identity(),
         execution,
+        semantics: SEMANTICS.to_string(),
     })
 }
 
@@ -93,7 +97,7 @@ pub fn output(comment: Declared, json: bool) -> Result<()> {
         .map(|host| format!(" host={host}"))
         .unwrap_or_default();
     println!(
-        "Concord: agent={} session={}{}",
+        "Concord observation: agent={} session={}{}; non-authoritative",
         comment.execution.agent, comment.execution.session, host
     );
     Ok(())

@@ -33,6 +33,8 @@ mod unix {
             assert_eq!(value["comment"]["execution"]["agent"], agent);
             assert_eq!(value["comment"]["execution"]["session"], session);
             assert_eq!(value["comment"]["execution"]["host"], Value::Null);
+            let semantics = value["comment"]["semantics"].as_str().expect("semantics");
+            assert!(semantics.contains("observations"));
             request(fixture.path(), &body, &session);
         }
 
@@ -135,7 +137,6 @@ mod unix {
         Different,
         Timeout,
     }
-
     struct Case<'a> {
         name: &'a str,
         reply: Reply,
@@ -163,12 +164,8 @@ mod unix {
 
     fn bootstrap(space: &Path) {
         let output = spawn::concord(space)
-            .args([
-                "--root",
-                space.to_str().expect("root"),
-                "issue",
-                "bootstrap",
-            ])
+            .args(["--root", space.to_str().expect("root")])
+            .args(["issue", "bootstrap"])
             .output()
             .expect("bootstrap");
         assert!(output.status.success());
