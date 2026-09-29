@@ -1,9 +1,12 @@
 use super::super::{emit, input};
-use super::{observe, projection};
+use super::projection;
 use crate::args::issue::{Command, Preflight};
 use concord_core::{Admission, Anchor, Coordinate, Error, Estate, Reconcile, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+
+mod comment;
+mod observe;
 
 const SCHEMA: &str = "concord.issue-delivery/v1";
 const SHAPE: &str = r#"{"schema":"concord.issue-delivery/v1","anchor":{"key":1,"node":"I_node","owner":"PerishLab","repository":"concord","number":25,"revision":0},"observation":{"node":"I_node","owner":"PerishLab","repository":"concord","number":25,"url":"https://github.com/PerishLab/concord/issues/25","state":"open","kind":"Feature","updated":"2026-09-27T00:00:00Z","seen":0}}"#;
@@ -72,6 +75,16 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 .ready(&coordinate)
                 .await?;
             emit(json!({"readiness": readiness}), output)
+        }
+        Command::Comment {
+            issue,
+            input,
+            command,
+            timeout,
+        } => {
+            let coordinate = Coordinate::parse(&issue)?;
+            let comment = comment::declare(&coordinate, &input, &command, timeout).await?;
+            comment::output(comment, output)
         }
         Command::Delivery { command } => super::delivery::run(estate, command, output).await,
         Command::Attach {
