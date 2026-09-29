@@ -88,38 +88,6 @@ pub async fn land(
     })
 }
 
-pub async fn merge(
-    report: &mut Report,
-    preparation: &plumb::landing::Preparation,
-    command: &Path,
-    timeout: u64,
-) -> Result<()> {
-    Git::fetch(&preparation.root).await?;
-    let source = Git::run(&preparation.root, &["rev-parse", "HEAD"]).await?;
-    let target = Git::run(
-        &preparation.root,
-        &["rev-parse", &format!("origin/{}", preparation.base)],
-    )
-    .await?;
-    if source != preparation.source || target != preparation.target {
-        return Err(stale(
-            "source or base advanced after the exact pull was created",
-        ));
-    }
-    let repository = Git::repository(&preparation.root).await?;
-    let mut client = Client {
-        command,
-        repository: &repository,
-        timeout,
-    };
-    client.mark(&preparation.candidate).await?;
-    client
-        .settle(report.pull.number, &preparation.candidate)
-        .await?;
-    report.merged = true;
-    Ok(())
-}
-
 async fn push(root: &Path, branch: &str, source: &str, upstream: bool) -> Result<()> {
     let reference = format!("refs/heads/{branch}");
     let tracking = format!("refs/remotes/origin/{branch}");
@@ -134,10 +102,10 @@ async fn push(root: &Path, branch: &str, source: &str, upstream: bool) -> Result
     Git::run(root, &args).await.map(|_| ())
 }
 
-struct Client<'a> {
-    command: &'a Path,
-    repository: &'a str,
-    timeout: u64,
+pub(super) struct Client<'a> {
+    pub command: &'a Path,
+    pub repository: &'a str,
+    pub timeout: u64,
 }
 
 impl Client<'_> {
@@ -196,7 +164,7 @@ impl Client<'_> {
             .map_err(|error| provider(format!("gh pr view did not answer JSON: {error}")))
     }
 
-    async fn mark(&mut self, candidate: &str) -> Result<()> {
+    pub async fn mark(&mut self, candidate: &str) -> Result<()> {
         self.gh(&[
             "api",
             "-X",
@@ -213,23 +181,14 @@ impl Client<'_> {
         .map(|_| ())
     }
 
-    async fn settle(&mut self, number: i64, candidate: &str) -> Result<()> {
-        let number = number.to_string();
+    pub async fn settle(&mut self, number: i64, squash: &plumb::delivery::Squash) -> Result<()> {
+        let number = u64::try_from(number)
+            .map_err(|_| provider(format!("pull number {number} is negative")))?;
+        let arguments = squash.arguments(self.repository, number);
+        let arguments = arguments.iter().map(String::as_str).collect::<Vec<_>>();
         let mut last = None;
         for turn in 1..=6 {
-            match self
-                .gh(&[
-                    "pr",
-                    "merge",
-                    &number,
-                    "-R",
-                    self.repository,
-                    "--merge",
-                    "--match-head-commit",
-                    candidate,
-                ])
-                .await
-            {
+            match self.gh(&arguments).await {
                 Ok(_) => return Ok(()),
                 Err(error) if pending(error.message()) => last = Some(error),
                 Err(error) => return Err(error),
@@ -267,7 +226,7 @@ fn pending(message: &str) -> bool {
         .any(|needle| message.contains(needle))
 }
 
-fn stale(message: impl Into<String>) -> Error {
+pub(super) fn stale(message: impl Into<String>) -> Error {
     Error::typed("concord.delivery.stale", message)
 }
 
