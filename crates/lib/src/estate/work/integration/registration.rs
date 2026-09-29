@@ -115,8 +115,8 @@ fn reserved(integration: &Integration, request: &Register, path: &str, common: &
     Ok(())
 }
 
-fn origin(path: &Path) -> Result<Repository> {
-    let value = git::at(path).text(&["remote", "get-url", REMOTE])?;
+pub(in crate::estate) fn origin(path: &Path) -> Result<Repository> {
+    let value = git::at(path).text(&["config", "--get", "remote.origin.url"])?;
     let coordinate = value
         .strip_prefix("https://github.com/")
         .or_else(|| value.strip_prefix("http://github.com/"))

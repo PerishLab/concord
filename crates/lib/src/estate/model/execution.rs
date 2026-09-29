@@ -24,6 +24,8 @@ pub(super) struct Integration {
 pub(super) struct IssueMember {
     #[field(string)]
     branch: string,
+    #[field(string)]
+    base: string,
     #[relation(Anchor, one2one, root)]
     anchor: Anchor,
     #[relation(Integration, many2one)]

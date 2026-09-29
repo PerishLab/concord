@@ -1,7 +1,6 @@
 use concord_core::authority::{Plumb, Warrant};
 use concord_core::{
-    Admission, Coordinate, Estate, IssueAttach, IssueProving, Register, Repository, Seat,
-    issue_delivery,
+    Admission, Coordinate, Estate, IssueProving, Register, Repository, Seat, Start, issue_delivery,
 };
 use plumb::guard::{Action, Authority, Descriptor};
 use serde::Serialize;
@@ -71,6 +70,14 @@ pub(super) async fn fixture(producer: &str, depot: &str) -> Fixture {
             "https://github.com/PerishLab/probe.git",
         ],
     );
+    git(
+        &source,
+        &[
+            "config",
+            &format!("url.{}.insteadOf", remote.display()),
+            "https://github.com/PerishLab/probe.git",
+        ],
+    );
 
     let estate = Seat::new(temp.path())
         .bootstrap()
@@ -93,13 +100,23 @@ pub(super) async fn fixture(producer: &str, depot: &str) -> Fixture {
         .await
         .expect("register Integration");
     estate
-        .attach_issue(&IssueAttach {
+        .start(&Start {
             issue: issue.clone(),
+            node: "I_delivery".into(),
+            stable: "R_probe".into(),
             claims: vec!["topic.md".into()],
             revision: 0,
         })
         .await
         .expect("attach Member");
+    git(
+        &source,
+        &[
+            "config",
+            "--unset-all",
+            &format!("url.{}.insteadOf", remote.display()),
+        ],
+    );
     let member = temp.path().join(".issues/I_delivery/worktree");
     std::fs::write(member.join("topic.md"), "delivery\n").expect("change");
     git(&member, &["add", "topic.md"]);

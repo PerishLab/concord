@@ -60,6 +60,16 @@ impl Checkout<'_> {
         self.text(&["rev-parse", "--verify", "HEAD^{commit}"])
     }
 
+    pub fn fetch(&self, remote: &str, branch: &str) -> Result<String> {
+        let source = format!("refs/heads/{branch}:refs/remotes/{remote}/{branch}");
+        self.run(&["fetch", "--no-tags", remote, &source])?;
+        self.text(&[
+            "rev-parse",
+            "--verify",
+            &format!("refs/remotes/{remote}/{branch}^{{commit}}"),
+        ])
+    }
+
     pub fn merge(&self, left: &str, right: &str) -> Result<String> {
         self.text(&["merge-base", left, right])
     }

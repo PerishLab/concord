@@ -3,7 +3,9 @@ mod reconcile;
 pub(in crate::estate) mod registration;
 
 use crate::{Error, Result};
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
+use std::fs::File;
 use std::path::PathBuf;
 
 pub(super) const BRANCH: &str = "main";
@@ -40,6 +42,22 @@ pub struct Register {
 pub struct Rename {
     pub node: String,
     pub repository: Repository,
+}
+
+pub(in crate::estate) fn guard(estate: &crate::estate::Estate, held: &Integration) -> Result<File> {
+    let path = estate
+        .space
+        .join(".concord")
+        .join(format!("integration-{}.lock", held.key));
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&path)?;
+    crate::path::at(&path).mode(0o600)?;
+    file.lock_exclusive()?;
+    Ok(file)
 }
 
 impl Repository {
