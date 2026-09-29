@@ -35,6 +35,19 @@ struct Change<'a> {
 }
 
 impl Estate {
+    pub fn claim_intersections(
+        &self,
+        left: &IssueWorktree,
+        right: &IssueWorktree,
+    ) -> Result<Vec<String>> {
+        if git::at(&self.issue_source(left)?).identity()?
+            != git::at(&self.issue_source(right)?).identity()?
+        {
+            return Ok(Vec::new());
+        }
+        Ok(crate::claim::intersections(&left.claims, &right.claims))
+    }
+
     pub async fn claim_issue(&self, request: &IssueClaiming) -> Result<IssueMemberChange> {
         self.change_issue_claim(Change {
             issue: &request.issue,

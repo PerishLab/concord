@@ -232,6 +232,7 @@ pub(super) struct CompleteIssue {
     pub sub_issues: Vec<Issue>,
     pub blocked_by: Vec<Issue>,
     pub blocking: Vec<Issue>,
+    pub pulls: Vec<Pull>,
     pub comments: Vec<super::github::RawComment>,
 }
 
@@ -240,6 +241,7 @@ pub(super) enum Connection {
     SubIssues,
     BlockedBy,
     Blocking,
+    Pulls,
     Comments,
 }
 
