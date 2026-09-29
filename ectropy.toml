@@ -472,3 +472,9 @@ name = "max_nodes"
 [[vocabulary.term]]
 description = "The exact Issue-and-Member delivery plan composed by Concord over Plumb's delivery kernel."
 name = "issue_delivery"
+
+[[grant]]
+paths = [
+    "crates/lib/src/runtime/build.rs",
+]
+syntax = "embed"
