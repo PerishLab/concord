@@ -1,10 +1,10 @@
 #[cfg(unix)]
 mod unix {
+    use super::super::execution::unix::{Facts, provider, repository};
     use super::super::spawn;
     use serde_json::{Value, json};
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
-    use std::process::Command;
 
     #[test]
     fn relationships() {
@@ -13,7 +13,7 @@ mod unix {
         for (node, number) in [("I_root", 68), ("I_parent", 60), ("I_child", 69)] {
             attach(fixture.path(), node, number);
         }
-        let source = repository(fixture.path());
+        let source = repository(fixture.path(), "PerishLab/concord");
         let provider = tool(
             fixture.path(),
             "repository",
@@ -38,9 +38,14 @@ mod unix {
                 provider.to_str().expect("provider path"),
             ],
         );
-        member(fixture.path(), "PerishLab/concord#68", "crates/cli");
-        member(fixture.path(), "PerishLab/concord#60", "crates");
-        member(fixture.path(), "PerishLab/concord#69", "docs");
+        member(
+            fixture.path(),
+            "I_root",
+            "PerishLab/concord#68",
+            "crates/cli",
+        );
+        member(fixture.path(), "I_parent", "PerishLab/concord#60", "crates");
+        member(fixture.path(), "I_child", "PerishLab/concord#69", "docs");
 
         let provider = tool(fixture.path(), "relationships", reply(false));
         let report = preflight(fixture.path(), &provider, 20);
@@ -108,17 +113,32 @@ mod unix {
         );
     }
 
-    fn member(space: &Path, issue: &str, claim: &str) {
+    fn member(space: &Path, node: &str, issue: &str, claim: &str) {
+        let number = issue
+            .rsplit_once('#')
+            .and_then(|(_, number)| number.parse().ok())
+            .expect("Issue number");
+        let provider = provider(
+            space,
+            Facts {
+                node,
+                stable: "R_concord",
+                coordinate: "PerishLab/concord",
+                number,
+            },
+        );
         success(
             space,
             &[
                 "member",
-                "attach",
+                "start",
                 issue,
                 "--claim",
                 claim,
                 "--revision",
                 "0",
+                "--github-command",
+                provider.to_str().expect("start provider"),
             ],
         );
     }
@@ -194,47 +214,6 @@ mod unix {
             "pageInfo": {"hasNextPage": more, "endCursor": more.then_some("next")},
             "nodes": nodes,
         })
-    }
-
-    fn repository(root: &Path) -> PathBuf {
-        let source = root.join("source");
-        std::fs::create_dir(&source).expect("source");
-        git(&source, &["init", "-b", "main"]);
-        git(&source, &["config", "user.name", "Concord Test"]);
-        git(
-            &source,
-            &["config", "user.email", "concord@example.invalid"],
-        );
-        std::fs::write(source.join("README.md"), "fixture\n").expect("fixture file");
-        git(&source, &["add", "README.md"]);
-        git(&source, &["commit", "-m", "fixture"]);
-        git(
-            &source,
-            &[
-                "remote",
-                "add",
-                "origin",
-                "https://github.com/PerishLab/concord.git",
-            ],
-        );
-        git(&source, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
-        git(
-            &source,
-            &["branch", "--set-upstream-to=origin/main", "main"],
-        );
-        source
-    }
-
-    fn git(root: &Path, arguments: &[&str]) {
-        assert!(
-            Command::new("git")
-                .arg("-C")
-                .arg(root)
-                .args(arguments)
-                .status()
-                .expect("run Git")
-                .success()
-        );
     }
 
     fn tool(root: &Path, name: &str, body: String) -> PathBuf {

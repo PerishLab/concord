@@ -2,6 +2,7 @@ mod artifact;
 pub(in crate::estate) mod integration;
 mod issue;
 mod overlap;
+mod provision;
 mod status;
 
 use super::{Estate, fault};
@@ -10,9 +11,9 @@ pub use issue::authority;
 pub use issue::delivery as issue_delivery;
 pub use issue::landing as issue_landing;
 pub use issue::{
-    IssueArtifact, IssueAttach, IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange,
+    Finish, IssueArtifact, IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange,
     IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval, IssueRetirement,
-    IssueWithdrawal, IssueWorktree,
+    IssueWithdrawal, IssueWorktree, Start,
 };
 pub use overlap::ClaimOverlap;
 use serde::{Deserialize, Serialize};

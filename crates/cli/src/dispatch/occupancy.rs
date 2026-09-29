@@ -121,18 +121,19 @@ fn issue(command: &args::issue::Command) -> Option<Vec<Seed<'_>>> {
 fn member(command: &args::member::Command) -> Option<Vec<Seed<'_>>> {
     use args::member::Command;
     let issue = match command {
-        Command::Attach { issue, .. }
+        Command::Start { issue, .. }
         | Command::Claim { issue, .. }
         | Command::Narrow { issue, .. }
         | Command::Prove { issue, .. }
         | Command::Release { issue, .. }
+        | Command::Complete { issue, .. }
         | Command::Retire { issue, .. } => issue.as_str(),
         Command::Reference { command } => command.issue(),
         Command::List { .. } | Command::Status { .. } | Command::Landing { .. } => return None,
     };
     let mut seeds = vec![Seed::Issue(issue), Seed::Member(issue)];
     match command {
-        Command::Attach { claim, .. } => seeds.push(Seed::Addition(issue, claim)),
+        Command::Start { claim, .. } => seeds.push(Seed::Addition(issue, claim)),
         Command::Claim { claim, .. } | Command::Narrow { claim, .. } => {
             seeds.push(Seed::MemberSurfaces(issue, Some(claim)))
         }

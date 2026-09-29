@@ -3,31 +3,23 @@ pub mod authority;
 mod claim;
 pub mod delivery;
 pub mod landing;
+mod lifecycle;
 mod proof;
 mod reference;
-mod release;
-mod status;
+mod start;
 
 use super::super::{Anchor, Coordinate, Estate, fault};
-use crate::path::at;
-use crate::{Error, Result, component, git};
+use crate::{Error, Result, component};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 
 pub use artifact::{IssueArtifact, IssueImport, IssueRemoval};
 pub use claim::{IssueClaiming, IssueMemberChange, IssueNarrowing};
+pub use lifecycle::{Finish, IssueMemberStatus, IssueRelease, IssueRetirement};
 pub use proof::IssueProving;
 pub use reference::{IssueDeclaration, IssueWithdrawal};
-pub use release::{IssueRelease, IssueRetirement};
-pub use status::IssueMemberStatus;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IssueAttach {
-    pub issue: Coordinate,
-    pub claims: Vec<String>,
-    pub revision: i64,
-}
+pub use start::Start;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct IssueWorktree {
@@ -36,6 +28,7 @@ pub struct IssueWorktree {
     pub node: String,
     pub integration: super::Integration,
     pub branch: String,
+    pub base: String,
     pub claims: Vec<String>,
     pub proof: Option<super::Proof>,
 }
@@ -61,6 +54,7 @@ impl Estate {
                 .transpose()?
                 .ok_or_else(|| malformed(row.key(), "integration"))?;
             let branch = text(&row, "branch")?;
+            let base = text(&row, "base")?;
             let mut held = claims
                 .iter()
                 .filter(|claim| claim.int("member") == Some(row.key()))
@@ -78,110 +72,13 @@ impl Estate {
                 node: anchor.node,
                 integration,
                 branch,
+                base,
                 claims: held,
                 proof: issue_proof(&proofs, row.key(), anchor.key)?,
             });
         }
         out.sort_by_key(|member| member.node.clone());
         Ok(out)
-    }
-
-    pub async fn attach_issue(&self, request: &IssueAttach) -> Result<IssueMemberChange> {
-        let claims = crate::claim::normalize(&request.claims)?;
-        let _guard = self.guard()?;
-        self.ensure().await?;
-        let anchor = self.issue(&request.issue).await?;
-        issue_stale(anchor.revision, request.revision)?;
-        let integration = self.integration(&anchor.coordinate).await?;
-        let source = PathBuf::from(&integration.path);
-        let branch = branch(&anchor.node);
-        if self
-            .issue_worktrees()
-            .await?
-            .iter()
-            .any(|member| member.node == anchor.node)
-        {
-            return Err(Error::typed(
-                "concord.member.reserved",
-                format!("member already exists: {}", request.issue.identity()),
-            ));
-        }
-        if git::at(&source).exists(&branch)? {
-            return Err(Error::typed(
-                "concord.member.branch",
-                format!("target branch already exists: {branch}"),
-            ));
-        }
-        let observations = self.issue_overlaps(None, &source, &claims).await?;
-        let path = self.issue_path(&anchor)?;
-        if path.exists() {
-            return Err(Error::typed(
-                "concord.member.territory",
-                format!("member path already exists: {}", path.display()),
-            ));
-        }
-        let root = path
-            .parent()
-            .ok_or_else(|| Error::new("member path has no Issue parent"))?;
-        let fresh = !root.exists();
-        at(root).directory()?;
-        if let Err(error) = git::at(&source).add(&path, &branch, false) {
-            if fresh {
-                let _ = std::fs::remove_dir(root);
-            }
-            return Err(error);
-        }
-        let revision = anchor.revision + 1;
-        let next = revision.to_string();
-        let root = anchor.key.to_string();
-        let key = integration.key.to_string();
-        let made = self
-            .core
-            .batch(async |tx| {
-                let member = tx
-                    .put(
-                        "IssueMember",
-                        &[
-                            ("branch", branch.as_str()),
-                            ("anchor", root.as_str()),
-                            ("integration", key.as_str()),
-                        ],
-                    )
-                    .await?;
-                let parent = member.to_string();
-                for claim in &claims {
-                    tx.put(
-                        "IssueClaim",
-                        &[
-                            ("path", claim.as_str()),
-                            ("member", parent.as_str()),
-                            ("anchor", root.as_str()),
-                        ],
-                    )
-                    .await?;
-                }
-                tx.set("Anchor", anchor.key, &[("revision", next.as_str())])
-                    .await?;
-                Ok(member)
-            })
-            .await;
-        if let Err(error) = made {
-            let rollback = git::at(&source).remove(&path);
-            if fresh {
-                let _ = std::fs::remove_dir(root);
-            }
-            return match rollback {
-                Ok(()) => Err(fault(error)),
-                Err(rollback) => Err(Error::typed(
-                    "concord.member.disagreement",
-                    format!("{error}; worktree rollback failed: {rollback}"),
-                )),
-            };
-        }
-        Ok(IssueMemberChange {
-            member: self.issue_member(&request.issue).await?,
-            observations,
-        })
     }
 
     pub async fn issue_member(&self, issue: &Coordinate) -> Result<IssueWorktree> {
@@ -217,7 +114,7 @@ impl Estate {
     }
 }
 
-fn branch(node: &str) -> String {
+pub(super) fn branch(node: &str) -> String {
     let digest = Sha256::digest(node.as_bytes());
     format!("concord/issue-{digest:x}")
 }

@@ -1,33 +1,42 @@
 use super::{emit, explicit};
 use crate::args::member::Command;
 use concord_core::{
-    Coordinate, Estate, IssueAttach, IssueClaiming, IssueMemberChange, IssueNarrowing,
-    IssueProving, IssueRelease, IssueRetirement, Result,
+    Coordinate, Estate, Finish, IssueClaiming, IssueMemberChange, IssueNarrowing, IssueProving,
+    IssueRelease, IssueRetirement, Result, Start,
 };
 use serde_json::json;
 
 mod landing;
 mod reference;
+mod start;
 mod status;
 
 pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> {
     match command {
         Command::List { issue } => list(estate, issue, output).await,
         Command::Status { issue } => status::run(estate, &issue, output).await,
-        Command::Attach {
+        Command::Start {
             issue,
             claim,
             revision,
-        } => issue_changed(
-            estate
-                .attach_issue(&IssueAttach {
-                    issue: Coordinate::parse(&issue)?,
-                    claims: claim,
-                    revision,
-                })
-                .await?,
-            output,
-        ),
+            command,
+            timeout,
+        } => {
+            let issue = Coordinate::parse(&issue)?;
+            let observed = start::observe(&issue, &command, timeout).await?;
+            issue_changed(
+                estate
+                    .start(&Start {
+                        issue,
+                        node: observed.node,
+                        stable: observed.stable,
+                        claims: claim,
+                        revision,
+                    })
+                    .await?,
+                output,
+            )
+        }
         Command::Claim {
             issue,
             claim,
@@ -77,6 +86,20 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             explicit(apply, "member release")?;
             let revision = estate
                 .release_issue(&IssueRelease {
+                    issue: Coordinate::parse(&issue)?,
+                    revision,
+                })
+                .await?;
+            emit(json!({"revision": revision}), output)
+        }
+        Command::Complete {
+            issue,
+            revision,
+            apply,
+        } => {
+            explicit(apply, "member complete")?;
+            let revision = estate
+                .finish(&Finish {
                     issue: Coordinate::parse(&issue)?,
                     revision,
                 })
