@@ -1,6 +1,6 @@
 use super::github::{RawConnection, RawEvent, RawIssue, RawIssueNode, RawSource};
 use super::projection::{Fault, Issue, Page, Pull};
-use concord_core::{Coordinate, Error, Result};
+use concord_core::{Coordinate, Result};
 use std::collections::BTreeMap;
 
 pub(super) fn root(coordinate: &Coordinate, raw: &RawIssue) -> std::result::Result<Issue, Fault> {
@@ -122,7 +122,8 @@ pub(super) fn pulls(raw: &RawConnection<RawEvent>, after: Option<String>) -> Res
         .filter_map(|event| event.source.as_ref())
         .filter(|source| source.kind == "PullRequest")
         .map(pull)
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(super::projection::fault)?;
     nodes.sort_by(|left, right| {
         (&left.owner, &left.repository, left.number).cmp(&(
             &right.owner,
@@ -139,7 +140,22 @@ pub(super) fn pulls(raw: &RawConnection<RawEvent>, after: Option<String>) -> Res
     })
 }
 
-fn pull(raw: &RawSource) -> Result<Pull> {
+pub(super) fn insert_pulls(
+    target: &mut BTreeMap<String, Pull>,
+    raw: &[RawEvent],
+) -> std::result::Result<(), Fault> {
+    for source in raw
+        .iter()
+        .filter_map(|event| event.source.as_ref())
+        .filter(|source| source.kind == "PullRequest")
+    {
+        let pull = pull(source)?;
+        target.insert(pull.node.clone(), pull);
+    }
+    Ok(())
+}
+
+fn pull(raw: &RawSource) -> std::result::Result<Pull, Fault> {
     let repository = raw
         .repository
         .as_ref()
@@ -177,12 +193,12 @@ fn pull(raw: &RawSource) -> Result<Pull> {
     })
 }
 
-fn required<'a>(value: Option<&'a str>, message: &str) -> Result<&'a str> {
+fn required<'a>(value: Option<&'a str>, message: &str) -> std::result::Result<&'a str, Fault> {
     value
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| malformed(message))
 }
 
-fn malformed(message: &str) -> Error {
-    Error::typed("concord.issue.projection.malformed", message)
+fn malformed(message: &str) -> Fault {
+    super::github::provider("malformed", message)
 }

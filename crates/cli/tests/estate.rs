@@ -1,5 +1,7 @@
 #[path = "seat/execution.rs"]
 mod execution;
+#[path = "seat/existing.rs"]
+mod existing;
 #[path = "seat/issue.rs"]
 mod issue;
 #[path = "seat/preflight.rs"]

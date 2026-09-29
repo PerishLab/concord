@@ -250,6 +250,18 @@ description = "Observing Issue Member Claim overlap is one coordination operatio
 name = "issue_overlaps"
 
 [[vocabulary.term]]
+description = "Computing exact Claim intersections between two Issue Members is one read-only coordination operation."
+name = "claim_intersections"
+
+[[vocabulary.term]]
+description = "One GitHub pull request and its native relation to the projected Issue."
+name = "PullRelation"
+
+[[vocabulary.term]]
+description = "Inserting projected pull requests into a stable node-keyed collection."
+name = "insert_pulls"
+
+[[vocabulary.term]]
 description = "Listing every Issue-anchored worktree is one product operation."
 name = "issue_worktrees"
 

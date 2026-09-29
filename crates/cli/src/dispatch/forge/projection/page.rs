@@ -44,6 +44,15 @@ impl Projection<'_> {
                     &mut active,
                 )?;
             }
+            if active.contains(&Connection::Pulls) {
+                super::super::shape::insert_pulls(&mut result.pulls, &raw.timeline_items.nodes)?;
+                settle(
+                    Connection::Pulls,
+                    &raw.timeline_items.page_info,
+                    &mut request.pulls_after,
+                    &mut active,
+                )?;
+            }
             if active.contains(&Connection::Comments) {
                 for comment in &raw.comments.nodes {
                     result.comments.insert(comment.url.clone(), comment.clone());
@@ -81,6 +90,7 @@ struct Builder {
     sub_issues: BTreeMap<String, super::Issue>,
     blocked_by: BTreeMap<String, super::Issue>,
     blocking: BTreeMap<String, super::Issue>,
+    pulls: BTreeMap<String, super::Pull>,
     comments: BTreeMap<String, super::super::github::RawComment>,
 }
 
@@ -118,6 +128,7 @@ impl Builder {
             sub_issues: self.sub_issues.into_values().collect(),
             blocked_by: self.blocked_by.into_values().collect(),
             blocking: self.blocking.into_values().collect(),
+            pulls: self.pulls.into_values().collect(),
             comments: self.comments.into_values().collect(),
         }
     }
@@ -164,6 +175,7 @@ fn name(connection: Connection) -> &'static str {
         Connection::SubIssues => "sub-issues",
         Connection::BlockedBy => "blocked-by",
         Connection::Blocking => "blocking",
+        Connection::Pulls => "pulls",
         Connection::Comments => "comments",
     }
 }
