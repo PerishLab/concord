@@ -6,15 +6,31 @@ use std::path::{Path, PathBuf};
 const LIMIT: usize = 1024 * 1024;
 
 pub fn read<T: DeserializeOwned>(path: &Path, shape: &str) -> Result<T> {
-    let (bytes, label) = if path == Path::new("-") {
-        (
+    let (bytes, label) = bytes(path)?;
+    decode(&bytes, &label, shape)
+}
+
+pub fn stream<T: DeserializeOwned>(path: &Path, shape: &str) -> Result<Option<T>> {
+    let (bytes, label) = bytes(path)?;
+    if path == Path::new("-") && bytes.is_empty() {
+        return Ok(None);
+    }
+    decode(&bytes, &label, shape).map(Some)
+}
+
+fn bytes(path: &Path) -> Result<(Vec<u8>, String)> {
+    if path == Path::new("-") {
+        Ok((
             bounded(std::io::stdin().lock(), "stdin")?,
             "stdin".to_string(),
-        )
+        ))
     } else {
-        regular(path)?
-    };
-    serde_json::from_slice(&bytes).map_err(|error| {
+        regular(path)
+    }
+}
+
+fn decode<T: DeserializeOwned>(bytes: &[u8], label: &str, shape: &str) -> Result<T> {
+    serde_json::from_slice(bytes).map_err(|error| {
         Error::detailed(
             "concord.input.json",
             format!("cannot decode JSON change-set from {label}: {error}"),

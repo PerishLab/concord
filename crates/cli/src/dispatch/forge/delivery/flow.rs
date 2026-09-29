@@ -1,4 +1,4 @@
-use super::{SHAPE, projection, pull, settle, version};
+use super::{SHAPE, handoff::Refusal, projection, pull, settle, version};
 use crate::args::issue::Delivery;
 use crate::dispatch::{emit, input};
 use concord_core::authority::Plumb;
@@ -11,7 +11,10 @@ use std::path::{Path, PathBuf};
 #[serde(deny_unknown_fields)]
 struct Envelope {
     version: u64,
-    plan: issue_delivery::Plan,
+    #[serde(default)]
+    plan: Option<issue_delivery::Plan>,
+    #[serde(default)]
+    error: Option<Refusal>,
 }
 
 struct Flow<'a> {
@@ -34,9 +37,24 @@ pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()
             "delivery land received a non-land command",
         ));
     };
-    let envelope: Envelope = input::read(&path, SHAPE)?;
+    let envelope: Envelope = input::stream(&path, SHAPE)?.ok_or_else(|| {
+        Error::typed(
+            "concord.delivery.handoff",
+            "streamed delivery handoff ended without a plan or preparation refusal",
+        )
+    })?;
     version(envelope.version)?;
-    if envelope.plan.issue != Coordinate::parse(&issue)? {
+    let plan = match (envelope.plan, envelope.error) {
+        (Some(plan), None) => plan,
+        (None, Some(error)) => return Err(error.restore()),
+        _ => {
+            return Err(Error::typed(
+                "concord.delivery.envelope",
+                "delivery envelope must carry exactly one plan or preparation refusal",
+            ));
+        }
+    };
+    if plan.issue != Coordinate::parse(&issue)? {
         return Err(Error::typed(
             "concord.delivery.coordinate",
             "delivery plan Issue or Member does not match the command",
@@ -44,7 +62,7 @@ pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()
     }
     Flow {
         estate,
-        plan: envelope.plan,
+        plan,
         command,
         timeout,
     }

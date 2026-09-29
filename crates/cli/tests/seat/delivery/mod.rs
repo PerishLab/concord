@@ -1,4 +1,6 @@
 #[cfg(unix)]
+mod handoff;
+#[cfg(unix)]
 mod provider;
 
 #[cfg(unix)]
@@ -118,7 +120,12 @@ mod unix {
             fixture.path(),
             &["member", "prove", "PerishLab/probe#1", "--revision", "1"],
         );
-        let plan = prepare(fixture.path(), provider)
+        super::handoff::verify(fixture.path(), provider);
+        assert_eq!(
+            success(fixture.path(), &["issue", "show", "PerishLab/probe#1"])["anchor"]["revision"],
+            2
+        );
+        let plan = prepare(fixture.path(), provider, "2", true)
             .output()
             .expect("prepare stored plan");
         assert!(plan.status.success());
@@ -190,7 +197,7 @@ mod unix {
         assert_eq!(replay["released"], false);
     }
 
-    fn prepare(space: &Path, provider: &str) -> Command {
+    pub(super) fn prepare(space: &Path, provider: &str, revision: &str, handoff: bool) -> Command {
         let mut command = spawn::concord(space);
         command
             .args(["--root", space.to_str().expect("root"), "--json"])
@@ -200,12 +207,17 @@ mod unix {
                 "prepare",
                 "PerishLab/probe#1",
                 "--revision",
-                "2",
+                revision,
                 "--github-command",
                 provider,
+                "--observe-timeout",
+                "1",
             ])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        if handoff {
+            command.arg("--handoff");
+        }
         command
     }
 
