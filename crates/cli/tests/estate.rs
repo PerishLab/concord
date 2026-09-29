@@ -1,3 +1,5 @@
+#[path = "seat/delivery.rs"]
+mod delivery;
 #[path = "seat/execution.rs"]
 mod execution;
 #[path = "seat/existing.rs"]

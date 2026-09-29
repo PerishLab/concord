@@ -69,9 +69,11 @@ impl Estate {
         if report.agrees() {
             return Ok(());
         }
-        Err(Error::typed(
+        let count = report.faults.len();
+        Err(Error::detailed(
             "concord.audit.refused",
-            format!("estate has {} agreement fault(s)", report.faults.len()),
+            format!("estate has {count} agreement fault(s)"),
+            serde_json::json!({"agreement": report}),
         ))
     }
 }
