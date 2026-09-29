@@ -1,3 +1,5 @@
+mod completion;
+
 use concord_core::authority::{Plumb, Warrant};
 use concord_core::{
     Admission, Coordinate, Estate, IssueProving, Register, Repository, Seat, Start, issue_delivery,

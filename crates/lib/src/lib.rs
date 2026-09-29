@@ -21,10 +21,11 @@ pub use config::{Root, host};
 pub use error::{Error, Result};
 pub use estate::{
     Admission, Agreement, Anchor, BoundaryState, CheckoutState, ClaimOverlap, Coordinate, Estate,
-    Finding, Finish, Integration, IntegrationState, IssueArtifact, IssueClaiming, IssueDeclaration,
-    IssueImport, IssueMemberChange, IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease,
-    IssueRemoval, IssueRetirement, IssueWithdrawal, IssueWorktree, Proof, Reconcile, Reference,
-    ReferenceKind, Register, Rename, Repository, Seat, Start, UpstreamState,
+    Finding, Finish, Guard, Integration, IntegrationState, IssueArtifact, IssueClaiming,
+    IssueDeclaration, IssueImport, IssueMemberChange, IssueMemberStatus, IssueNarrowing,
+    IssueProving, IssueRelease, IssueRemoval, IssueRetirement, IssueWithdrawal, IssueWorktree,
+    Proof, Reconcile, Reference, ReferenceKind, Register, Rename, Repository, Seat, Start,
+    UpstreamState,
 };
 pub use estate::{authority, issue_delivery, issue_landing};
 pub use protocol::PLUMB;
