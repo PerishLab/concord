@@ -24,7 +24,6 @@ pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<()>
     match command {
         Delivery::Prepare {
             issue,
-            member,
             revision,
             base,
             command,
@@ -38,7 +37,6 @@ pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<()>
                 estate,
                 &issue_delivery::Request {
                     issue,
-                    member,
                     revision,
                     base,
                     snapshot: observed.snapshot,
@@ -56,7 +54,6 @@ pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<()>
 async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()> {
     let Delivery::Land {
         issue,
-        member,
         plan: path,
         command,
         timeout,
@@ -70,7 +67,7 @@ async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()> {
     let envelope: Envelope = input::read(&path, SHAPE)?;
     version(envelope.version)?;
     let plan = envelope.plan;
-    if plan.issue != Coordinate::parse(&issue)? || plan.member.name != member {
+    if plan.issue != Coordinate::parse(&issue)? {
         return Err(Error::typed(
             "concord.delivery.coordinate",
             "delivery plan Issue or Member does not match the command",
@@ -94,9 +91,8 @@ async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()> {
     settle::merge(&mut report, &ready.preparation, &command, timeout).await?;
     emit(
         json!({
-            "schema": "concord.issue-delivery-land/v1",
+            "schema": "concord.issue-delivery-land/v2",
             "issue": plan.issue,
-            "member": plan.member.name,
             "revision": revision,
             "pull": report.pull,
             "candidate": report.candidate,
@@ -107,9 +103,7 @@ async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()> {
 }
 
 async fn attach(estate: &Estate, plan: &issue_delivery::Plan, pull: &pull::Pull) -> Result<i64> {
-    let status = estate
-        .issue_member_status(&plan.issue, &plan.member.name)
-        .await?;
+    let status = estate.issue_member_status(&plan.issue).await?;
     let coordinate = (plan.delivery.repository.split_once('/'), pull.number);
     let Some((owner, repository)) = coordinate.0 else {
         return Err(Error::typed(
@@ -133,7 +127,6 @@ async fn attach(estate: &Estate, plan: &issue_delivery::Plan, pull: &pull::Pull)
     estate
         .refer_issue(&IssueDeclaration {
             issue: plan.issue.clone(),
-            member: plan.member.name.clone(),
             provider: "github".to_string(),
             owner: owner.to_string(),
             repository: repository.to_string(),
@@ -153,7 +146,7 @@ fn version(value: u64) -> Result<()> {
     ))
 }
 
-const SHAPE: &str = r#"{"version":1,"plan":{"schema":"concord.issue-member-delivery/v2","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"authority":{},"delivery":{}}}"#;
+const SHAPE: &str = r#"{"version":1,"plan":{"schema":"concord.issue-member-delivery/v3","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"authority":{},"delivery":{}}}"#;
 
 #[cfg(test)]
 mod tests {

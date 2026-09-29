@@ -15,15 +15,10 @@ pub enum Command {
         issue: Option<String>,
     },
     #[command(about = "Inspect one Issue Member's local Git health")]
-    Status { issue: String, member: String },
+    Status { issue: String },
     #[command(about = "Create and attach an Issue worktree Member")]
     Attach {
         issue: String,
-        name: String,
-        #[arg(long)]
-        source: PathBuf,
-        #[arg(long)]
-        branch: Option<String>,
         #[arg(long, required = true, num_args = 1..)]
         claim: Vec<String>,
         #[arg(long)]
@@ -32,7 +27,6 @@ pub enum Command {
     #[command(about = "Expand one Issue Member claim")]
     Claim {
         issue: String,
-        member: String,
         #[arg(long, required = true, num_args = 1..)]
         claim: Vec<String>,
         #[arg(long)]
@@ -41,7 +35,6 @@ pub enum Command {
     #[command(about = "Shrink one Issue Member claim to an explicit set")]
     Narrow {
         issue: String,
-        member: String,
         #[arg(long, required = true, num_args = 1..)]
         claim: Vec<String>,
         #[arg(long)]
@@ -52,7 +45,6 @@ pub enum Command {
     #[command(about = "Create a current Plumb Boundary proof")]
     Prove {
         issue: String,
-        member: String,
         #[arg(long)]
         revision: i64,
     },
@@ -69,7 +61,6 @@ pub enum Command {
     #[command(about = "Remove one clean and landed Issue Member")]
     Release {
         issue: String,
-        member: String,
         #[arg(long)]
         revision: i64,
         #[arg(long)]
@@ -78,7 +69,6 @@ pub enum Command {
     #[command(about = "Remove one clean unlanded Issue Member against matching Artifacts")]
     Retire {
         issue: String,
-        member: String,
         #[arg(long, required = true, num_args = 1..)]
         artifacts: Vec<String>,
         #[arg(long)]
@@ -93,7 +83,6 @@ pub enum Landing {
     #[command(about = "Prepare an exact Issue Member landing plan")]
     Prepare {
         issue: String,
-        member: String,
         #[arg(long, default_value = "main")]
         base: String,
         #[arg(long, default_value = "")]
@@ -112,7 +101,6 @@ pub enum Landing {
     #[command(about = "Revalidate an exact Issue Member landing plan")]
     Ready {
         issue: String,
-        member: String,
         #[arg(long, default_value = "-")]
         plan: PathBuf,
     },
@@ -123,7 +111,6 @@ pub enum Reference {
     #[command(about = "Declare an Issue Member pull coordinate")]
     Set {
         issue: String,
-        member: String,
         #[arg(long)]
         provider: String,
         #[arg(long)]
@@ -138,7 +125,6 @@ pub enum Reference {
     #[command(about = "Remove an Issue Member pull coordinate")]
     Remove {
         issue: String,
-        member: String,
         #[arg(long)]
         owner: String,
         #[arg(long)]
@@ -171,7 +157,7 @@ impl Command {
     pub(crate) fn activity(&self) -> Option<Vec<&str>> {
         match self {
             Self::List { issue } => issue.as_deref().map(|held| vec![held]),
-            Self::Status { issue, .. }
+            Self::Status { issue }
             | Self::Attach { issue, .. }
             | Self::Claim { issue, .. }
             | Self::Narrow { issue, .. }

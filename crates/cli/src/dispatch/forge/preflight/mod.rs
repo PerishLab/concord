@@ -10,7 +10,7 @@ use serde::Serialize;
 use std::collections::BTreeSet;
 use std::path::Path;
 
-const SCHEMA: &str = "concord.issue-preflight/v1";
+const SCHEMA: &str = "concord.issue-preflight/v2";
 
 pub struct Request<'a> {
     pub repository: &'a str,
@@ -38,7 +38,6 @@ pub struct Proposal {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Member {
-    pub name: String,
     pub branch: String,
     pub claims: Vec<String>,
 }
@@ -99,7 +98,6 @@ pub async fn run(estate: &Estate, request: Request<'_>) -> Result<Preflight> {
                 .iter()
                 .filter(|member| member.node == candidate.issue.node)
                 .map(|member| Member {
-                    name: member.name.clone(),
                     branch: member.branch.clone(),
                     claims: member.claims.clone(),
                 })
@@ -222,7 +220,7 @@ fn matches(observation: &occupancy::Observation, expected: &str) -> bool {
         .subjects
         .iter()
         .any(|subject| match subject {
-            Subject::Issue { node } | Subject::IssueMember { node, .. } => node == expected,
+            Subject::Issue { node } | Subject::IssueMember { node } => node == expected,
             Subject::Surface { .. } => false,
         })
 }

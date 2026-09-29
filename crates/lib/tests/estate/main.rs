@@ -4,6 +4,43 @@ use concord_core::Seat;
 use keel::adapt::db::Sqlite;
 use keel::wire::Wire;
 
+mod legacy {
+    use keel::atom::{int, string};
+    use keel::resource;
+
+    #[resource]
+    struct Anchor {
+        #[field(string, unique)]
+        node: string,
+        #[field(string)]
+        owner: string,
+        #[field(string)]
+        repository: string,
+        #[field(int, min = 1)]
+        number: int,
+        #[field(int, min = 0)]
+        revision: int,
+    }
+
+    #[resource]
+    struct IssueMember {
+        #[field(string, unique = anchor)]
+        name: string,
+        #[field(string)]
+        source: string,
+        #[field(string)]
+        branch: string,
+        #[relation(Anchor, many2one, root)]
+        anchor: Anchor,
+    }
+
+    pub fn graph() -> keel::Graph {
+        let mut graph = keel::Graph::new();
+        graph.plug::<Anchor>().plug::<IssueMember>();
+        graph
+    }
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn genesis() {
     let temp = tempfile::tempdir().expect("temporary Space");
@@ -50,6 +87,24 @@ async fn drift() {
     };
     assert_eq!(error.code(), "concord.estate.upgrade_required");
     assert!(error.to_string().contains("estate drift"));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn legacy() {
+    let temp = tempfile::tempdir().expect("temporary Space");
+    let seat = Seat::new(temp.path());
+    std::fs::create_dir_all(temp.path().join(".concord")).expect("estate root");
+    let wire = Sqlite::file(seat.database()).await.expect("open database");
+    let mut held = keel::bootstrap(legacy::graph(), wire).expect("bootstrap previous graph");
+    let sudo = held.mint().await.expect("mint possession");
+    std::fs::write(seat.sudo(), &sudo).expect("write possession");
+    drop(held.seal(&sudo).await.expect("seal previous estate"));
+
+    let error = match seat.open().await {
+        Ok(_) => panic!("previous estate must refuse"),
+        Err(error) => error,
+    };
+    assert_eq!(error.code(), "concord.estate.upgrade_required");
 }
 
 #[tokio::test(flavor = "current_thread")]

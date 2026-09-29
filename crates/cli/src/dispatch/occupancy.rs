@@ -17,9 +17,9 @@ pub(crate) enum Intent {
 
 enum Seed<'a> {
     Issue(&'a str),
-    Member(&'a str, &'a str),
-    MemberSurfaces(&'a str, &'a str, Option<&'a [String]>),
-    Surfaces(&'a Path, &'a [String]),
+    Member(&'a str),
+    MemberSurfaces(&'a str, Option<&'a [String]>),
+    Addition(&'a str, &'a [String]),
 }
 
 impl Run {
@@ -67,22 +67,23 @@ async fn resolve(estate: &Estate, seeds: Vec<Seed<'_>>) -> Result<Vec<Subject>> 
                 let anchor = estate.issue(&Coordinate::parse(issue)?).await?;
                 vec![Subject::Issue { node: anchor.node }]
             }
-            Seed::Member(issue, member) => {
+            Seed::Member(issue) => {
                 let anchor = estate.issue(&Coordinate::parse(issue)?).await?;
-                vec![Subject::IssueMember {
-                    node: anchor.node,
-                    member: member.to_string(),
-                }]
+                vec![Subject::IssueMember { node: anchor.node }]
             }
-            Seed::MemberSurfaces(issue, member, additions) => {
+            Seed::MemberSurfaces(issue, additions) => {
                 let coordinate = Coordinate::parse(issue)?;
-                let held = estate.issue_member(&coordinate, member).await?;
+                let held = estate.issue_member(&coordinate).await?;
                 let mut claims = held.claims;
                 claims.extend(additions.into_iter().flatten().cloned());
-                let source = estate.issue_source_path(&coordinate, member).await?;
+                let source = estate.issue_source_path(&coordinate).await?;
                 estate.write_surfaces(&source, &claims)?
             }
-            Seed::Surfaces(source, claims) => estate.write_surfaces(source, claims)?,
+            Seed::Addition(issue, claims) => {
+                let coordinate = Coordinate::parse(issue)?;
+                let integration = estate.integration(&coordinate).await?;
+                estate.write_surfaces(Path::new(&integration.path), claims)?
+            }
         };
         subjects.extend(found);
     }
@@ -96,6 +97,7 @@ fn seeds(command: &args::Command) -> Option<Vec<Seed<'_>>> {
         args::Command::Member(args) => member(&args.command),
         args::Command::Issue(args) => issue(&args.command),
         args::Command::Artifact(args) => artifact(&args.command),
+        args::Command::Integration(_) => None,
         args::Command::Config(_)
         | args::Command::Cookbook(_)
         | args::Command::Audit(_)
@@ -106,11 +108,11 @@ fn seeds(command: &args::Command) -> Option<Vec<Seed<'_>>> {
 fn issue(command: &args::issue::Command) -> Option<Vec<Seed<'_>>> {
     match command {
         args::issue::Command::Delivery {
-            command: args::issue::Delivery::Land { issue, member, .. },
+            command: args::issue::Delivery::Land { issue, .. },
         } => Some(vec![
             Seed::Issue(issue),
-            Seed::Member(issue, member),
-            Seed::MemberSurfaces(issue, member, None),
+            Seed::Member(issue),
+            Seed::MemberSurfaces(issue, None),
         ]),
         _ => None,
     }
@@ -118,29 +120,23 @@ fn issue(command: &args::issue::Command) -> Option<Vec<Seed<'_>>> {
 
 fn member(command: &args::member::Command) -> Option<Vec<Seed<'_>>> {
     use args::member::Command;
-    let (issue, member) = match command {
-        Command::Attach { issue, name, .. } => (issue.as_str(), name),
-        Command::Claim { issue, member, .. }
-        | Command::Narrow { issue, member, .. }
-        | Command::Prove { issue, member, .. }
-        | Command::Release { issue, member, .. }
-        | Command::Retire { issue, member, .. } => (issue.as_str(), member),
-        Command::Reference { command } => (
-            command.issue(),
-            match command {
-                args::member::Reference::Set { member, .. }
-                | args::member::Reference::Remove { member, .. } => member,
-            },
-        ),
+    let issue = match command {
+        Command::Attach { issue, .. }
+        | Command::Claim { issue, .. }
+        | Command::Narrow { issue, .. }
+        | Command::Prove { issue, .. }
+        | Command::Release { issue, .. }
+        | Command::Retire { issue, .. } => issue.as_str(),
+        Command::Reference { command } => command.issue(),
         Command::List { .. } | Command::Status { .. } | Command::Landing { .. } => return None,
     };
-    let mut seeds = vec![Seed::Issue(issue), Seed::Member(issue, member)];
+    let mut seeds = vec![Seed::Issue(issue), Seed::Member(issue)];
     match command {
-        Command::Attach { source, claim, .. } => seeds.push(Seed::Surfaces(source, claim)),
+        Command::Attach { claim, .. } => seeds.push(Seed::Addition(issue, claim)),
         Command::Claim { claim, .. } | Command::Narrow { claim, .. } => {
-            seeds.push(Seed::MemberSurfaces(issue, member, Some(claim)))
+            seeds.push(Seed::MemberSurfaces(issue, Some(claim)))
         }
-        _ => seeds.push(Seed::MemberSurfaces(issue, member, None)),
+        _ => seeds.push(Seed::MemberSurfaces(issue, None)),
     }
     Some(seeds)
 }

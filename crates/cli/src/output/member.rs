@@ -1,11 +1,7 @@
 use concord_core::IssueMemberStatus;
 
 pub fn issue_status(status: &IssueMemberStatus) {
-    println!(
-        "member status: {}/{}",
-        status.member.issue.identity(),
-        status.member.name
-    );
+    println!("member status: {}", status.member.issue.identity());
     if status.references.is_empty() {
         println!("  references: -");
     } else {

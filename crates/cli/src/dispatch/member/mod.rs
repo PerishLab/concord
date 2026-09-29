@@ -13,21 +13,15 @@ mod status;
 pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> {
     match command {
         Command::List { issue } => list(estate, issue, output).await,
-        Command::Status { issue, member } => status::run(estate, &issue, &member, output).await,
+        Command::Status { issue } => status::run(estate, &issue, output).await,
         Command::Attach {
             issue,
-            name,
-            source,
-            branch,
             claim,
             revision,
         } => issue_changed(
             estate
                 .attach_issue(&IssueAttach {
                     issue: Coordinate::parse(&issue)?,
-                    name,
-                    source,
-                    branch,
                     claims: claim,
                     revision,
                 })
@@ -36,14 +30,12 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
         ),
         Command::Claim {
             issue,
-            member,
             claim,
             revision,
         } => issue_changed(
             estate
                 .claim_issue(&IssueClaiming {
                     issue: Coordinate::parse(&issue)?,
-                    member,
                     claims: claim,
                     revision,
                 })
@@ -52,7 +44,6 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
         ),
         Command::Narrow {
             issue,
-            member,
             claim,
             revision,
             apply,
@@ -62,7 +53,6 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 estate
                     .narrow_issue(&IssueNarrowing {
                         issue: Coordinate::parse(&issue)?,
-                        member,
                         claims: claim,
                         revision,
                     })
@@ -70,14 +60,10 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 output,
             )
         }
-        Command::Prove {
-            issue,
-            member,
-            revision,
-        } => emit(
+        Command::Prove { issue, revision } => emit(
             json!({"member":
             estate.prove_issue(&IssueProving {
-                issue: Coordinate::parse(&issue)?, member, revision,
+                issue: Coordinate::parse(&issue)?, revision,
             }).await?}),
             output,
         ),
@@ -85,7 +71,6 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
         Command::Reference { command } => reference::run(estate, command, output).await,
         Command::Release {
             issue,
-            member,
             revision,
             apply,
         } => {
@@ -93,7 +78,6 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             let revision = estate
                 .release_issue(&IssueRelease {
                     issue: Coordinate::parse(&issue)?,
-                    member,
                     revision,
                 })
                 .await?;
@@ -101,7 +85,6 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
         }
         Command::Retire {
             issue,
-            member,
             artifacts,
             revision,
             apply,
@@ -110,7 +93,6 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             let revision = estate
                 .retire_issue(&IssueRetirement {
                     issue: Coordinate::parse(&issue)?,
-                    member,
                     artifacts,
                     revision,
                 })
