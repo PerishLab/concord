@@ -43,6 +43,15 @@ fn book() -> Cookbook {
             ),
         ),
         entry(
+            "concord.delivery.landed",
+            "After a squash merge, the fetched base head does not hold the Guard-proved candidate: its parent differs (moved), its tree differs (tree), or it lost the candidate's Guard proof (proof).",
+            "Do not retry: the merge already happened and cannot be undone. For moved, the base advanced between revalidation and merge, so main now holds a tree no Guard proved; run the Guard on main as it stands and land any repair as a new change. For tree or proof, compare the named head with the candidate, then land a repair as a new change. In every case, sync the integration checkout to the fetched main before releasing the Member.",
+            (
+                "Retain the refusal, which names the pull, head, candidate and kind, and inspect `git show <head>` against `git show <candidate>`.",
+                "Main holds a Guard-proved tree again and the integration checkout equals the fetched main.",
+            ),
+        ),
+        entry(
             "concord.delivery.provider",
             "The explicit external provider command could not complete or confirm a pull-request mutation.",
             "Observe the exact repository, head branch, and pull request on GitHub before retrying. If the mutation already happened, resume from that provider state; otherwise fix the provider command or authentication and re-run the prepared delivery.",
