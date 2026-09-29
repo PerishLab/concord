@@ -18,7 +18,7 @@ pub use agreement::{Agreement, Finding};
 pub use forge::{Admission, Anchor, Coordinate, Reconcile};
 pub use forge::{Reference, ReferenceKind};
 pub use work::{
-    BoundaryState, CheckoutState, ClaimOverlap, Finish, Integration, IntegrationState,
+    BoundaryState, CheckoutState, ClaimOverlap, Finish, Guard, Integration, IntegrationState,
     IssueArtifact, IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange,
     IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval, IssueRetirement,
     IssueWithdrawal, IssueWorktree, Proof, Register, Rename, Repository, Start, UpstreamState,
