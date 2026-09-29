@@ -1,12 +1,15 @@
 use super::super::{Estate, Proof};
 use super::authority::{self, Authorities, Warrant};
 use super::{IssueWorktree, issue_stale};
-use crate::{Error, Result, claim, git};
+use crate::{Error, Reference, Result, claim, git};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA: &str = "concord.issue-member-delivery/v3";
-pub const READY: &str = "concord.issue-member-delivery-ready/v2";
+pub use super::authority::delivery::{Resume, resume};
+pub use super::proof::delivery::{Completion, Settlement};
+
+pub const SCHEMA: &str = "concord.issue-member-delivery/v4";
+pub const READY: &str = "concord.issue-member-delivery-ready/v3";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -38,6 +41,7 @@ pub struct Member {
     pub key: i64,
     pub integration: super::super::Integration,
     pub branch: String,
+    pub base: String,
     pub claims: Vec<String>,
 }
 
@@ -46,6 +50,8 @@ pub struct Ready {
     pub schema: String,
     pub plan: Plan,
     pub preparation: plumb::landing::Preparation,
+    pub revision: i64,
+    pub reference: Option<Reference>,
 }
 
 struct Context {
@@ -96,23 +102,14 @@ pub async fn revalidate<A: Authorities>(
     snapshot: &plumb::delivery::Snapshot,
     observed: u64,
 ) -> Result<Ready> {
-    if plan.schema != SCHEMA {
-        return Err(Error::typed(
-            "concord.delivery.schema",
-            format!("delivery plan schema {} is not {SCHEMA}", plan.schema),
-        ));
-    }
-    let context = context(estate, &plan.issue, plan.revision).await?;
-    agree(&context, snapshot)?;
-    if context.node != plan.node
-        || member(&context.member) != plan.member
-        || context.boundary != plan.boundary
-    {
+    let resumed = resume::<A>(estate, plan, snapshot).await?;
+    if resumed.released {
         return Err(Error::typed(
             "concord.delivery.stale",
-            "Issue, Member, or Boundary identity changed after delivery preparation",
+            "delivery is already released and cannot perform another provider mutation",
         ));
     }
+    let context = context(estate, &plan.issue, resumed.revision).await?;
     let authority = authority::keep::<A>(&plan.authority, "concord.delivery.authority")?;
     let ready = plumb::delivery::revalidate(
         plumb::delivery::Request {
@@ -131,6 +128,8 @@ pub async fn revalidate<A: Authorities>(
         schema: READY.to_string(),
         plan: plan.clone(),
         preparation: ready.preparation().clone(),
+        revision: resumed.revision,
+        reference: resumed.reference,
     })
 }
 
@@ -167,16 +166,21 @@ fn agree(context: &Context, snapshot: &plumb::delivery::Snapshot) -> Result<()> 
         "{}/{}#{}",
         context.issue.owner, context.issue.repository, context.issue.number
     );
-    if snapshot.node != context.node
-        || snapshot.repository != format!("{}/{}", context.issue.owner, context.issue.repository)
-        || i64::try_from(snapshot.number).ok() != Some(context.issue.number)
-    {
-        return Err(Error::typed(
-            "concord.delivery.issue",
-            format!("Issue snapshot does not match execution anchor {coordinate}"),
-        ));
+    let repository = format!("{}/{}", context.issue.owner, context.issue.repository);
+    if snapshot.node != context.node || snapshot.repository != repository {
+        return Err(issue(coordinate));
+    }
+    if i64::try_from(snapshot.number).ok() != Some(context.issue.number) {
+        return Err(issue(coordinate));
     }
     Ok(())
+}
+
+fn issue(coordinate: String) -> Error {
+    Error::typed(
+        "concord.delivery.issue",
+        format!("Issue snapshot does not match execution anchor {coordinate}"),
+    )
 }
 
 fn narrative(
@@ -191,28 +195,39 @@ fn narrative(
             "Issue Outcome section is empty",
         ));
     }
-    let coordinate = format!("{}#{}", snapshot.repository, snapshot.number);
-    let claims = context
-        .member
-        .claims
-        .iter()
-        .map(|path| format!("- `{path}`"))
-        .collect::<Vec<_>>()
-        .join("\n");
-    Ok(plumb::delivery::Narrative {
-        title: snapshot.title.clone(),
-        body: format!(
-            "Refs {coordinate}\n\n## Outcome\n\n{outcome}\n\n## Change\n\nThe Issue Member contributes `{}` from branch `{}`.\n\n## Verification\n\nBoundary `{}` proves commit `{}` under `{}`.\n\n## Boundary\n\n{claims}",
-            context.boundary.head,
-            context.member.branch,
-            context.boundary.key,
-            context.boundary.head,
-            context.boundary.plumb,
-        ),
-    })
+    Ok(member(&context.member).narrative(snapshot, &context.boundary, outcome))
 }
 
-fn agreement(source: &Path, path: &Path, member: &IssueWorktree, proof: &Proof) -> Result<()> {
+impl Member {
+    fn narrative(
+        &self,
+        snapshot: &plumb::delivery::Snapshot,
+        boundary: &Proof,
+        outcome: &str,
+    ) -> plumb::delivery::Narrative {
+        let coordinate = format!("{}#{}", snapshot.repository, snapshot.number);
+        let claims = self
+            .claims
+            .iter()
+            .map(|path| format!("- `{path}`"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        plumb::delivery::Narrative {
+            title: snapshot.title.clone(),
+            body: format!(
+                "Refs {coordinate}\n\n## Outcome\n\n{outcome}\n\n## Change\n\nThe Issue Member contributes `{}` from branch `{}`.\n\n## Verification\n\nBoundary `{}` proves commit `{}` under `{}`.\n\n## Boundary\n\n{claims}",
+                boundary.head, self.branch, boundary.key, boundary.head, boundary.plumb,
+            ),
+        }
+    }
+}
+
+pub(super) fn agreement(
+    source: &Path,
+    path: &Path,
+    member: &IssueWorktree,
+    proof: &Proof,
+) -> Result<()> {
     if !git::at(source).registered(path)? {
         return Err(Error::typed(
             "concord.member.disagreement",
@@ -242,11 +257,12 @@ fn agreement(source: &Path, path: &Path, member: &IssueWorktree, proof: &Proof) 
     Ok(())
 }
 
-fn member(member: &IssueWorktree) -> Member {
+pub(super) fn member(member: &IssueWorktree) -> Member {
     Member {
         key: member.key,
         integration: member.integration.clone(),
         branch: member.branch.clone(),
+        base: member.base.clone(),
         claims: member.claims.clone(),
     }
 }

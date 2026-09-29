@@ -31,6 +31,11 @@ pub struct Integration {
     pub branch: String,
 }
 
+pub struct Guard {
+    pub(in crate::estate) integration: Integration,
+    _file: File,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Register {
     pub node: String,
@@ -58,6 +63,17 @@ pub(in crate::estate) fn guard(estate: &crate::estate::Estate, held: &Integratio
     crate::path::at(&path).mode(0o600)?;
     file.lock_exclusive()?;
     Ok(file)
+}
+
+impl Integration {
+    pub fn guard(&self, estate: &crate::estate::Estate) -> Result<Guard> {
+        let integration = self.clone();
+        let file = guard(estate, &integration)?;
+        Ok(Guard {
+            integration,
+            _file: file,
+        })
+    }
 }
 
 impl Repository {

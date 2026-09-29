@@ -95,3 +95,139 @@ impl Estate {
             .map_err(super::super::fault)
     }
 }
+
+pub(super) mod delivery {
+    use super::super::super::integration::{self, TRACKING};
+    use super::super::delivery::{Member, member};
+    use super::super::{IssueRelease, issue_stale};
+    use crate::estate::{Estate, Guard, Proof};
+    use crate::{Error, Reference, Result, git};
+    use plumb::integration::{Expectation, Relation};
+    use serde::Serialize;
+    use std::path::PathBuf;
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct Settlement {
+        pub issue: crate::estate::Coordinate,
+        pub prepared: i64,
+        pub revision: i64,
+        pub member: Member,
+        pub boundary: Proof,
+        pub reference: Reference,
+        pub base: String,
+        pub candidate: String,
+        pub merge: String,
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+    pub struct Completion {
+        pub revision: i64,
+        pub head: String,
+        pub released: bool,
+    }
+
+    impl Estate {
+        pub async fn complete(&self, guard: &Guard, request: &Settlement) -> Result<Completion> {
+            self.ensure().await?;
+            let anchor = self.issue(&request.issue).await?;
+            issue_stale(anchor.revision, request.revision)?;
+            let held = self.integration(&request.issue).await?;
+            if held != request.member.integration || held != guard.integration {
+                return Err(disagreement());
+            }
+            if request.base != held.branch {
+                return Err(disagreement());
+            }
+            let active = match self.issue_member(&request.issue).await {
+                Ok(held_member) => {
+                    if member(&held_member) != request.member {
+                        return Err(stale());
+                    }
+                    if held_member.proof.as_ref() != Some(&request.boundary) {
+                        return Err(stale());
+                    }
+                    let references = self.issue_references(held_member.key, anchor.key).await?;
+                    if references.as_slice() != [request.reference.clone()] {
+                        return Err(Error::typed(
+                            "concord.delivery.reference",
+                            "Member pull coordinate changed before completion",
+                        ));
+                    }
+                    true
+                }
+                Err(error) if error.code() == "concord.member.absent" => {
+                    if !matches!(request.revision - request.prepared, 1 | 2) {
+                        return Err(stale());
+                    }
+                    false
+                }
+                Err(error) => return Err(error),
+            };
+            let current = self.integration(&request.issue).await?;
+            if current != held {
+                return Err(Error::typed(
+                    "concord.integration.changed",
+                    "registered Integration changed during delivery completion",
+                ));
+            }
+            let source = PathBuf::from(&held.path);
+            let remote = integration::registration::origin(&source)?;
+            if remote != held.repository {
+                return Err(Error::typed(
+                    "concord.integration.repository",
+                    "Integration origin no longer matches its registered repository",
+                ));
+            }
+            let before = git::at(&source).head()?;
+            let target = git::at(&source).fetch(&held.remote, &held.branch)?;
+            if !git::at(&source).ancestor(&request.merge, &target)? {
+                return Err(Error::typed(
+                    "concord.delivery.merge",
+                    format!(
+                        "observed merge {} is not reachable from fetched {}/{} head {target}",
+                        request.merge, held.remote, held.branch
+                    ),
+                ));
+            }
+            plumb::delivery::landed(&source, &request.candidate, &request.merge)
+                .map_err(|error| Error::typed("concord.delivery.landed", error.message))?;
+            let expected = Expectation::new(&held.branch, TRACKING, &target);
+            let advanced = plumb::integration::advance(&source, &expected, &before)
+                .map_err(|error| Error::typed("concord.integration.advance", error.to_string()))?;
+            if advanced.relation != Relation::Equal || advanced.checkout.head != target {
+                return Err(Error::typed(
+                    "concord.integration.advance",
+                    "integration checkout did not equal fetched origin/main",
+                ));
+            }
+            let revision = if active {
+                self.release_issue(&IssueRelease {
+                    issue: request.issue.clone(),
+                    revision: request.revision,
+                })
+                .await?
+            } else {
+                request.revision
+            };
+            Ok(Completion {
+                revision,
+                head: target,
+                released: active,
+            })
+        }
+    }
+
+    fn disagreement() -> Error {
+        Error::typed(
+            "concord.delivery.integration",
+            "registered Integration or delivery base changed",
+        )
+    }
+
+    fn stale() -> Error {
+        Error::typed(
+            "concord.delivery.stale",
+            "Member, Boundary, or released revision changed before completion",
+        )
+    }
+}

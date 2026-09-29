@@ -6,7 +6,7 @@ mod provision;
 mod status;
 
 use super::{Estate, fault};
-pub use integration::{Integration, Register, Rename, Repository};
+pub use integration::{Guard, Integration, Register, Rename, Repository};
 pub use issue::authority;
 pub use issue::delivery as issue_delivery;
 pub use issue::landing as issue_landing;

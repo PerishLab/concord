@@ -1,6 +1,6 @@
 #[path = "seat/comment.rs"]
 mod comment;
-#[path = "seat/delivery.rs"]
+#[path = "seat/delivery/mod.rs"]
 mod delivery;
 #[path = "seat/execution.rs"]
 mod execution;
