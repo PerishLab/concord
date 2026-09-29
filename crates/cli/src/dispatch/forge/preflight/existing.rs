@@ -5,7 +5,7 @@ use serde::Serialize;
 use std::collections::BTreeSet;
 use std::path::Path;
 
-const SCHEMA: &str = "concord.issue-preflight-existing/v1";
+const SCHEMA: &str = "concord.issue-preflight-existing/v2";
 
 pub struct Request<'a> {
     pub issue: &'a str,
@@ -187,7 +187,6 @@ fn execution(view: &View<'_>, members: &[&IssueWorktree], node: &str) -> Result<
         members: members
             .iter()
             .map(|member| Member {
-                name: member.name.clone(),
                 branch: member.branch.clone(),
                 claims: member.claims.clone(),
             })
@@ -214,8 +213,8 @@ fn intersections(
             let paths = estate.claim_intersections(left, right)?;
             if !paths.is_empty() {
                 found.push(Overlap {
-                    root: left.name.clone(),
-                    related: right.name.clone(),
+                    root: left.issue.identity(),
+                    related: right.issue.identity(),
                     paths,
                 });
             }

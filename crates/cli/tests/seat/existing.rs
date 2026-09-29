@@ -14,42 +14,51 @@ mod unix {
             attach(fixture.path(), node, number);
         }
         let source = repository(fixture.path());
-        member(
+        let provider = tool(
             fixture.path(),
-            &source,
-            "PerishLab/concord#68",
-            ("root", "crates/cli"),
+            "repository",
+            format!(
+                "printf '%s\\n' '{}'",
+                json!({
+                    "node": "R_concord",
+                    "coordinate": "PerishLab/concord",
+                    "branch": "main",
+                })
+            ),
         );
-        member(
+        success(
             fixture.path(),
-            &source,
-            "PerishLab/concord#60",
-            ("parent", "crates"),
+            &[
+                "integration",
+                "register",
+                "PerishLab/concord",
+                "--path",
+                source.to_str().expect("source path"),
+                "--github-command",
+                provider.to_str().expect("provider path"),
+            ],
         );
-        member(
-            fixture.path(),
-            &source,
-            "PerishLab/concord#69",
-            ("child", "docs"),
-        );
+        member(fixture.path(), "PerishLab/concord#68", "crates/cli");
+        member(fixture.path(), "PerishLab/concord#60", "crates");
+        member(fixture.path(), "PerishLab/concord#69", "docs");
 
         let provider = tool(fixture.path(), "relationships", reply(false));
         let report = preflight(fixture.path(), &provider, 20);
         let result = &report["preflight"];
-        assert_eq!(result["schema"], "concord.issue-preflight-existing/v1");
+        assert_eq!(result["schema"], "concord.issue-preflight-existing/v2");
         assert_eq!(result["complete"], true);
         assert_eq!(result["issue"]["node"], "I_root");
-        assert_eq!(result["execution"]["members"][0]["name"], "root");
+        assert_eq!(result["execution"]["members"][0]["claims"][0], "crates/cli");
         assert_eq!(result["pulls"][0]["kind"], "linked-pull");
         assert_eq!(result["pulls"][0]["pull"]["number"], 72);
         for kind in ["parent", "sub-issue", "blocked-by", "blocking"] {
             assert!(relationship(result, kind).is_some(), "missing {kind}");
         }
         let parent = relationship(result, "parent").expect("parent");
-        assert_eq!(parent["execution"]["members"][0]["name"], "parent");
+        assert_eq!(parent["execution"]["members"][0]["claims"][0], "crates");
         assert_eq!(parent["overlaps"][0]["paths"][0], "crates/cli");
         let child = relationship(result, "sub-issue").expect("child");
-        assert_eq!(child["execution"]["members"][0]["name"], "child");
+        assert_eq!(child["execution"]["members"][0]["claims"][0], "docs");
         assert!(
             child["overlaps"]
                 .as_array()
@@ -99,17 +108,13 @@ mod unix {
         );
     }
 
-    fn member(space: &Path, source: &Path, issue: &str, declaration: (&str, &str)) {
-        let (name, claim) = declaration;
+    fn member(space: &Path, issue: &str, claim: &str) {
         success(
             space,
             &[
                 "member",
                 "attach",
                 issue,
-                name,
-                "--source",
-                source.to_str().expect("source path"),
                 "--claim",
                 claim,
                 "--revision",
@@ -136,7 +141,7 @@ mod unix {
 
     fn observation(node: &str, number: i64) -> String {
         let value = json!({
-            "node": node, "number": number,
+            "node": node, "stable": "R_concord", "number": number,
             "url": format!("https://github.com/PerishLab/concord/issues/{number}"),
             "state": "OPEN", "kind": "Task", "updated_at": "2026-09-29T00:00:00Z",
         });
@@ -203,6 +208,20 @@ mod unix {
         std::fs::write(source.join("README.md"), "fixture\n").expect("fixture file");
         git(&source, &["add", "README.md"]);
         git(&source, &["commit", "-m", "fixture"]);
+        git(
+            &source,
+            &[
+                "remote",
+                "add",
+                "origin",
+                "https://github.com/PerishLab/concord.git",
+            ],
+        );
+        git(&source, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
+        git(
+            &source,
+            &["branch", "--set-upstream-to=origin/main", "main"],
+        );
         source
     }
 

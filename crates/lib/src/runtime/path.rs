@@ -1,27 +1,6 @@
 use crate::{Error, Result};
 use std::io::Write;
-use std::path::{Path, PathBuf};
-
-pub fn expand(value: &str, base: &Path) -> Result<PathBuf> {
-    let path = if value == "~" || value.starts_with("~/") {
-        let home = crate::config::home()?;
-        let suffix = value.strip_prefix("~/").unwrap_or("");
-        home.join(suffix)
-    } else {
-        PathBuf::from(value)
-    };
-    let path = if path.is_absolute() {
-        path
-    } else {
-        base.join(path)
-    };
-    path.canonicalize().map_err(|error| {
-        Error::new(format!(
-            "cannot resolve repository source {}: {error}",
-            path.display()
-        ))
-    })
-}
+use std::path::Path;
 
 pub struct Managed<'a> {
     path: &'a Path,

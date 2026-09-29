@@ -5,38 +5,30 @@ use crate::{Error, Result, git};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IssueRelease {
     pub issue: super::super::super::Coordinate,
-    pub member: String,
     pub revision: i64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IssueRetirement {
     pub issue: super::super::super::Coordinate,
-    pub member: String,
     pub artifacts: Vec<String>,
     pub revision: i64,
 }
 
 impl Estate {
     pub async fn release_issue(&self, request: &IssueRelease) -> Result<i64> {
-        self.finish_issue_member(&request.issue, &request.member, request.revision, None)
+        self.finish_issue_member(&request.issue, request.revision, None)
             .await
     }
 
     pub async fn retire_issue(&self, request: &IssueRetirement) -> Result<i64> {
-        self.finish_issue_member(
-            &request.issue,
-            &request.member,
-            request.revision,
-            Some(&request.artifacts),
-        )
-        .await
+        self.finish_issue_member(&request.issue, request.revision, Some(&request.artifacts))
+            .await
     }
 
     async fn finish_issue_member(
         &self,
         issue: &super::super::super::Coordinate,
-        name: &str,
         revision: i64,
         artifacts: Option<&[String]>,
     ) -> Result<i64> {
@@ -44,8 +36,8 @@ impl Estate {
         self.ensure().await?;
         let anchor = self.issue(issue).await?;
         issue_stale(anchor.revision, revision)?;
-        let member = self.issue_member(issue, name).await?;
-        let path = self.issue_path(&anchor, &member.name)?;
+        let member = self.issue_member(issue).await?;
+        let path = self.issue_path(&anchor)?;
         let source = self.issue_source(&member)?;
         current(&member, &git::at(&path).head()?)?;
         if !git::at(&path).clean()? {

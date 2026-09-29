@@ -14,7 +14,7 @@ const CAPACITY: usize = 64;
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum Subject {
     Issue { node: String },
-    IssueMember { node: String, member: String },
+    IssueMember { node: String },
     Surface { repository: String, path: String },
 }
 

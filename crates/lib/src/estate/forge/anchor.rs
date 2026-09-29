@@ -31,45 +31,9 @@ pub struct Admission {
 pub struct Reconcile {
     pub anchor: Coordinate,
     pub node: String,
+    pub repository: String,
     pub coordinate: Coordinate,
     pub revision: i64,
-}
-
-impl Coordinate {
-    pub fn parse(raw: &str) -> Result<Self> {
-        let (seat, number) = raw.split_once('#').ok_or_else(coordinate)?;
-        let (owner, repository) = seat.split_once('/').ok_or_else(coordinate)?;
-        if owner.is_empty() || repository.is_empty() {
-            return Err(coordinate());
-        }
-        if repository.contains('/') {
-            return Err(coordinate());
-        }
-        if [owner, repository]
-            .iter()
-            .any(|part| part.chars().any(char::is_whitespace))
-        {
-            return Err(coordinate());
-        }
-        let number = number
-            .parse::<i64>()
-            .ok()
-            .filter(|number| *number > 0)
-            .ok_or_else(coordinate)?;
-        Ok(Self {
-            owner: owner.to_string(),
-            repository: repository.to_string(),
-            number,
-        })
-    }
-
-    pub fn identity(&self) -> String {
-        format!("{}/{}#{}", self.owner, self.repository, self.number)
-    }
-
-    fn validate(&self) -> Result<()> {
-        Self::parse(&self.identity()).map(|_| ())
-    }
 }
 
 impl Estate {
@@ -151,6 +115,7 @@ impl Estate {
 
     pub async fn reconcile(&self, request: &Reconcile) -> Result<Anchor> {
         node(&request.node)?;
+        node(&request.repository)?;
         request.anchor.validate()?;
         request.coordinate.validate()?;
         let _guard = self.guard()?;
@@ -196,20 +161,46 @@ impl Estate {
                 ),
             ));
         }
+        let member = self
+            .issue_worktrees()
+            .await?
+            .into_iter()
+            .find(|member| member.node == held.node);
+        if let Some(member) = &member
+            && member.integration.node != request.repository
+        {
+            return Err(Error::typed(
+                "concord.issue.repository_transfer",
+                "Issue cannot transfer to a different repository while its Member exists",
+            ));
+        }
+        if let Some(member) = &member
+            && (member.integration.repository.owner != request.coordinate.owner
+                || member.integration.repository.name != request.coordinate.repository)
+        {
+            return Err(Error::typed(
+                "concord.integration.coordinate",
+                "reconcile the stable repository Integration before its Issue coordinates",
+            ));
+        }
         let revision = held.revision + 1;
         let number = request.coordinate.number.to_string();
         let next = revision.to_string();
         self.core
-            .set(
-                "Anchor",
-                row.key(),
-                &[
-                    ("owner", request.coordinate.owner.as_str()),
-                    ("repository", request.coordinate.repository.as_str()),
-                    ("number", number.as_str()),
-                    ("revision", next.as_str()),
-                ],
-            )
+            .batch(async |tx| {
+                tx.set(
+                    "Anchor",
+                    row.key(),
+                    &[
+                        ("owner", request.coordinate.owner.as_str()),
+                        ("repository", request.coordinate.repository.as_str()),
+                        ("number", number.as_str()),
+                        ("revision", next.as_str()),
+                    ],
+                )
+                .await?;
+                Ok(())
+            })
             .await
             .map_err(fault)?;
         Ok(Anchor {
@@ -264,13 +255,6 @@ fn node(node: &str) -> Result<()> {
         ));
     }
     Ok(())
-}
-
-fn coordinate() -> Error {
-    Error::typed(
-        "concord.issue.coordinate",
-        "Issue must be OWNER/REPOSITORY#NUMBER",
-    )
 }
 
 fn malformed(key: i64, field: &str) -> Error {

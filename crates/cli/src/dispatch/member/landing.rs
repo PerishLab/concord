@@ -16,7 +16,6 @@ pub(super) async fn run(estate: &Estate, command: Landing, output: bool) -> Resu
     match command {
         Landing::Prepare {
             issue,
-            member,
             base,
             title,
             body,
@@ -27,7 +26,6 @@ pub(super) async fn run(estate: &Estate, command: Landing, output: bool) -> Resu
         } => {
             let request = issue_landing::Request {
                 issue: Coordinate::parse(&issue)?,
-                member,
                 revision,
                 base,
                 title,
@@ -43,16 +41,9 @@ pub(super) async fn run(estate: &Estate, command: Landing, output: bool) -> Resu
                 output,
             )
         }
-        Landing::Ready {
-            issue,
-            member,
-            plan,
-        } => {
+        Landing::Ready { issue, plan } => {
             let envelope: Envelope = input::read(&plan, PLAN)?;
-            if envelope.version != 1
-                || envelope.plan.issue != Coordinate::parse(&issue)?
-                || envelope.plan.member.name != member
-            {
+            if envelope.version != 1 || envelope.plan.issue != Coordinate::parse(&issue)? {
                 return Err(concord_core::Error::typed(
                     "concord.landing.coordinate",
                     "landing plan version, Issue, or Member does not match the command",
@@ -66,4 +57,4 @@ pub(super) async fn run(estate: &Estate, command: Landing, output: bool) -> Resu
     }
 }
 
-const PLAN: &str = r#"{"version":1,"plan":{"schema":"concord.issue-member-landing/v2","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"guard":{},"authority":{},"landing":{}}}"#;
+const PLAN: &str = r#"{"version":1,"plan":{"schema":"concord.issue-member-landing/v3","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"guard":{},"authority":{},"landing":{}}}"#;

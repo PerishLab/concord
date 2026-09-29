@@ -3,6 +3,7 @@ mod artifact;
 mod configuration;
 mod forge;
 mod input;
+mod integration;
 mod member;
 mod occupancy;
 
@@ -85,6 +86,9 @@ impl Dispatch {
                 unreachable!("handled before estate open")
             }
             Command::Issue(args) => forge::run(&self.estate, args.command, self.json).await,
+            Command::Integration(args) => {
+                integration::run(&self.estate, args.command, self.json).await
+            }
             Command::Member(args) => member::run(&self.estate, args.command, self.json).await,
             Command::Artifact(args) => artifact::run(&self.estate, args.command, self.json).await,
             Command::Audit(_) => {

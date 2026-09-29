@@ -10,6 +10,7 @@ const LIMIT: usize = 16 * 1024;
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Observed {
     pub node: String,
+    pub stable: String,
     #[serde(flatten)]
     pub coordinate: Coordinate,
     pub url: String,
@@ -22,6 +23,7 @@ pub struct Observed {
 #[derive(Deserialize)]
 struct Reply {
     node: String,
+    stable: String,
     number: i64,
     url: String,
     state: String,
@@ -31,8 +33,8 @@ struct Reply {
 }
 
 pub async fn issue(coordinate: &Coordinate, command: &Path, timeout: u64) -> Result<Observed> {
-    let query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){id number url state updatedAt issueType{name}}}}";
-    let selector = ".data.repository.issue | if . == null then null else {node: .id, number: .number, url: .url, state: .state, kind: (.issueType.name // \"\"), updated_at: .updatedAt} end";
+    let query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){id issue(number:$number){id number url state updatedAt issueType{name}}}}";
+    let selector = ".data.repository as $repository | $repository.issue | if . == null then null else {node: .id, stable: $repository.id, number: .number, url: .url, state: .state, kind: (.issueType.name // \"\"), updated_at: .updatedAt} end";
     let mut process = Command::new(command);
     process
         .args(["api", "graphql", "-f"])
@@ -86,6 +88,12 @@ fn shape(coordinate: &Coordinate, reply: Reply) -> Result<Observed> {
     if reply.node.trim().is_empty() {
         return Err(fault("node", "GitHub Issue has no stable node identity"));
     }
+    if reply.stable.trim().is_empty() {
+        return Err(fault(
+            "repository",
+            "GitHub repository has no stable node identity",
+        ));
+    }
     if reply.kind.trim().is_empty() {
         return Err(fault("type", "GitHub Issue has no enabled native type"));
     }
@@ -98,6 +106,7 @@ fn shape(coordinate: &Coordinate, reply: Reply) -> Result<Observed> {
     }
     Ok(Observed {
         node: reply.node,
+        stable: reply.stable,
         coordinate: coordinate.clone(),
         url: reply.url,
         state,

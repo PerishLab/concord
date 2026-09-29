@@ -7,7 +7,6 @@ pub(super) async fn run(estate: &Estate, command: Reference, output: bool) -> Re
     let revision = match command {
         Reference::Set {
             issue,
-            member,
             provider,
             owner,
             repository,
@@ -17,7 +16,6 @@ pub(super) async fn run(estate: &Estate, command: Reference, output: bool) -> Re
             estate
                 .refer_issue(&IssueDeclaration {
                     issue: Coordinate::parse(&issue)?,
-                    member,
                     provider,
                     owner,
                     repository,
@@ -28,7 +26,6 @@ pub(super) async fn run(estate: &Estate, command: Reference, output: bool) -> Re
         }
         Reference::Remove {
             issue,
-            member,
             owner,
             repository,
             number,
@@ -39,7 +36,6 @@ pub(super) async fn run(estate: &Estate, command: Reference, output: bool) -> Re
             estate
                 .unrefer_issue(&IssueWithdrawal {
                     issue: Coordinate::parse(&issue)?,
-                    member,
                     owner,
                     repository,
                     number,

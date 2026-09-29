@@ -209,6 +209,7 @@ mod unix {
         let (state, kind, updated) = view;
         let value = json!({
             "node": node,
+            "stable": "R_concord",
             "number": number,
             "url": format!("https://github.com/{owner}/{repository}/issues/{number}"),
             "state": state,
