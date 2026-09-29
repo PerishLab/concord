@@ -1,6 +1,6 @@
 #[cfg(unix)]
 mod unix {
-    use super::super::execution::unix::{git, repository, text};
+    use super::super::execution::unix::{self as execution, Facts, git, repository, text};
     use super::super::spawn;
     use plumb::guard::{Action, Authority, Descriptor};
     use serde::Serialize;
@@ -10,7 +10,6 @@ mod unix {
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
     use std::process::{Command, Stdio};
-
     #[derive(Serialize)]
     struct Claim<'a> {
         schema: &'a str,
@@ -21,7 +20,6 @@ mod unix {
         platform: &'a str,
         actions: &'a [Action],
     }
-
     #[test]
     fn handoff() {
         let fixture = tempfile::tempdir().expect("fixture");
@@ -52,6 +50,41 @@ mod unix {
                 observer.to_str().expect("repository provider"),
             ],
         );
+        success(
+            fixture.path(),
+            &[
+                "member",
+                "start",
+                "PerishLab/probe#1",
+                "--claim",
+                "topic.md",
+                "--revision",
+                "0",
+                "--github-command",
+                execution::provider(
+                    fixture.path(),
+                    Facts {
+                        node: "I_delivery",
+                        stable: "R_probe",
+                        coordinate: "PerishLab/probe",
+                        number: 1,
+                    },
+                )
+                .to_str()
+                .expect("start provider"),
+            ],
+        );
+        git(
+            &source,
+            &[
+                "config",
+                "--unset-all",
+                &format!(
+                    "url.{}.insteadOf",
+                    fixture.path().join("remote.git").display()
+                ),
+            ],
+        );
         git(
             &source,
             &[
@@ -59,18 +92,6 @@ mod unix {
                 "set-url",
                 "origin",
                 fixture.path().join("remote.git").to_str().expect("remote"),
-            ],
-        );
-        success(
-            fixture.path(),
-            &[
-                "member",
-                "attach",
-                "PerishLab/probe#1",
-                "--claim",
-                "topic.md",
-                "--revision",
-                "0",
             ],
         );
         let member = fixture.path().join(".issues/I_delivery/worktree");
@@ -90,7 +111,6 @@ mod unix {
             fixture.path(),
             &["member", "prove", "PerishLab/probe#1", "--revision", "1"],
         );
-
         for _ in 0..3 {
             let mut producer = prepare(fixture.path(), provider).spawn().expect("prepare");
             let stdout = producer.stdout.take().expect("prepare stdout");

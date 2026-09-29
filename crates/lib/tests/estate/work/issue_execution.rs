@@ -1,6 +1,6 @@
 use concord_core::{
-    Admission, Coordinate, IssueAttach, IssueDeclaration, IssueImport, IssueNarrowing,
-    IssueProving, IssueRelease, IssueRetirement, Reconcile, Register, Rename, Repository, Seat,
+    Admission, Coordinate, IssueDeclaration, IssueImport, IssueNarrowing, IssueProving,
+    IssueRelease, IssueRetirement, Reconcile, Register, Rename, Repository, Seat, Start,
 };
 use std::path::Path;
 use std::process::Command;
@@ -13,7 +13,10 @@ fn coordinate(raw: &str) -> Coordinate {
 async fn lifecycle() {
     let temp = tempfile::tempdir().expect("temporary Space");
     let source = temp.path().join("source");
+    let remote = temp.path().join("remote.git");
     std::fs::create_dir(&source).expect("source directory");
+    std::fs::create_dir(&remote).expect("remote directory");
+    git(&remote, &["init", "--bare"]);
     git(&source, &["init", "-b", "main"]);
     git(&source, &["config", "user.name", "Concord Test"]);
     git(
@@ -32,11 +35,15 @@ async fn lifecycle() {
             "https://github.com/PerishLab/concord.git",
         ],
     );
-    git(&source, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
     git(
         &source,
-        &["branch", "--set-upstream-to=origin/main", "main"],
+        &[
+            "config",
+            &format!("url.{}.insteadOf", remote.display()),
+            "https://github.com/PerishLab/concord.git",
+        ],
     );
+    git(&source, &["push", "-u", "origin", "main"]);
 
     let estate = Seat::new(temp.path())
         .bootstrap()
@@ -68,8 +75,10 @@ async fn lifecycle() {
         .await
         .expect("register Integration");
     let member = estate
-        .attach_issue(&IssueAttach {
+        .start(&Start {
             issue: issue.clone(),
+            node: "I_execution".to_string(),
+            stable: "R_concord".to_string(),
             claims: vec!["crates".to_string()],
             revision: 0,
         })
@@ -82,8 +91,10 @@ async fn lifecycle() {
     let path = temp.path().join(".issues/I_execution/worktree");
     assert!(path.join(".git").is_file());
     let duplicate = estate
-        .attach_issue(&IssueAttach {
+        .start(&Start {
             issue: issue.clone(),
+            node: "I_execution".to_string(),
+            stable: "R_concord".to_string(),
             claims: vec!["docs".to_string()],
             revision: 1,
         })

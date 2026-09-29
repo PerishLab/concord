@@ -16,13 +16,17 @@ pub enum Command {
     },
     #[command(about = "Inspect one Issue Member's local Git health")]
     Status { issue: String },
-    #[command(about = "Create and attach an Issue worktree Member")]
-    Attach {
+    #[command(about = "Start one Issue Member from synchronized main")]
+    Start {
         issue: String,
         #[arg(long, required = true, num_args = 1..)]
         claim: Vec<String>,
         #[arg(long)]
         revision: i64,
+        #[arg(long = "github-command")]
+        command: PathBuf,
+        #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
+        timeout: u64,
     },
     #[command(about = "Expand one Issue Member claim")]
     Claim {
@@ -60,6 +64,14 @@ pub enum Command {
     },
     #[command(about = "Remove one clean and landed Issue Member")]
     Release {
+        issue: String,
+        #[arg(long)]
+        revision: i64,
+        #[arg(long)]
+        apply: bool,
+    },
+    #[command(about = "Complete one unchanged Issue Member without delivery")]
+    Complete {
         issue: String,
         #[arg(long)]
         revision: i64,
@@ -143,13 +155,14 @@ impl Command {
         match self {
             Self::List { .. } => "member.list",
             Self::Status { .. } => "member.status",
-            Self::Attach { .. } => "member.attach",
+            Self::Start { .. } => "member.start",
             Self::Claim { .. } => "member.claim",
             Self::Narrow { .. } => "member.narrow",
             Self::Prove { .. } => "member.prove",
             Self::Landing { command } => command.name(),
             Self::Reference { command } => command.name(),
             Self::Release { .. } => "member.release",
+            Self::Complete { .. } => "member.complete",
             Self::Retire { .. } => "member.retire",
         }
     }
@@ -158,11 +171,12 @@ impl Command {
         match self {
             Self::List { issue } => issue.as_deref().map(|held| vec![held]),
             Self::Status { issue }
-            | Self::Attach { issue, .. }
+            | Self::Start { issue, .. }
             | Self::Claim { issue, .. }
             | Self::Narrow { issue, .. }
             | Self::Prove { issue, .. }
             | Self::Release { issue, .. }
+            | Self::Complete { issue, .. }
             | Self::Retire { issue, .. } => Some(vec![issue]),
             Self::Landing { command } => Some(vec![command.issue()]),
             Self::Reference { command } => Some(vec![command.issue()]),
