@@ -1,6 +1,9 @@
 mod git;
 mod projection;
 mod pull;
+mod settle;
+#[cfg(test)]
+mod squash;
 
 use super::super::{emit, input};
 use super::projection::Projection;
@@ -88,7 +91,7 @@ async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()> {
     )
     .await?;
     let revision = attach(estate, &plan, &report.pull).await?;
-    pull::merge(&mut report, &ready.preparation, &command, timeout).await?;
+    settle::merge(&mut report, &ready.preparation, &command, timeout).await?;
     emit(
         json!({
             "schema": "concord.issue-delivery-land/v1",
