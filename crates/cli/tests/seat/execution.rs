@@ -1,5 +1,5 @@
 #[cfg(unix)]
-mod unix {
+pub(super) mod unix {
     use super::super::spawn;
     use serde_json::{Value, json};
     use std::os::unix::fs::PermissionsExt;
@@ -13,6 +13,7 @@ mod unix {
         let provider = fixture.path().join("provider");
         let reply = json!({
             "node": "I_execution",
+            "stable": "R_concord",
             "number": 26,
             "url": "https://github.com/PerishLab/concord/issues/26",
             "state": "OPEN",
@@ -36,16 +37,32 @@ mod unix {
                 provider.to_str().expect("provider path"),
             ],
         );
-        let source = repository(fixture.path());
+        let source = repository(fixture.path(), "PerishLab/concord");
+        let provider = fixture.path().join("repository-provider");
+        let reply = json!({
+            "node": "R_concord",
+            "coordinate": "PerishLab/concord",
+            "branch": "main",
+        });
+        executable(&provider, &format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
+        success(
+            fixture.path(),
+            &[
+                "integration",
+                "register",
+                "PerishLab/concord",
+                "--path",
+                source.to_str().expect("source path"),
+                "--github-command",
+                provider.to_str().expect("provider path"),
+            ],
+        );
         let attached = operator(
             fixture.path(),
             &[
                 "member",
                 "attach",
                 "PerishLab/concord#26",
-                "delivery",
-                "--source",
-                source.to_str().expect("source path"),
                 "--claim",
                 "crates",
                 "--revision",
@@ -60,7 +77,7 @@ mod unix {
         assert!(
             fixture
                 .path()
-                .join(".issues/I_execution/members/delivery/.git")
+                .join(".issues/I_execution/worktree/.git")
                 .is_file()
         );
 
@@ -70,7 +87,6 @@ mod unix {
                 "member",
                 "claim",
                 "PerishLab/concord#26",
-                "delivery",
                 "--claim",
                 "docs",
                 "--revision",
@@ -104,7 +120,7 @@ mod unix {
         );
     }
 
-    fn repository(root: &Path) -> std::path::PathBuf {
+    pub(crate) fn repository(root: &Path, coordinate: &str) -> std::path::PathBuf {
         let source = root.join("source");
         std::fs::create_dir(&source).expect("source");
         git(&source, &["init", "-b", "main"]);
@@ -116,7 +132,30 @@ mod unix {
         std::fs::write(source.join("README.md"), "fixture\n").expect("fixture file");
         git(&source, &["add", "README.md"]);
         git(&source, &["commit", "-m", "fixture"]);
+        git(
+            &source,
+            &[
+                "remote",
+                "add",
+                "origin",
+                &format!("https://github.com/{coordinate}.git"),
+            ],
+        );
+        git(&source, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
+        git(
+            &source,
+            &["branch", "--set-upstream-to=origin/main", "main"],
+        );
         source
+    }
+
+    fn executable(path: &Path, body: &str) {
+        std::fs::write(path, body).expect("provider command");
+        let mut permissions = std::fs::metadata(path)
+            .expect("provider metadata")
+            .permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(path, permissions).expect("provider mode");
     }
 
     fn success(space: &Path, arguments: &[&str]) -> Value {
@@ -134,7 +173,7 @@ mod unix {
             .expect("run Concord as operator")
     }
 
-    fn git(root: &Path, arguments: &[&str]) {
+    pub(crate) fn git(root: &Path, arguments: &[&str]) {
         let status = Command::new("git")
             .arg("-C")
             .arg(root)
@@ -142,5 +181,16 @@ mod unix {
             .status()
             .expect("run Git");
         assert!(status.success());
+    }
+
+    pub(crate) fn text(root: &Path, arguments: &[&str]) -> String {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(arguments)
+            .output()
+            .expect("run Git");
+        assert!(output.status.success());
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
     }
 }

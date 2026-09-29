@@ -1,6 +1,6 @@
 use concord_core::{
     Admission, Coordinate, IssueAttach, IssueDeclaration, IssueImport, IssueNarrowing,
-    IssueProving, IssueRelease, IssueRetirement, Reconcile, Seat,
+    IssueProving, IssueRelease, IssueRetirement, Reconcile, Register, Rename, Repository, Seat,
 };
 use std::path::Path;
 use std::process::Command;
@@ -23,6 +23,20 @@ async fn lifecycle() {
     std::fs::write(source.join("README.md"), "fixture\n").expect("fixture file");
     git(&source, &["add", "README.md"]);
     git(&source, &["commit", "-m", "fixture"]);
+    git(
+        &source,
+        &[
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/PerishLab/concord.git",
+        ],
+    );
+    git(&source, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    git(
+        &source,
+        &["branch", "--set-upstream-to=origin/main", "main"],
+    );
 
     let estate = Seat::new(temp.path())
         .bootstrap()
@@ -36,12 +50,26 @@ async fn lifecycle() {
         })
         .await
         .expect("attach Issue");
+    let mismatch = estate
+        .register(&Register {
+            node: "R_plumb".to_string(),
+            repository: Repository::parse("PerishLab/plumb").expect("repository"),
+            path: source.clone(),
+        })
+        .await
+        .expect_err("origin repository mismatch");
+    assert_eq!(mismatch.code(), "concord.integration.repository");
+    estate
+        .register(&Register {
+            node: "R_concord".to_string(),
+            repository: Repository::parse("PerishLab/concord").expect("repository"),
+            path: source.clone(),
+        })
+        .await
+        .expect("register Integration");
     let member = estate
         .attach_issue(&IssueAttach {
             issue: issue.clone(),
-            name: "delivery".to_string(),
-            source: source.clone(),
-            branch: None,
             claims: vec!["crates".to_string()],
             revision: 0,
         })
@@ -50,9 +78,18 @@ async fn lifecycle() {
         .member;
     assert_eq!(member.issue, issue);
     assert_eq!(member.node, "I_execution");
-    assert_eq!(member.branch, format!("issue-{}-delivery", 1));
-    let path = temp.path().join(".issues/I_execution/members/delivery");
+    assert!(member.branch.starts_with("concord/issue-"));
+    let path = temp.path().join(".issues/I_execution/worktree");
     assert!(path.join(".git").is_file());
+    let duplicate = estate
+        .attach_issue(&IssueAttach {
+            issue: issue.clone(),
+            claims: vec!["docs".to_string()],
+            revision: 1,
+        })
+        .await
+        .expect_err("one Anchor owns at most one Member");
+    assert_eq!(duplicate.code(), "concord.member.reserved");
 
     std::fs::create_dir(path.join("crates")).expect("claimed directory");
     std::fs::write(path.join("crates/note.md"), "bounded\n").expect("member delta");
@@ -61,7 +98,6 @@ async fn lifecycle() {
     let proved = estate
         .prove_issue(&IssueProving {
             issue: issue.clone(),
-            member: "delivery".to_string(),
             revision: 1,
         })
         .await
@@ -71,7 +107,6 @@ async fn lifecycle() {
     let narrowed = estate
         .narrow_issue(&IssueNarrowing {
             issue: issue.clone(),
-            member: "delivery".to_string(),
             claims: vec!["crates/note.md".to_string()],
             revision: 2,
         })
@@ -82,7 +117,6 @@ async fn lifecycle() {
     estate
         .prove_issue(&IssueProving {
             issue: issue.clone(),
-            member: "delivery".to_string(),
             revision: 3,
         })
         .await
@@ -92,7 +126,6 @@ async fn lifecycle() {
         estate
             .refer_issue(&IssueDeclaration {
                 issue: issue.clone(),
-                member: "delivery".to_string(),
                 provider: "github".to_string(),
                 owner: "PerishLab".to_string(),
                 repository: "concord".to_string(),
@@ -103,7 +136,7 @@ async fn lifecycle() {
             .expect("declare pull coordinate");
     }
     let status = estate
-        .issue_member_status(&issue, "delivery")
+        .issue_member_status(&issue)
         .await
         .expect("Issue Member status");
     assert_eq!(
@@ -115,20 +148,29 @@ async fn lifecycle() {
         vec![31, 32]
     );
 
-    let moved = coordinate("PerishLab/plumb#40");
-    estate
+    let transfer = estate
         .reconcile(&Reconcile {
-            anchor: issue,
+            anchor: issue.clone(),
             node: "I_execution".to_string(),
-            coordinate: moved.clone(),
+            repository: "R_plumb".to_string(),
+            coordinate: coordinate("PerishLab/plumb#40"),
             revision: 6,
         })
         .await
-        .expect("reconcile transferred Issue");
+        .expect_err("refuse repository transfer");
+    assert_eq!(transfer.code(), "concord.issue.repository_transfer");
+    let moved = coordinate("PerishLab/concord-renamed#26");
+    estate
+        .rename(&Rename {
+            node: "R_concord".to_string(),
+            repository: Repository::parse("PerishLab/concord-renamed").expect("repository"),
+        })
+        .await
+        .expect("reconcile repository rename");
     assert!(path.is_dir());
     assert_eq!(
         estate
-            .issue_member(&moved, "delivery")
+            .issue_member(&moved)
             .await
             .expect("Member follows stable node")
             .node,
@@ -158,7 +200,6 @@ async fn lifecycle() {
     let refusal = estate
         .release_issue(&IssueRelease {
             issue: moved.clone(),
-            member: "delivery".to_string(),
             revision: 8,
         })
         .await
@@ -168,7 +209,6 @@ async fn lifecycle() {
         estate
             .retire_issue(&IssueRetirement {
                 issue: moved.clone(),
-                member: "delivery".to_string(),
                 artifacts: vec!["evidence".to_string()],
                 revision: 8,
             })
@@ -178,7 +218,7 @@ async fn lifecycle() {
     );
     assert_eq!(
         estate
-            .issue_member(&moved, "delivery")
+            .issue_member(&moved)
             .await
             .expect_err("retired Member")
             .code(),
@@ -191,6 +231,25 @@ async fn lifecycle() {
             .expect("Artifacts")
             .len(),
         1
+    );
+    let foreign = temp.path().join("foreign");
+    git(
+        &source,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "foreign",
+            foreign.to_str().expect("foreign"),
+        ],
+    );
+    let audit = estate.inspect().await.expect("audit estate");
+    assert_eq!(audit.faults[0].code, "integration.worktree.unknown");
+    assert_eq!(audit.faults[0].subject, foreign.display().to_string());
+    assert!(audit.faults[0].message.contains(" at head "));
+    git(
+        &source,
+        &["worktree", "remove", foreign.to_str().expect("foreign")],
     );
     let audit = estate.inspect().await.expect("audit estate");
     assert!(audit.faults.is_empty(), "{:?}", audit.faults);

@@ -6,7 +6,6 @@ use crate::{Reference, ReferenceKind};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IssueDeclaration {
     pub issue: super::super::super::Coordinate,
-    pub member: String,
     pub provider: String,
     pub owner: String,
     pub repository: String,
@@ -17,7 +16,6 @@ pub struct IssueDeclaration {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IssueWithdrawal {
     pub issue: super::super::super::Coordinate,
-    pub member: String,
     pub owner: String,
     pub repository: String,
     pub number: i64,
@@ -36,7 +34,7 @@ impl Estate {
         self.ensure().await?;
         let anchor = self.issue(&request.issue).await?;
         issue_stale(anchor.revision, request.revision)?;
-        let member = self.issue_member(&request.issue, &request.member).await?;
+        let member = self.issue_member(&request.issue).await?;
         let rows = self
             .core
             .live("IssueChange")
@@ -81,7 +79,7 @@ impl Estate {
         self.ensure().await?;
         let anchor = self.issue(&request.issue).await?;
         issue_stale(anchor.revision, request.revision)?;
-        let member = self.issue_member(&request.issue, &request.member).await?;
+        let member = self.issue_member(&request.issue).await?;
         let row = self
             .core
             .live("IssueChange")

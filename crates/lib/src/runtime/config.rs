@@ -32,10 +32,6 @@ impl Root {
     }
 }
 
-pub(crate) fn home() -> Result<PathBuf> {
-    plumb::config::home().ok_or_else(|| Error::new("HOME is required to expand repository source"))
-}
-
 pub(crate) fn operator() -> Option<Operator> {
     let variables = [
         (Agent::Claude, "CLAUDE_CODE_SESSION_ID"),

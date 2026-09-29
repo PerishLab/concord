@@ -18,10 +18,11 @@ pub use agreement::{Agreement, Finding};
 pub use forge::{Admission, Anchor, Coordinate, Reconcile};
 pub use forge::{Reference, ReferenceKind};
 pub use work::{
-    BoundaryState, CheckoutState, ClaimOverlap, IntegrationState, IssueArtifact, IssueAttach,
-    IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange, IssueMemberStatus,
-    IssueNarrowing, IssueProving, IssueRelease, IssueRemoval, IssueRetirement, IssueWithdrawal,
-    IssueWorktree, Proof, UpstreamState, authority, issue_delivery, issue_landing,
+    BoundaryState, CheckoutState, ClaimOverlap, Integration, IntegrationState, IssueArtifact,
+    IssueAttach, IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange,
+    IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval, IssueRetirement,
+    IssueWithdrawal, IssueWorktree, Proof, Register, Rename, Repository, UpstreamState, authority,
+    issue_delivery, issue_landing,
 };
 
 pub struct Estate {

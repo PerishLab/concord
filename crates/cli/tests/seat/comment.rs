@@ -215,6 +215,7 @@ mod unix {
         let arguments = space.join("arguments.txt");
         let observation = json!({
             "node": "I_issue",
+            "stable": "R_concord",
             "number": 83,
             "url": "https://github.com/PerishLab/concord/issues/83",
             "state": state,

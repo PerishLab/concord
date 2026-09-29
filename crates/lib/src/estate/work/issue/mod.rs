@@ -12,6 +12,7 @@ use super::super::{Anchor, Coordinate, Estate, fault};
 use crate::path::at;
 use crate::{Error, Result, component, git};
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 
 pub use artifact::{IssueArtifact, IssueImport, IssueRemoval};
@@ -24,9 +25,6 @@ pub use status::IssueMemberStatus;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IssueAttach {
     pub issue: Coordinate,
-    pub name: String,
-    pub source: PathBuf,
-    pub branch: Option<String>,
     pub claims: Vec<String>,
     pub revision: i64,
 }
@@ -36,8 +34,7 @@ pub struct IssueWorktree {
     pub key: i64,
     pub issue: Coordinate,
     pub node: String,
-    pub name: String,
-    pub source: String,
+    pub integration: super::Integration,
     pub branch: String,
     pub claims: Vec<String>,
     pub proof: Option<super::Proof>,
@@ -46,6 +43,7 @@ pub struct IssueWorktree {
 impl Estate {
     pub async fn issue_worktrees(&self) -> Result<Vec<IssueWorktree>> {
         let anchors = self.core.live("Anchor").await.map_err(fault)?;
+        let integrations = self.core.live("Integration").await.map_err(fault)?;
         let claims = self.core.live("IssueClaim").await.map_err(fault)?;
         let proofs = self.core.live("IssueBoundary").await.map_err(fault)?;
         let mut out = Vec::new();
@@ -56,8 +54,12 @@ impl Estate {
                 .map(super::super::forge::decode_anchor)
                 .transpose()?
                 .ok_or_else(|| malformed(row.key(), "anchor"))?;
-            let name = text(&row, "name")?;
-            let source = text(&row, "source")?;
+            let integration = row
+                .int("integration")
+                .and_then(|key| integrations.iter().find(|held| held.key() == key))
+                .map(super::integration::decode)
+                .transpose()?
+                .ok_or_else(|| malformed(row.key(), "integration"))?;
             let branch = text(&row, "branch")?;
             let mut held = claims
                 .iter()
@@ -74,66 +76,44 @@ impl Estate {
                 key: row.key(),
                 issue: anchor.coordinate,
                 node: anchor.node,
-                name,
-                source,
+                integration,
                 branch,
                 claims: held,
                 proof: issue_proof(&proofs, row.key(), anchor.key)?,
             });
         }
-        out.sort_by_key(|member| (member.node.clone(), member.name.clone()));
+        out.sort_by_key(|member| member.node.clone());
         Ok(out)
     }
 
     pub async fn attach_issue(&self, request: &IssueAttach) -> Result<IssueMemberChange> {
-        component("member name", &request.name)?;
-        let source = request.source.canonicalize().map_err(|error| {
-            Error::typed(
-                "concord.member.source",
-                format!(
-                    "cannot resolve source {}: {error}",
-                    request.source.display()
-                ),
-            )
-        })?;
-        if !git::at(&source).clean()? {
-            return Err(Error::typed(
-                "concord.member.source",
-                "integration checkout is not clean",
-            ));
-        }
         let claims = crate::claim::normalize(&request.claims)?;
         let _guard = self.guard()?;
         self.ensure().await?;
         let anchor = self.issue(&request.issue).await?;
         issue_stale(anchor.revision, request.revision)?;
-        let branch = request
-            .branch
-            .clone()
-            .unwrap_or_else(|| format!("issue-{}-{}", anchor.key, request.name));
+        let integration = self.integration(&anchor.coordinate).await?;
+        let source = PathBuf::from(&integration.path);
+        let branch = branch(&anchor.node);
+        if self
+            .issue_worktrees()
+            .await?
+            .iter()
+            .any(|member| member.node == anchor.node)
+        {
+            return Err(Error::typed(
+                "concord.member.reserved",
+                format!("member already exists: {}", request.issue.identity()),
+            ));
+        }
         if git::at(&source).exists(&branch)? {
             return Err(Error::typed(
                 "concord.member.branch",
                 format!("target branch already exists: {branch}"),
             ));
         }
-        if self
-            .issue_worktrees()
-            .await?
-            .iter()
-            .any(|member| member.node == anchor.node && member.name == request.name)
-        {
-            return Err(Error::typed(
-                "concord.member.reserved",
-                format!(
-                    "member already exists: {}/{}",
-                    request.issue.identity(),
-                    request.name
-                ),
-            ));
-        }
         let observations = self.issue_overlaps(None, &source, &claims).await?;
-        let path = self.issue_path(&anchor, &request.name)?;
+        let path = self.issue_path(&anchor)?;
         if path.exists() {
             return Err(Error::typed(
                 "concord.member.territory",
@@ -151,10 +131,10 @@ impl Estate {
             }
             return Err(error);
         }
-        let stored = source.display().to_string();
         let revision = anchor.revision + 1;
         let next = revision.to_string();
         let root = anchor.key.to_string();
+        let key = integration.key.to_string();
         let made = self
             .core
             .batch(async |tx| {
@@ -162,10 +142,9 @@ impl Estate {
                     .put(
                         "IssueMember",
                         &[
-                            ("name", request.name.as_str()),
-                            ("source", stored.as_str()),
                             ("branch", branch.as_str()),
                             ("anchor", root.as_str()),
+                            ("integration", key.as_str()),
                         ],
                     )
                     .await?;
@@ -200,46 +179,47 @@ impl Estate {
             };
         }
         Ok(IssueMemberChange {
-            member: self.issue_member(&request.issue, &request.name).await?,
+            member: self.issue_member(&request.issue).await?,
             observations,
         })
     }
 
-    pub async fn issue_member(&self, issue: &Coordinate, name: &str) -> Result<IssueWorktree> {
+    pub async fn issue_member(&self, issue: &Coordinate) -> Result<IssueWorktree> {
         let anchor = self.issue(issue).await?;
         self.issue_worktrees()
             .await?
             .into_iter()
-            .find(|member| member.node == anchor.node && member.name == name)
+            .find(|member| member.node == anchor.node)
             .ok_or_else(|| {
                 Error::typed(
                     "concord.member.absent",
-                    format!("member not found: {}/{}", issue.identity(), name),
+                    format!("member not found: {}", issue.identity()),
                 )
             })
     }
 
-    pub async fn issue_source_path(&self, issue: &Coordinate, name: &str) -> Result<PathBuf> {
-        let member = self.issue_member(issue, name).await?;
+    pub async fn issue_source_path(&self, issue: &Coordinate) -> Result<PathBuf> {
+        let member = self.issue_member(issue).await?;
         self.issue_source(&member)
     }
 
-    pub(in crate::estate) fn issue_path(&self, anchor: &Anchor, name: &str) -> Result<PathBuf> {
+    pub(in crate::estate) fn issue_path(&self, anchor: &Anchor) -> Result<PathBuf> {
         component("issue node", &anchor.node)?;
         Ok(self
             .space
             .join(".issues")
             .join(&anchor.node)
-            .join("members")
-            .join(name))
+            .join("worktree"))
     }
 
     pub(in crate::estate) fn issue_source(&self, member: &IssueWorktree) -> Result<PathBuf> {
-        crate::path::expand(
-            &member.source,
-            &self.space.join(".issues").join(&member.node),
-        )
+        Ok(PathBuf::from(&member.integration.path))
     }
+}
+
+fn branch(node: &str) -> String {
+    let digest = Sha256::digest(node.as_bytes());
+    format!("concord/issue-{digest:x}")
 }
 
 fn issue_proof(rows: &[keel::Row], member: i64, anchor: i64) -> Result<Option<super::Proof>> {

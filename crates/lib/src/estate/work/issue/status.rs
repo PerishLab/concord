@@ -19,12 +19,11 @@ impl Estate {
     pub async fn issue_member_status(
         &self,
         issue: &super::super::super::Coordinate,
-        name: &str,
     ) -> Result<IssueMemberStatus> {
         let anchor = self.issue(issue).await?;
-        let member = self.issue_member(issue, name).await?;
+        let member = self.issue_member(issue).await?;
         let references = self.issue_references(member.key, anchor.key).await?;
-        let path = self.issue_path(&anchor, &member.name)?;
+        let path = self.issue_path(&anchor)?;
         let source = self.issue_source(&member)?;
         let worktree = super::super::status::checkout(&path)?;
         let integration_checkout = super::super::status::checkout(&source)?;

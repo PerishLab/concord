@@ -6,8 +6,8 @@ use plumb::guard::{Authority, Expected};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA: &str = "concord.issue-member-landing/v2";
-pub const READY: &str = "concord.issue-member-ready/v1";
+pub const SCHEMA: &str = "concord.issue-member-landing/v3";
+pub const READY: &str = "concord.issue-member-ready/v2";
 const AUTHORITY: &str = "concord.landing.authority";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -22,7 +22,6 @@ pub struct Guard {
 #[serde(deny_unknown_fields)]
 pub struct Request {
     pub issue: super::super::super::Coordinate,
-    pub member: String,
     pub revision: i64,
     pub base: String,
     pub title: String,
@@ -48,8 +47,7 @@ pub struct Plan {
 #[serde(deny_unknown_fields)]
 pub struct Member {
     pub key: i64,
-    pub name: String,
-    pub source: String,
+    pub integration: super::super::Integration,
     pub branch: String,
     pub claims: Vec<String>,
 }
@@ -70,7 +68,7 @@ struct Context {
 }
 
 pub async fn prepare<A: Authorities>(estate: &Estate, request: &Request) -> Result<Plan> {
-    let context = context(estate, &request.issue, &request.member, request.revision).await?;
+    let context = context(estate, &request.issue, request.revision).await?;
     let inspected = plumb::landing::Request {
         root: &context.path,
         base: &request.base,
@@ -108,7 +106,7 @@ pub async fn revalidate<A: Authorities>(estate: &Estate, plan: &Plan) -> Result<
             format!("landing plan schema {} is not {SCHEMA}", plan.schema),
         ));
     }
-    let context = context(estate, &plan.issue, &plan.member.name, plan.revision).await?;
+    let context = context(estate, &plan.issue, plan.revision).await?;
     if context.node != plan.node
         || member(&context.member) != plan.member
         || context.boundary != plan.boundary
@@ -140,20 +138,19 @@ pub async fn revalidate<A: Authorities>(estate: &Estate, plan: &Plan) -> Result<
 async fn context(
     estate: &Estate,
     issue: &super::super::super::Coordinate,
-    name: &str,
     revision: i64,
 ) -> Result<Context> {
     estate.ensure().await?;
     let anchor = estate.issue(issue).await?;
     issue_stale(anchor.revision, revision)?;
-    let member = estate.issue_member(issue, name).await?;
+    let member = estate.issue_member(issue).await?;
     let boundary = member.proof.clone().ok_or_else(|| {
         Error::typed(
             "concord.landing.boundary",
             "Member has no current Boundary proof",
         )
     })?;
-    let path = estate.issue_path(&anchor, &member.name)?;
+    let path = estate.issue_path(&anchor)?;
     let source = estate.issue_source(&member)?;
     agreement(&source, &path, &member, &boundary)?;
     Ok(Context {
@@ -214,8 +211,7 @@ fn verify(
 fn member(member: &IssueWorktree) -> Member {
     Member {
         key: member.key,
-        name: member.name.clone(),
-        source: member.source.clone(),
+        integration: member.integration.clone(),
         branch: member.branch.clone(),
         claims: member.claims.clone(),
     }

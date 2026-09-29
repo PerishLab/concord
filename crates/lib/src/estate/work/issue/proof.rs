@@ -5,7 +5,6 @@ use crate::{Error, Result, git};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IssueProving {
     pub issue: super::super::super::Coordinate,
-    pub member: String,
     pub revision: i64,
 }
 
@@ -15,9 +14,9 @@ impl Estate {
         self.ensure().await?;
         let anchor = self.issue(&request.issue).await?;
         issue_stale(anchor.revision, request.revision)?;
-        let member = self.issue_member(&request.issue, &request.member).await?;
+        let member = self.issue_member(&request.issue).await?;
         let source = self.issue_source(&member)?;
-        let path = self.issue_path(&anchor, &member.name)?;
+        let path = self.issue_path(&anchor)?;
         if !git::at(&source).clean()? {
             return Err(Error::typed(
                 "concord.member.source",
@@ -50,7 +49,7 @@ impl Estate {
         };
         self.keep_issue_boundary(anchor.key, member.key, anchor.revision + 1, &proof)
             .await?;
-        self.issue_member(&request.issue, &request.member).await
+        self.issue_member(&request.issue).await
     }
 
     async fn keep_issue_boundary(

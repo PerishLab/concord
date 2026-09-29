@@ -156,7 +156,6 @@ pub enum Delivery {
     #[command(about = "Prepare one exact Issue-led pull-request plan without provider mutation")]
     Prepare {
         issue: String,
-        member: String,
         #[arg(long)]
         revision: i64,
         #[arg(long, default_value = "main")]
@@ -169,7 +168,6 @@ pub enum Delivery {
     #[command(about = "Revalidate and merge one exact Issue-led pull-request plan")]
     Land {
         issue: String,
-        member: String,
         #[arg(long, value_name = "PATH|-", default_value = "-")]
         plan: PathBuf,
         #[arg(long = "github-command")]

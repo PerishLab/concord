@@ -1,6 +1,7 @@
 use concord_core::authority::{Plumb, Warrant};
 use concord_core::{
-    Admission, Coordinate, Estate, IssueAttach, IssueProving, Seat, issue_delivery,
+    Admission, Coordinate, Estate, IssueAttach, IssueProving, Register, Repository, Seat,
+    issue_delivery,
 };
 use plumb::guard::{Action, Authority, Descriptor};
 use serde::Serialize;
@@ -32,7 +33,6 @@ pub(super) fn released() -> Authority {
 pub(super) fn request(issue: &Coordinate) -> issue_delivery::Request {
     issue_delivery::Request {
         issue: issue.clone(),
-        member: "kernel".into(),
         revision: 2,
         base: "main".into(),
         snapshot: snapshot(),
@@ -62,6 +62,15 @@ pub(super) async fn fixture(producer: &str, depot: &str) -> Fixture {
         &["remote", "add", "origin", remote.to_str().expect("remote")],
     );
     git(&source, &["push", "-u", "origin", "main"]);
+    git(
+        &source,
+        &[
+            "remote",
+            "set-url",
+            "origin",
+            "https://github.com/PerishLab/probe.git",
+        ],
+    );
 
     let estate = Seat::new(temp.path())
         .bootstrap()
@@ -76,29 +85,25 @@ pub(super) async fn fixture(producer: &str, depot: &str) -> Fixture {
         .await
         .expect("admit Issue");
     estate
+        .register(&Register {
+            node: "R_probe".into(),
+            repository: Repository::parse("PerishLab/probe").expect("repository"),
+            path: source.clone(),
+        })
+        .await
+        .expect("register Integration");
+    estate
         .attach_issue(&IssueAttach {
             issue: issue.clone(),
-            name: "kernel".into(),
-            source: source.clone(),
-            branch: None,
             claims: vec!["topic.md".into()],
             revision: 0,
         })
         .await
         .expect("attach Member");
-    let member = temp.path().join(".issues/I_delivery/members/kernel");
+    let member = temp.path().join(".issues/I_delivery/worktree");
     std::fs::write(member.join("topic.md"), "delivery\n").expect("change");
     git(&member, &["add", "topic.md"]);
     git(&member, &["commit", "-m", "Issue delivery"]);
-    git(
-        &source,
-        &[
-            "remote",
-            "set-url",
-            "origin",
-            "https://github.com/PerishLab/probe.git",
-        ],
-    );
     let tree = text(&member, &["rev-parse", "HEAD^{tree}"]);
     let proof = proof(tree, producer, depot);
     let token = proof.encode().expect("proof");
@@ -114,7 +119,6 @@ pub(super) async fn fixture(producer: &str, depot: &str) -> Fixture {
     estate
         .prove_issue(&IssueProving {
             issue: issue.clone(),
-            member: "kernel".into(),
             revision: 1,
         })
         .await
@@ -183,7 +187,7 @@ async fn exact() {
         .expect_err("Issue drift");
     assert_eq!(error.code(), "concord.delivery.stale");
 
-    let member = _temp.path().join(".issues/I_delivery/members/kernel");
+    let member = _temp.path().join(".issues/I_delivery/worktree");
     std::fs::rename(&member, _temp.path().join("displaced")).expect("displace Member");
     let error = issue_delivery::revalidate::<Plumb>(&estate, &plan, &snapshot, 3)
         .await
@@ -192,7 +196,7 @@ async fn exact() {
     let details = error.details().expect("agreement details");
     assert_eq!(
         details["agreement"]["faults"][0]["code"],
-        "member.agreement"
+        "integration.worktree.missing"
     );
 }
 

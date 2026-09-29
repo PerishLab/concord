@@ -7,7 +7,6 @@ use std::path::Path;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IssueClaiming {
     pub issue: super::super::super::Coordinate,
-    pub member: String,
     pub claims: Vec<String>,
     pub revision: i64,
 }
@@ -15,7 +14,6 @@ pub struct IssueClaiming {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IssueNarrowing {
     pub issue: super::super::super::Coordinate,
-    pub member: String,
     pub claims: Vec<String>,
     pub revision: i64,
 }
@@ -28,7 +26,6 @@ pub struct IssueMemberChange {
 
 struct Change<'a> {
     issue: &'a super::super::super::Coordinate,
-    member: &'a str,
     claims: &'a [String],
     revision: i64,
     narrow: bool,
@@ -51,7 +48,6 @@ impl Estate {
     pub async fn claim_issue(&self, request: &IssueClaiming) -> Result<IssueMemberChange> {
         self.change_issue_claim(Change {
             issue: &request.issue,
-            member: &request.member,
             claims: &request.claims,
             revision: request.revision,
             narrow: false,
@@ -62,7 +58,6 @@ impl Estate {
     pub async fn narrow_issue(&self, request: &IssueNarrowing) -> Result<IssueMemberChange> {
         self.change_issue_claim(Change {
             issue: &request.issue,
-            member: &request.member,
             claims: &request.claims,
             revision: request.revision,
             narrow: true,
@@ -75,7 +70,7 @@ impl Estate {
         self.ensure().await?;
         let anchor = self.issue(change.issue).await?;
         issue_stale(anchor.revision, change.revision)?;
-        let member = self.issue_member(change.issue, change.member).await?;
+        let member = self.issue_member(change.issue).await?;
         let claims = if change.narrow {
             crate::claim::normalize(change.claims)?
         } else {
@@ -94,7 +89,7 @@ impl Estate {
             .issue_overlaps(Some(member.key), &source, &claims)
             .await?;
         if change.narrow {
-            let path = self.issue_path(&anchor, &member.name)?;
+            let path = self.issue_path(&anchor)?;
             if !git::at(&source).clean()? {
                 return Err(Error::typed(
                     "concord.member.source",
@@ -162,7 +157,7 @@ impl Estate {
             .await
             .map_err(super::super::fault)?;
         Ok(IssueMemberChange {
-            member: self.issue_member(change.issue, change.member).await?,
+            member: self.issue_member(change.issue).await?,
             observations,
         })
     }
@@ -185,7 +180,7 @@ impl Estate {
                 if !paths.is_empty() {
                     observations.push(ClaimOverlap {
                         code: "claim.overlap".to_string(),
-                        peer: format!("{}/{}", member.issue.identity(), member.name),
+                        peer: member.issue.identity(),
                         paths,
                     });
                 }

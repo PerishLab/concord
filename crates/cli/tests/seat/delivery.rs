@@ -1,5 +1,6 @@
 #[cfg(unix)]
 mod unix {
+    use super::super::execution::unix::{git, repository, text};
     use super::super::spawn;
     use plumb::guard::{Action, Authority, Descriptor};
     use serde::Serialize;
@@ -37,23 +38,42 @@ mod unix {
                 provider,
             ],
         );
-        let source = repository(fixture.path());
+        let source = repository(fixture.path(), "PerishLab/probe");
+        let observer = observer(fixture.path());
+        success(
+            fixture.path(),
+            &[
+                "integration",
+                "register",
+                "PerishLab/probe",
+                "--path",
+                source.to_str().expect("source path"),
+                "--github-command",
+                observer.to_str().expect("repository provider"),
+            ],
+        );
+        git(
+            &source,
+            &[
+                "remote",
+                "set-url",
+                "origin",
+                fixture.path().join("remote.git").to_str().expect("remote"),
+            ],
+        );
         success(
             fixture.path(),
             &[
                 "member",
                 "attach",
                 "PerishLab/probe#1",
-                "delivery",
-                "--source",
-                source.to_str().expect("source path"),
                 "--claim",
                 "topic.md",
                 "--revision",
                 "0",
             ],
         );
-        let member = fixture.path().join(".issues/I_delivery/members/delivery");
+        let member = fixture.path().join(".issues/I_delivery/worktree");
         std::fs::write(member.join("topic.md"), "delivery\n").expect("member delta");
         git(&member, &["add", "topic.md"]);
         git(&member, &["commit", "-m", "delivery"]);
@@ -68,14 +88,7 @@ mod unix {
         guard(&member, &repository);
         success(
             fixture.path(),
-            &[
-                "member",
-                "prove",
-                "PerishLab/probe#1",
-                "delivery",
-                "--revision",
-                "1",
-            ],
+            &["member", "prove", "PerishLab/probe#1", "--revision", "1"],
         );
 
         for _ in 0..3 {
@@ -114,7 +127,6 @@ mod unix {
                 "delivery",
                 "prepare",
                 "PerishLab/probe#1",
-                "delivery",
                 "--revision",
                 "2",
                 "--github-command",
@@ -134,7 +146,6 @@ mod unix {
                 "delivery",
                 "land",
                 "PerishLab/probe#1",
-                "delivery",
                 "--plan",
                 "-",
                 "--github-command",
@@ -151,27 +162,19 @@ mod unix {
         assert_ne!(error["error"]["code"], "concord.audit.refused");
     }
 
-    fn repository(root: &Path) -> PathBuf {
-        let source = root.join("source");
-        let remote = root.join("remote.git");
-        std::fs::create_dir(&source).expect("source");
-        std::fs::create_dir(&remote).expect("remote");
-        git(&remote, &["init", "--bare"]);
-        git(&source, &["init", "-b", "main"]);
-        git(&source, &["config", "user.name", "Concord Test"]);
-        git(
-            &source,
-            &["config", "user.email", "concord@example.invalid"],
-        );
-        std::fs::write(source.join("README.md"), "fixture\n").expect("fixture file");
-        git(&source, &["add", "README.md"]);
-        git(&source, &["commit", "-m", "fixture"]);
-        git(
-            &source,
-            &["remote", "add", "origin", remote.to_str().expect("remote")],
-        );
-        git(&source, &["push", "-u", "origin", "main"]);
-        source
+    fn observer(root: &Path) -> PathBuf {
+        let reply = json!({
+            "node": "R_probe",
+            "coordinate": "PerishLab/probe",
+            "branch": "main",
+        });
+        let path = root.join("repository-provider");
+        std::fs::write(&path, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"))
+            .expect("repository provider");
+        let mut permissions = std::fs::metadata(&path).expect("metadata").permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(&path, permissions).expect("provider mode");
+        path
     }
 
     fn guard(member: &Path, repository: &str) {
@@ -222,7 +225,7 @@ mod unix {
 
     fn projection() -> String {
         let observed = json!({
-            "node": "I_delivery", "number": 1,
+            "node": "I_delivery", "stable": "R_probe", "number": 1,
             "url": "https://github.com/PerishLab/probe/issues/1",
             "state": "OPEN", "kind": "Task", "updated_at": "2026-09-29T00:00:00Z",
         });
@@ -273,28 +276,5 @@ mod unix {
             String::from_utf8_lossy(&output.stderr)
         );
         serde_json::from_slice(&output.stdout).expect("Concord JSON")
-    }
-
-    fn git(root: &Path, arguments: &[&str]) {
-        assert!(
-            Command::new("git")
-                .arg("-C")
-                .arg(root)
-                .args(arguments)
-                .status()
-                .expect("run Git")
-                .success()
-        );
-    }
-
-    fn text(root: &Path, arguments: &[&str]) -> String {
-        let output = Command::new("git")
-            .arg("-C")
-            .arg(root)
-            .args(arguments)
-            .output()
-            .expect("run Git");
-        assert!(output.status.success());
-        String::from_utf8_lossy(&output.stdout).trim().to_string()
     }
 }

@@ -6,12 +6,26 @@ mod anchor;
 
 pub(super) async fn inspect(estate: &Estate, report: &mut Agreement) -> Result<()> {
     custody(estate, report)?;
-    anchors(estate, report).await?;
+    resources(estate, report).await?;
     anchor::inspect(estate, report).await?;
     Ok(())
 }
 
-async fn anchors(estate: &Estate, report: &mut Agreement) -> Result<()> {
+async fn resources(estate: &Estate, report: &mut Agreement) -> Result<()> {
+    for row in estate
+        .core
+        .live("Integration")
+        .await
+        .map_err(super::fault)?
+    {
+        if let Err(error) = super::work::integration::decode(&row) {
+            report.fault(
+                "integration.shape",
+                format!("Integration/{}", row.key()),
+                error.to_string(),
+            );
+        }
+    }
     for row in estate.core.live("Anchor").await.map_err(super::fault)? {
         if let Err(error) = super::forge::decode_anchor(&row) {
             report.fault(

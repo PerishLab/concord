@@ -35,7 +35,7 @@ mod unix {
         assert!(activity.status.success());
         let command = tool(fixture.path(), "preflight", search(false));
         let report = run(fixture.path(), &command, "Preflight Issue collisions");
-        assert_eq!(report["preflight"]["schema"], "concord.issue-preflight/v1");
+        assert_eq!(report["preflight"]["schema"], "concord.issue-preflight/v2");
         assert_eq!(report["preflight"]["complete"], true);
         assert_eq!(report["preflight"]["candidates"][0]["issue"]["number"], 62);
         assert_eq!(
@@ -120,7 +120,7 @@ mod unix {
 
     fn observation(node: &str, number: i64) -> String {
         let value = json!({
-            "node": node, "number": number,
+            "node": node, "stable": "R_concord", "number": number,
             "url": format!("https://github.com/PerishLab/concord/issues/{number}"),
             "state": "OPEN", "kind": "Feature", "updated_at": "2026-09-28T00:00:00Z",
         });

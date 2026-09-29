@@ -1,5 +1,6 @@
 pub(crate) mod artifact;
 pub(crate) mod audit;
+pub(crate) mod integration;
 pub(crate) mod issue;
 pub(crate) mod member;
 
@@ -9,6 +10,7 @@ use std::path::PathBuf;
 
 pub use artifact::Args as Artifact;
 pub use audit::Args as Audit;
+pub use integration::Args as Integration;
 pub use issue::Args as Issue;
 pub use member::Args as Member;
 
@@ -37,6 +39,8 @@ pub enum Command {
     Cookbook(Cookbook),
     #[command(about = "Anchor local execution to typed GitHub Issues")]
     Issue(Issue),
+    #[command(about = "Manage canonical repository Integrations")]
+    Integration(Integration),
     #[command(about = "Manage repository worktree Members")]
     Member(Member),
     #[command(about = "Manage direct private Artifact payload")]
@@ -53,6 +57,7 @@ impl Command {
             Self::Config(args) => args.command.name(),
             Self::Cookbook(_) => "cookbook",
             Self::Issue(args) => args.command.name(),
+            Self::Integration(args) => args.command.name(),
             Self::Member(args) => args.command.name(),
             Self::Artifact(args) => args.command.name(),
             Self::Audit(_) => "audit",
@@ -63,6 +68,7 @@ impl Command {
     pub(crate) fn activity(&self) -> Option<Vec<&str>> {
         match self {
             Self::Issue(_) => None,
+            Self::Integration(_) => None,
             Self::Member(args) => args.command.activity(),
             Self::Artifact(args) => Some(args.command.activity()),
             Self::Audit(_) | Self::Config(_) | Self::Cookbook(_) | Self::Skill(_) => None,

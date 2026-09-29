@@ -9,7 +9,7 @@ mod comment;
 mod observe;
 
 const SCHEMA: &str = "concord.issue-delivery/v1";
-const SHAPE: &str = r#"{"schema":"concord.issue-delivery/v1","anchor":{"key":1,"node":"I_node","owner":"PerishLab","repository":"concord","number":25,"revision":0},"observation":{"node":"I_node","owner":"PerishLab","repository":"concord","number":25,"url":"https://github.com/PerishLab/concord/issues/25","state":"open","kind":"Feature","updated":"2026-09-27T00:00:00Z","seen":0}}"#;
+const SHAPE: &str = r#"{"schema":"concord.issue-delivery/v1","anchor":{"key":1,"node":"I_node","owner":"PerishLab","repository":"concord","number":25,"revision":0},"observation":{"node":"I_node","stable":"R_node","owner":"PerishLab","repository":"concord","number":25,"url":"https://github.com/PerishLab/concord/issues/25","state":"open","kind":"Feature","updated":"2026-09-27T00:00:00Z","seen":0}}"#;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -168,6 +168,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 .reconcile(&Reconcile {
                     anchor,
                     node: observed.node,
+                    repository: observed.stable,
                     coordinate,
                     revision,
                 })
@@ -256,6 +257,7 @@ fn node(anchor: &Anchor, observation: &observe::Observed) -> Result<()> {
 fn same(left: &observe::Observed, right: &observe::Observed) -> bool {
     [
         left.node == right.node,
+        left.stable == right.stable,
         left.coordinate == right.coordinate,
         left.url == right.url,
         left.state == right.state,

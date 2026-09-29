@@ -3,15 +3,31 @@ use keel::atom::{int, string};
 use keel::resource;
 
 #[resource]
-pub(super) struct IssueMember {
-    #[field(string, unique = anchor)]
-    name: string,
+pub(super) struct Integration {
+    #[field(string, unique)]
+    node: string,
     #[field(string)]
-    source: string,
+    owner: string,
+    #[field(string, unique = owner)]
+    repository: string,
+    #[field(string, unique)]
+    path: string,
+    #[field(string, unique)]
+    common: string,
+    #[field(string)]
+    remote: string,
     #[field(string)]
     branch: string,
-    #[relation(Anchor, many2one, root)]
+}
+
+#[resource]
+pub(super) struct IssueMember {
+    #[field(string)]
+    branch: string,
+    #[relation(Anchor, one2one, root)]
     anchor: Anchor,
+    #[relation(Integration, many2one)]
+    integration: Integration,
 }
 
 #[resource]

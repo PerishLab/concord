@@ -6,6 +6,7 @@ pub(super) fn graph() -> Graph {
     let mut graph = Graph::new();
     graph
         .plug::<reference::Anchor>()
+        .plug::<execution::Integration>()
         .plug::<execution::IssueMember>()
         .plug::<execution::IssueClaim>()
         .plug::<execution::IssueBoundary>()

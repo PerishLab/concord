@@ -54,6 +54,7 @@ async fn reconciliation() {
         .reconcile(&Reconcile {
             anchor: before.clone(),
             node: "I_issue".to_string(),
+            repository: "R_plumb".to_string(),
             coordinate: after.clone(),
             revision: 0,
         })
@@ -74,6 +75,7 @@ async fn reconciliation() {
         .reconcile(&Reconcile {
             anchor: after.clone(),
             node: "I_issue".to_string(),
+            repository: "R_plumb".to_string(),
             coordinate: coordinate("PerishLab/plumb#41"),
             revision: 0,
         })
@@ -85,6 +87,7 @@ async fn reconciliation() {
         .reconcile(&Reconcile {
             anchor: after,
             node: "I_other".to_string(),
+            repository: "R_plumb".to_string(),
             coordinate: coordinate("PerishLab/plumb#41"),
             revision: 1,
         })
