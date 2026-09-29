@@ -17,7 +17,7 @@ mod protocol;
 
 pub(crate) use protocol::{claim, component};
 
-pub use config::Root;
+pub use config::{Root, host};
 pub use error::{Error, Result};
 pub use estate::{
     Admission, Agreement, Anchor, BoundaryState, CheckoutState, ClaimOverlap, Coordinate, Estate,

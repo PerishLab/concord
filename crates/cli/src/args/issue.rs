@@ -60,6 +60,16 @@ pub enum Command {
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
+    #[command(about = "Declare one GitHub Issue comment with execution observations")]
+    Comment {
+        issue: String,
+        #[arg(long, value_name = "PATH|-", default_value = "-")]
+        input: PathBuf,
+        #[arg(long = "github-command")]
+        command: PathBuf,
+        #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
+        timeout: u64,
+    },
     #[command(about = "Prepare and land exact Issue-led pull requests")]
     Delivery {
         #[command(subcommand)]
@@ -177,6 +187,7 @@ impl Command {
             Self::Preflight { command } => command.name(),
             Self::Graph { .. } => "issue.graph",
             Self::Ready { .. } => "issue.ready",
+            Self::Comment { .. } => "issue.comment",
             Self::Delivery { command } => command.name(),
             Self::Attach { .. } => "issue.attach",
             Self::Show { .. } => "issue.show",
