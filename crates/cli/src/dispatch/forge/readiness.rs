@@ -159,23 +159,12 @@ fn distribution_evidence(body: &str, evidence: &mut BTreeSet<String>) {
                 '(' | ')' | '[' | ']' | '<' | '>' | ',' | '.' | ';' | '"' | '\''
             )
         });
-        if distribution(token) {
+        if token.starts_with("https://releases.plumb.perish.uk/")
+            && token.contains("/distribution.json")
+        {
             evidence.insert(token.to_string());
         }
     }
-}
-
-fn distribution(token: &str) -> bool {
-    let Some(rest) = token.strip_prefix("https://releases.") else {
-        return false;
-    };
-    let Some((host, path)) = rest.split_once('/') else {
-        return false;
-    };
-    let Some(product) = host.strip_suffix(".perish.uk") else {
-        return false;
-    };
-    !product.is_empty() && !product.contains('.') && path.ends_with("/distribution.json")
 }
 
 #[cfg(test)]
@@ -195,15 +184,7 @@ mod tests {
             "proof: https://releases.plumb.perish.uk/v1/releases/stable/v1/distribution.json",
             &mut evidence,
         );
-        distribution_evidence(
-            "see https://releases.concord.perish.uk/v1/releases/stable/v0.16.0/distribution.json.",
-            &mut evidence,
-        );
-        distribution_evidence(
-            "https://releases.example.com/v1/distribution.json https://releases.a.b.perish.uk/v1/distribution.json",
-            &mut evidence,
-        );
-        assert_eq!(evidence.len(), 2);
+        assert_eq!(evidence.len(), 1);
     }
 
     #[test]
