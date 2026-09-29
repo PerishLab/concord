@@ -13,7 +13,7 @@ pub fn consume(space: &Path, provider: &str, plan: &[u8]) -> Output {
 }
 
 pub fn start(space: &Path, provider: &str, plan: &[u8]) -> Child {
-    let mut consumer = land(space, provider)
+    let mut consumer = land(space, provider, "-")
         .stdin(Stdio::piped())
         .spawn()
         .expect("consume stored plan");
@@ -26,7 +26,7 @@ pub fn start(space: &Path, provider: &str, plan: &[u8]) -> Child {
     consumer
 }
 
-fn land(space: &Path, provider: &str) -> Command {
+fn land(space: &Path, provider: &str, plan: &str) -> Command {
     let mut command = spawn::concord(space);
     command
         .args(["--root", space.to_str().expect("root"), "--json"])
@@ -36,7 +36,7 @@ fn land(space: &Path, provider: &str) -> Command {
             "land",
             "PerishLab/probe#1",
             "--plan",
-            "-",
+            plan,
             "--github-command",
             provider,
         ])
@@ -90,6 +90,8 @@ pub fn projection(root: &Path) -> String {
     let hidden = root.join("hide-readback");
     let slow = root.join("slow-readback");
     let create = root.join("fail-create");
+    let failure = root.join("provider-failure");
+    let delay = root.join("provider-delay");
     format!(
         r#"reply() {{
   state=$(cat '{state}')
@@ -98,6 +100,8 @@ pub fn projection(root: &Path) -> String {
   jq -cn --arg id PR_node --argjson number 7 --arg url https://github.com/PerishLab/probe/pull/7 --arg state "$state" --arg base "$(cat '{base}')" --arg head "$candidate" --arg merge "$merge" --arg title "$(cat '{title}')" --arg body "$(cat '{body}')" '{{id:$id,number:$number,url:$url,state:$state,baseRefName:$base,headRefOid:$head,mergeCommit:(if $merge == "" then null else {{oid:$merge}} end),mergedAt:(if $merge == "" then null else "2026-09-29T00:00:02Z" end),updatedAt:"2026-09-29T00:00:03Z",title:$title,body:$body}}'
 }}
 if [ "$1 $2" = "api graphql" ]; then
+  if [ -f '{failure}' ]; then rm '{failure}'; printf '%s\n' observe-failed >&2; exit 1; fi
+  if [ -f '{delay}' ]; then rm '{delay}'; sleep 2; fi
   for argument in "$@"; do [ "$argument" = "--jq" ] && printf '%s\n' '{observed}' && exit 0; done
   printf '%s\n' '{projected}'
   exit 0
@@ -162,6 +166,8 @@ exit 1"#,
         hidden = hidden.display(),
         slow = slow.display(),
         create = create.display(),
+        failure = failure.display(),
+        delay = delay.display(),
     )
 }
 

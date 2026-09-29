@@ -1,6 +1,7 @@
 mod client;
 mod flow;
 mod git;
+mod handoff;
 mod model;
 mod projection;
 mod pull;
@@ -8,12 +9,8 @@ mod settle;
 #[cfg(test)]
 mod squash;
 
-use super::super::emit;
-use super::projection::Projection;
 use crate::args::issue::Delivery;
-use concord_core::authority::Plumb;
-use concord_core::{Coordinate, Error, Estate, Result, issue_delivery};
-use serde_json::json;
+use concord_core::{Error, Estate, Result};
 
 pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<()> {
     match command {
@@ -21,26 +18,23 @@ pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<()>
             issue,
             revision,
             base,
+            handoff,
             command,
             timeout,
         } => {
-            let issue = Coordinate::parse(&issue)?;
-            let observed = Projection::new(&command, 100, 1, timeout)
-                .delivery(&issue)
-                .await?;
-            let plan = issue_delivery::prepare::<Plumb>(
+            handoff::prepare(
                 estate,
-                &issue_delivery::Request {
-                    issue,
+                handoff::Parameters {
+                    issue: &issue,
                     revision,
                     base,
-                    snapshot: observed.snapshot,
-                    observed: observed.observed,
-                    outcome: observed.outcome,
+                    carry: handoff,
+                    command: &command,
+                    timeout,
                 },
+                output,
             )
-            .await?;
-            emit(json!({"plan": plan}), output)
+            .await
         }
         command @ Delivery::Land { .. } => flow::land(estate, command, output).await,
     }

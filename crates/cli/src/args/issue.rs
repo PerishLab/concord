@@ -160,6 +160,11 @@ pub enum Delivery {
         revision: i64,
         #[arg(long, default_value = "main")]
         base: String,
+        #[arg(
+            long,
+            help = "Carry preparation failures through a streamed delivery handoff"
+        )]
+        handoff: bool,
         #[arg(long = "github-command")]
         command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
