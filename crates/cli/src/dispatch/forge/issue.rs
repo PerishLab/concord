@@ -1,6 +1,6 @@
 use super::super::{emit, input};
 use super::{observe, projection};
-use crate::args::issue::Command;
+use crate::args::issue::{Command, Preflight};
 use concord_core::{Admission, Anchor, Coordinate, Error, Estate, Reconcile, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -45,34 +45,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 .await?;
             emit(json!({"brief": brief}), output)
         }
-        Command::Preflight {
-            repository,
-            kind,
-            title,
-            outcome,
-            command,
-            page_size,
-            max_pages,
-            timeout,
-        } => {
-            let preflight = super::preflight::run(
-                estate,
-                super::preflight::Request {
-                    repository: &repository,
-                    kind: &kind,
-                    title: &title,
-                    outcome: &outcome,
-                    bounds: super::preflight::Bounds {
-                        command: &command,
-                        first: page_size,
-                        pages: max_pages,
-                        timeout,
-                    },
-                },
-            )
-            .await?;
-            emit(json!({"preflight": preflight}), output)
-        }
+        Command::Preflight { command } => preflight(estate, command, output).await,
         Command::Graph {
             issue,
             command,
@@ -187,6 +160,59 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 })
                 .await?;
             emit(json!({"anchor": anchor}), output)
+        }
+    }
+}
+
+async fn preflight(estate: &Estate, command: Preflight, output: bool) -> Result<()> {
+    match command {
+        Preflight::Proposed {
+            repository,
+            kind,
+            title,
+            outcome,
+            command,
+            page_size,
+            max_pages,
+            timeout,
+        } => {
+            let report = super::preflight::run(
+                estate,
+                super::preflight::Request {
+                    repository: &repository,
+                    kind: &kind,
+                    title: &title,
+                    outcome: &outcome,
+                    bounds: super::preflight::Bounds {
+                        command: &command,
+                        first: page_size,
+                        pages: max_pages,
+                        timeout,
+                    },
+                },
+            )
+            .await?;
+            emit(json!({"preflight": report}), output)
+        }
+        Preflight::Existing {
+            issue,
+            command,
+            page_size,
+            max_pages,
+            timeout,
+        } => {
+            let report = super::preflight::existing(
+                estate,
+                super::preflight::ExistingRequest {
+                    issue: &issue,
+                    command: &command,
+                    page_size,
+                    max_pages,
+                    timeout,
+                },
+            )
+            .await?;
+            emit(json!({"preflight": report}), output)
         }
     }
 }

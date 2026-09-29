@@ -29,23 +29,10 @@ pub enum Command {
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
-    #[command(about = "Preflight a proposed Issue against GitHub and active execution")]
+    #[command(about = "Preflight proposed or existing Issue work")]
     Preflight {
-        repository: String,
-        #[arg(long)]
-        kind: String,
-        #[arg(long)]
-        title: String,
-        #[arg(long)]
-        outcome: String,
-        #[arg(long = "github-command")]
-        command: PathBuf,
-        #[arg(long = "page-size", default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=100))]
-        page_size: u16,
-        #[arg(long = "max-pages", default_value_t = 4, value_parser = clap::value_parser!(u16).range(1..=20))]
-        max_pages: u16,
-        #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
-        timeout: u64,
+        #[command(subcommand)]
+        command: Preflight,
     },
     #[command(about = "Derive one bounded graph from native GitHub relationships")]
     Graph {
@@ -121,6 +108,40 @@ pub enum Command {
 }
 
 #[derive(Subcommand)]
+pub enum Preflight {
+    #[command(about = "Find probable duplicate work for a proposed Issue")]
+    Proposed {
+        repository: String,
+        #[arg(long)]
+        kind: String,
+        #[arg(long)]
+        title: String,
+        #[arg(long)]
+        outcome: String,
+        #[arg(long = "github-command")]
+        command: PathBuf,
+        #[arg(long = "page-size", default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=100))]
+        page_size: u16,
+        #[arg(long = "max-pages", default_value_t = 4, value_parser = clap::value_parser!(u16).range(1..=20))]
+        max_pages: u16,
+        #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
+        timeout: u64,
+    },
+    #[command(about = "Explain native relationships and active execution for an existing Issue")]
+    Existing {
+        issue: String,
+        #[arg(long = "github-command")]
+        command: PathBuf,
+        #[arg(long = "page-size", default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=100))]
+        page_size: u16,
+        #[arg(long = "max-pages", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
+        max_pages: u16,
+        #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
+        timeout: u64,
+    },
+}
+
+#[derive(Subcommand)]
 pub enum Delivery {
     #[command(about = "Prepare one exact Issue-led pull-request plan without provider mutation")]
     Prepare {
@@ -153,7 +174,7 @@ impl Command {
         match self {
             Self::Bootstrap => "issue.bootstrap",
             Self::Brief { .. } => "issue.brief",
-            Self::Preflight { .. } => "issue.preflight",
+            Self::Preflight { command } => command.name(),
             Self::Graph { .. } => "issue.graph",
             Self::Ready { .. } => "issue.ready",
             Self::Delivery { command } => command.name(),
@@ -162,6 +183,15 @@ impl Command {
             Self::Prepare { .. } => "issue.prepare",
             Self::Validate { .. } => "issue.validate",
             Self::Reconcile { .. } => "issue.reconcile",
+        }
+    }
+}
+
+impl Preflight {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Proposed { .. } => "issue.preflight.proposed",
+            Self::Existing { .. } => "issue.preflight.existing",
         }
     }
 }

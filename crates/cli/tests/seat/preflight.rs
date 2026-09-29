@@ -93,6 +93,7 @@ mod unix {
             &[
                 "issue",
                 "preflight",
+                "proposed",
                 "PerishLab/concord",
                 "--kind",
                 "Feature",
