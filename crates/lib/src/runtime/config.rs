@@ -56,3 +56,29 @@ pub(crate) fn operator() -> Option<Operator> {
         _ => None,
     }
 }
+
+pub fn host() -> Result<Option<String>> {
+    let Some(value) = std::env::var_os("CONCORD_HOST_ID") else {
+        return Ok(None);
+    };
+    let value = value.into_string().map_err(|_| {
+        Error::typed(
+            "concord.host.encoding",
+            "CONCORD_HOST_ID must be valid UTF-8",
+        )
+    })?;
+    if value.is_empty() {
+        return Ok(None);
+    }
+    if value.len() > 128
+        || !value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.' | ':' | '/')
+        })
+    {
+        return Err(Error::typed(
+            "concord.host.invalid",
+            "CONCORD_HOST_ID must be 1..=128 ASCII letters, digits, or -_.:/",
+        ));
+    }
+    Ok(Some(value))
+}
