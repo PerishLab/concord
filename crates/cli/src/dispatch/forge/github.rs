@@ -1,6 +1,7 @@
 use super::projection::{Fault, PageRequest, Projection};
 use concord_core::Coordinate;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::process::Command;
@@ -55,8 +56,8 @@ query(
 "#;
 
 #[derive(Deserialize)]
-struct Envelope {
-    data: Option<Data>,
+struct Envelope<T> {
+    data: Option<T>,
     #[serde(default)]
     errors: Vec<GraphqlError>,
 }
@@ -181,12 +182,17 @@ impl Projection<'_> {
             .args(["-f", &format!("owner={}", coordinate.owner)])
             .args(["-f", &format!("name={}", coordinate.repository)])
             .args(["-F", &format!("number={}", coordinate.number)])
-            .args(["-F", &format!("first={}", request.size)])
+            .args(["-F", &format!("first={}", request.size)]);
+        cursors(&mut process, request);
+        decode(&self.run(process).await?)
+    }
+
+    pub(super) async fn run(&self, mut process: Command) -> std::result::Result<Vec<u8>, Fault> {
+        process
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .kill_on_drop(true);
-        cursors(&mut process, request);
         let output =
             match tokio::time::timeout(Duration::from_secs(self.timeout), process.output()).await {
                 Ok(Ok(output)) => output,
@@ -205,7 +211,7 @@ impl Projection<'_> {
                 "GitHub Issue projection exceeds the reply limit",
             ));
         }
-        decode(&output.stdout)
+        Ok(output.stdout)
     }
 }
 
@@ -224,7 +230,14 @@ fn cursors(process: &mut Command, request: &PageRequest) {
 }
 
 fn decode(body: &[u8]) -> std::result::Result<RawIssue, Fault> {
-    let envelope = serde_json::from_slice::<Envelope>(body)
+    envelope::<Data>(body)?
+        .and_then(|data| data.repository)
+        .and_then(|repository| repository.issue)
+        .ok_or_else(|| provider("missing", "GitHub Issue is not readable"))
+}
+
+pub(super) fn envelope<T: DeserializeOwned>(body: &[u8]) -> std::result::Result<Option<T>, Fault> {
+    let envelope = serde_json::from_slice::<Envelope<T>>(body)
         .map_err(|_| provider("malformed", "GitHub Issue projection is not valid JSON"))?;
     if !envelope.errors.is_empty() {
         return Err(provider(
@@ -237,11 +250,7 @@ fn decode(body: &[u8]) -> std::result::Result<RawIssue, Fault> {
                 .join("; "),
         ));
     }
-    envelope
-        .data
-        .and_then(|data| data.repository)
-        .and_then(|repository| repository.issue)
-        .ok_or_else(|| provider("missing", "GitHub Issue is not readable"))
+    Ok(envelope.data)
 }
 
 pub(super) fn provider(code: &'static str, message: impl Into<String>) -> Fault {

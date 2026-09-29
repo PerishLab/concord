@@ -6,11 +6,13 @@ mod unix {
     use std::path::{Path, PathBuf};
     use std::process::Output;
 
+    const PLUMB: &str = "[release]\nauthority = \"https://releases.plumb.perish.uk\"\n";
+
     #[test]
     fn projections() {
         let fixture = tempfile::tempdir().expect("fixture");
         success(fixture.path(), &["issue", "bootstrap"]);
-        let command = tool(fixture.path(), "projection", reply());
+        let command = tool(fixture.path(), "projection", reply(&answer(PLUMB)));
         let command = command.to_str().expect("provider path");
         let brief = success(
             fixture.path(),
@@ -68,7 +70,49 @@ mod unix {
             ready["readiness"]["distribution_evidence"][0],
             "https://releases.plumb.perish.uk/v1/releases/stable/v1/distribution.json"
         );
+        assert_eq!(
+            ready["readiness"]["distribution_evidence"]
+                .as_array()
+                .expect("evidence")
+                .len(),
+            1
+        );
         unavailable(fixture.path());
+        withheld(
+            fixture.path(),
+            "exit 1",
+            "concord.issue.projection.provider",
+        );
+        let invalid = "[release]\nauthority = \"http://releases.plumb.perish.uk/\"\n";
+        withheld(
+            fixture.path(),
+            &answer(invalid),
+            "concord.issue.projection.declaration",
+        );
+    }
+
+    fn withheld(space: &Path, manifest: &str, code: &str) {
+        let command = tool(space, "withheld-projection", reply(manifest));
+        let command = command.to_str().expect("withheld path");
+        let ready = raw(
+            space,
+            &[
+                "issue",
+                "ready",
+                "PerishLab/concord#27",
+                "--github-command",
+                command,
+            ],
+        );
+        assert!(!ready.status.success());
+        assert!(String::from_utf8_lossy(&ready.stderr).contains(code));
+    }
+
+    fn answer(declaration: &str) -> String {
+        let concord = json!({"object": {"text": "[package]\nname = \"concord\"\n"}});
+        let plumb = json!({"object": {"text": declaration}});
+        let manifest = json!({"data": {"r0": concord, "r1": plumb}});
+        format!("printf '%s\\n' '{manifest}'")
     }
 
     fn unavailable(space: &Path) {
@@ -139,7 +183,7 @@ mod unix {
         }
     }
 
-    fn reply() -> String {
+    fn reply(manifest: &str) -> String {
         let issue = json!({
             "id": "I_issue",
             "number": 27,
@@ -159,7 +203,7 @@ mod unix {
             "comments": connection(vec![comment()]),
         });
         let value = json!({"data": {"repository": {"issue": issue}}});
-        format!("printf '%s\\n' '{}'", value)
+        format!("case \"$*\" in\n*plumb.toml*) {manifest} ;;\n*) printf '%s\\n' '{value}' ;;\nesac")
     }
 
     fn pull() -> Value {
@@ -167,18 +211,18 @@ mod unix {
             "__typename": "PullRequest",
             "id": "PR_pull",
             "number": 32,
-            "url": "https://github.com/PerishLab/concord/pull/32",
+            "url": "https://github.com/PerishLab/plumb/pull/32",
             "title": "Deliver projection",
             "state": "MERGED",
             "mergedAt": "2026-09-28T00:00:00Z",
             "updatedAt": "2026-09-28T00:00:00Z",
-            "repository": {"nameWithOwner": "PerishLab/concord"}
+            "repository": {"nameWithOwner": "PerishLab/plumb"}
         }})
     }
 
     fn comment() -> Value {
         json!({
-            "body": "Released https://releases.plumb.perish.uk/v1/releases/stable/v1/distribution.json",
+            "body": "Released https://releases.plumb.perish.uk/v1/releases/stable/v1/distribution.json and https://releases.example.com/v1/releases/stable/v1/distribution.json",
             "url": "https://github.com/PerishLab/concord/issues/27#issuecomment-1"
         })
     }
