@@ -176,12 +176,24 @@ async fn exact() {
         .expect("revalidate delivery");
     assert_eq!(ready.preparation.candidate, plan.delivery.candidate);
 
-    let mut drifted = snapshot;
+    let mut drifted = snapshot.clone();
     drifted.updated.push_str("-drift");
     let error = issue_delivery::revalidate::<Plumb>(&estate, &plan, &drifted, 3)
         .await
         .expect_err("Issue drift");
     assert_eq!(error.code(), "concord.delivery.stale");
+
+    let member = _temp.path().join(".issues/I_delivery/members/kernel");
+    std::fs::rename(&member, _temp.path().join("displaced")).expect("displace Member");
+    let error = issue_delivery::revalidate::<Plumb>(&estate, &plan, &snapshot, 3)
+        .await
+        .expect_err("estate disagreement");
+    assert_eq!(error.code(), "concord.audit.refused");
+    let details = error.details().expect("agreement details");
+    assert_eq!(
+        details["agreement"]["faults"][0]["code"],
+        "member.agreement"
+    );
 }
 
 pub(super) fn snapshot() -> plumb::delivery::Snapshot {
