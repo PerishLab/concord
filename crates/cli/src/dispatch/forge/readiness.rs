@@ -1,5 +1,6 @@
-use super::projection::{self, Connection, Projection, Readiness, ReadinessChecks};
-use concord_core::{Coordinate, Result};
+use super::projection::authority::{evidence, trust};
+use super::projection::{self, Connection, Fault, Projection, Readiness, ReadinessChecks};
+use concord_core::{Coordinate, Error, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Instant;
 
@@ -12,14 +13,16 @@ impl Projection<'_> {
                 BTreeSet::from([
                     Connection::SubIssues,
                     Connection::BlockedBy,
+                    Connection::Pulls,
                     Connection::Comments,
                 ]),
             )
             .await
-            .map_err(|error| {
-                projection::record("issue.ready", started.elapsed(), error.code);
-                projection::fault(error)
-            })?;
+            .map_err(|error| refuse(started, error))?;
+        let authorities = self
+            .authorities(&trust(&held.issue.coordinate, &held.pulls))
+            .await
+            .map_err(|error| refuse(started, error))?;
         let sections = sections(&held.body);
         let missing = required_sections(&held.kind)
             .iter()
@@ -47,11 +50,8 @@ impl Projection<'_> {
             blockers_closed,
         };
         let reasons = reasons(&missing, &checks);
-        let mut evidence = BTreeSet::new();
-        distribution_evidence(&held.body, &mut evidence);
-        for comment in &held.comments {
-            distribution_evidence(&comment.body, &mut evidence);
-        }
+        let texts = held.comments.iter().map(|comment| comment.body.as_str());
+        let distribution = evidence(texts.chain([held.body.as_str()]), &authorities);
         let readiness = Readiness {
             schema: projection::READINESS,
             issue: held.issue,
@@ -59,12 +59,17 @@ impl Projection<'_> {
             ready: reasons.is_empty(),
             checks,
             reasons,
-            distribution_evidence: evidence.into_iter().collect(),
+            distribution_evidence: distribution,
             observed_at: projection::now(),
         };
         projection::record("issue.ready", started.elapsed(), "fresh");
         Ok(readiness)
     }
+}
+
+fn refuse(started: Instant, error: Fault) -> Error {
+    projection::record("issue.ready", started.elapsed(), error.code);
+    projection::fault(error)
 }
 
 fn reasons(missing: &[&str], checks: &ReadinessChecks) -> Vec<String> {
@@ -151,26 +156,9 @@ fn checkboxes(section: &str) -> (usize, usize) {
     (total, open)
 }
 
-fn distribution_evidence(body: &str, evidence: &mut BTreeSet<String>) {
-    for token in body.split_whitespace() {
-        let token = token.trim_matches(|character: char| {
-            matches!(
-                character,
-                '(' | ')' | '[' | ']' | '<' | '>' | ',' | '.' | ';' | '"' | '\''
-            )
-        });
-        if token.starts_with("https://releases.plumb.perish.uk/")
-            && token.contains("/distribution.json")
-        {
-            evidence.insert(token.to_string());
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{checkboxes, distribution_evidence, outcome, sections};
-    use std::collections::BTreeSet;
+    use super::{checkboxes, outcome, sections};
 
     #[test]
     fn evidence() {
@@ -179,12 +167,6 @@ mod tests {
         let held = sections(body);
         assert_eq!(held["outcome"], "Done");
         assert_eq!(checkboxes(&held["acceptance"]), (2, 1));
-        let mut evidence = BTreeSet::new();
-        distribution_evidence(
-            "proof: https://releases.plumb.perish.uk/v1/releases/stable/v1/distribution.json",
-            &mut evidence,
-        );
-        assert_eq!(evidence.len(), 1);
     }
 
     #[test]
