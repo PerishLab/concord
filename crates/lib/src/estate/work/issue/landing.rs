@@ -184,11 +184,8 @@ fn agreement(source: &Path, path: &Path, member: &IssueWorktree, proof: &Proof) 
     }
     let head = git::at(path).head()?;
     let digest = claim::digest(&member.claims);
-    if !proof.current(&head, &digest) {
-        return Err(Error::typed(
-            "concord.landing.boundary",
-            "Member Boundary proof is stale",
-        ));
+    if let Some(reason) = proof.stale(&head, &digest) {
+        return Err(Error::typed("concord.landing.boundary", reason));
     }
     Ok(())
 }

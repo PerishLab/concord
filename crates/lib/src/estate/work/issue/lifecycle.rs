@@ -1,6 +1,6 @@
 use super::super::{BoundaryState, CheckoutState, Estate, IntegrationState, UpstreamState};
 use super::{IssueWorktree, issue_stale};
-use crate::{Error, PLUMB, Reference, Result, git};
+use crate::{Error, Reference, Result, git};
 use serde::Serialize;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -205,11 +205,8 @@ fn current(member: &IssueWorktree, head: &str) -> Result<()> {
         )
     })?;
     let claim = crate::claim::digest(&member.claims);
-    if !proof.current(head, &claim) {
-        return Err(Error::typed(
-            "concord.boundary.stale",
-            "Member Boundary proof is stale",
-        ));
+    if let Some(reason) = proof.stale(head, &claim) {
+        return Err(Error::typed("concord.boundary.stale", reason));
     }
     Ok(())
 }
@@ -260,16 +257,7 @@ fn boundary(member: &IssueWorktree, head: &str) -> BoundaryState {
     let Some(proof) = &member.proof else {
         return BoundaryState::Absent;
     };
-    let digest = crate::claim::digest(&member.claims);
-    if [
-        proof.schema == plumb::boundary::SCHEMA,
-        proof.plumb == PLUMB,
-        proof.head == head,
-        proof.claim == digest,
-    ]
-    .into_iter()
-    .all(|current| current)
-    {
+    if proof.current(head, &crate::claim::digest(&member.claims)) {
         BoundaryState::Current
     } else {
         BoundaryState::Stale
