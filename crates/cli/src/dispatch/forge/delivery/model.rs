@@ -1,6 +1,6 @@
 use super::pull::stale;
 use concord_core::Result;
-use plumb::landing::Preparation;
+use concord_core::issue_delivery::Preparation;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -74,7 +74,7 @@ fn refusal() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{Commit, Pull, State, contract};
-    use plumb::landing::{Guard, Preparation};
+    use concord_core::issue_delivery::Preparation;
     use std::path::PathBuf;
 
     #[test]
@@ -153,11 +153,6 @@ mod tests {
             candidate: "candidate".into(),
             title: "Deliver".into(),
             body: "Refs PerishLab/concord#28".into(),
-            guard: Guard {
-                schema: "guard".into(),
-                tree: "tree".into(),
-                digest: "digest".into(),
-            },
         }
     }
 }

@@ -19,6 +19,19 @@ paths = ["crates/cli/src/dispatch/forge/preflight/github.rs"]
 [comment]
 allow = false
 
+[[boundary]]
+allow = ["shadow"]
+note = "Concord's proof-neutral provider projection translates two externally owned Plumb plan types; retaining either external proof carrier would fabricate Guard evidence for native delivery"
+paths = ["crates/lib/src/estate/work/delivery/model.rs"]
+
+[[vocabulary.term]]
+description = "The explicit authority for Wharf's fixed native checks, not a fallback from Guard."
+name = "WharfNative"
+
+[[vocabulary.term]]
+description = "The spelling required by Rust's FromStr trait at the explicit authority grammar boundary."
+name = "from_str"
+
 [[grant]]
 paths = [
     "crates/*/src/**/*.rs",

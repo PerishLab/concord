@@ -23,6 +23,7 @@ tempfile = "3"
 tar = "0.4"
 tokio = { version = "1", features = ["io-util", "macros", "process", "rt", "time"] }
 toml = "0.9"
+which = "8"
 
 [workspace.dependencies.rustix]
 version = "1"

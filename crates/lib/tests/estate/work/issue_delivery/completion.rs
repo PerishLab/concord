@@ -81,6 +81,7 @@ async fn completion() {
     git(&source, &["fetch", "origin", "main"]);
     git(&source, &["merge", "--ff-only", "origin/main"]);
     let settlement = issue_delivery::Settlement {
+        authority: plan.authority.clone(),
         issue: issue.clone(),
         prepared: plan.revision,
         revision: 3,

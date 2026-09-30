@@ -1,8 +1,8 @@
 use super::git::Git;
 use super::pull::{Pull, State, stale};
+use concord_core::issue_delivery::Preparation;
 use concord_core::{Error, Result};
 use plumb::delivery::Squash;
-use plumb::landing::Preparation;
 
 pub async fn exact(preparation: &Preparation) -> Result<()> {
     Git::fetch(&preparation.root).await?;

@@ -1,3 +1,4 @@
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
@@ -20,4 +21,13 @@ fn main() {
         "cargo:rustc-env=CONCORD_PLUMB_VERSION=v{}",
         versions.into_iter().next().expect("Plumb version")
     );
+    let mut digest = Sha256::new();
+    for name in ["gate.rs", "process.rs"] {
+        let file = manifest.join("src/estate/work/delivery").join(name);
+        println!("cargo:rerun-if-changed={}", file.display());
+        let bytes = std::fs::read(&file).expect("read native gate implementation");
+        digest.update((bytes.len() as u64).to_be_bytes());
+        digest.update(bytes);
+    }
+    println!("cargo:rustc-env=CONCORD_WHARF_GATE={:x}", digest.finalize());
 }

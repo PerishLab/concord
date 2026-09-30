@@ -27,6 +27,7 @@ struct Flow<'a> {
 pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()> {
     let Delivery::Land {
         issue,
+        authority,
         plan: path,
         command,
         timeout,
@@ -60,6 +61,12 @@ pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()
             "delivery plan Issue or Member does not match the command",
         ));
     }
+    if plan.authority.mode() != authority {
+        return Err(Error::typed(
+            "concord.delivery.authority",
+            "land authority does not match the explicitly prepared plan",
+        ));
+    }
     Flow {
         estate,
         plan,
@@ -76,7 +83,7 @@ impl Flow<'_> {
         let observed = self.observe().await?;
         let mut resumed =
             issue_delivery::resume::<Plumb>(self.estate, &self.plan, &observed.snapshot).await?;
-        let preparation = preparation(&self.plan.delivery);
+        let preparation = self.plan.delivery.preparation();
         let identity = if resumed.released {
             Path::new(&self.plan.member.integration.path)
         } else {
@@ -121,7 +128,7 @@ impl Flow<'_> {
         if held.state == pull::State::Open {
             active(&resumed)?;
             self.mutation().await?;
-            provider.mark().await?;
+            provider.mark(self.plan.authority.mode()).await?;
             let ready = self.mutation().await?;
             let squash = settle::squash(&ready.preparation)?;
             let attempted = provider.settle(held.number, &squash).await;
@@ -139,6 +146,7 @@ impl Flow<'_> {
             .complete(
                 &integration,
                 &issue_delivery::Settlement {
+                    authority: self.plan.authority.clone(),
                     issue: self.plan.issue.clone(),
                     prepared: self.plan.revision,
                     revision: resumed.revision,
@@ -245,19 +253,4 @@ fn coordinate(repository: &str) -> Result<(&str, &str)> {
             "delivery repository coordinate is malformed",
         )
     })
-}
-
-fn preparation(plan: &plumb::delivery::Plan) -> plumb::landing::Preparation {
-    plumb::landing::Preparation {
-        root: plan.root.clone(),
-        base: plan.base.clone(),
-        target: plan.target.clone(),
-        branch: plan.branch.clone(),
-        projection: plan.projection.clone(),
-        source: plan.source.clone(),
-        candidate: plan.candidate.clone(),
-        title: plan.pull.title.clone(),
-        body: plan.pull.body.clone(),
-        guard: plan.guard.clone(),
-    }
 }

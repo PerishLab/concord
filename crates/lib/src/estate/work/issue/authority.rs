@@ -99,7 +99,7 @@ fn unavailable(absent: &[String]) -> String {
 }
 
 pub(super) mod delivery {
-    use super::{Authorities, keep};
+    use super::Authorities;
     use crate::estate::{Anchor, Estate, Integration};
     use crate::{Error, Reference, Result, claim};
     use serde::Serialize;
@@ -139,7 +139,7 @@ pub(super) mod delivery {
             estate,
         }
         .validate()?;
-        keep::<A>(&plan.authority, "concord.delivery.authority")?;
+        plan.authority.validate::<A>(&integration)?;
         match estate.issue_member(&plan.issue).await {
             Ok(held) => active(estate, plan, &anchor, held).await,
             Err(error) if error.code() == "concord.member.absent" => released(plan, &anchor),
@@ -196,17 +196,12 @@ pub(super) mod delivery {
     }
 
     fn schema(plan: &Plan) -> Result<()> {
-        if plan.schema == SCHEMA && plan.delivery.schema == plumb::delivery::SCHEMA {
+        if plan.schema == SCHEMA {
             return Ok(());
         }
         Err(Error::typed(
             "concord.delivery.schema",
-            format!(
-                "delivery plan schemas {} / {} are not {SCHEMA} / {}",
-                plan.schema,
-                plan.delivery.schema,
-                plumb::delivery::SCHEMA
-            ),
+            format!("delivery plan schema {} is not {SCHEMA}", plan.schema),
         ))
     }
 

@@ -44,11 +44,20 @@ fn book() -> Cookbook {
         ),
         entry(
             "concord.delivery.landed",
-            "After a squash merge, the fetched base head does not hold the Guard-proved candidate: its parent differs (moved), its tree differs (tree), or it lost the candidate's Guard proof (proof).",
-            "Do not retry: the merge already happened and cannot be undone. For moved, the base advanced between revalidation and merge, so main now holds a tree no Guard proved; run the Guard on main as it stands and land any repair as a new change. For tree or proof, compare the named head with the candidate, then land a repair as a new change. In every case, sync the integration checkout to the fetched main before releasing the Member.",
+            "After a squash merge, the fetched base head differs from the verified candidate in parent, tree or authority evidence. Native delivery also refuses lost or contradictory native proof.",
+            "Do not blindly retry a completed merge. Compare the exact head and candidate under the selected authority, reverify what main actually holds, and land any repair as a new Issue-led change. Never fabricate a Guard proof for native delivery or force Member release past failed readback. Synchronize the integration checkout through the verified lifecycle.",
             (
                 "Retain the refusal, which names the pull, head, candidate and kind, and inspect `git show <head>` against `git show <candidate>`.",
-                "Main holds a Guard-proved tree again and the integration checkout equals the fetched main.",
+                "Main holds the exact authority-verified tree and evidence, and the integration checkout equals fetched main.",
+            ),
+        ),
+        entry(
+            "concord.delivery.native",
+            "The explicit Wharf native gate failed, exceeded its budget, observed a changed tool world, or was used for a Plumb-governed source or base.",
+            "Inspect the named failure in the exact clean Wharf Member. Fix the gate or source through its Issue, prove the updated Boundary, and explicitly prepare again. Do not change the fixed gate command, inherit provider credentials, or fall back from Plumb Guard.",
+            (
+                "Retain the gate refusal, exact source/base, Python identity and current Member Boundary.",
+                "The fixed credential-free gate succeeds and a fresh native plan binds the current exact source and tool world.",
             ),
         ),
         entry(

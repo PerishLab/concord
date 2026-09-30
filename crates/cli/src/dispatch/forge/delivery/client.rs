@@ -92,7 +92,21 @@ impl Client<'_> {
             .map_err(|error| provider(format!("gh pr view did not answer JSON: {error}")))
     }
 
-    pub async fn mark(&mut self, candidate: &str) -> Result<()> {
+    pub async fn mark(
+        &mut self,
+        candidate: &str,
+        authority: concord_core::issue_delivery::Mode,
+    ) -> Result<()> {
+        let (context, description) = match authority {
+            concord_core::issue_delivery::Mode::Plumb => (
+                "guard / guard (pull_request)",
+                "Concord revalidated the exact Plumb Guard proof",
+            ),
+            concord_core::issue_delivery::Mode::WharfNative => (
+                "native / wharf (pull_request)",
+                "Concord revalidated the exact Wharf native proof",
+            ),
+        };
         self.gh(&[
             "api",
             "-X",
@@ -101,9 +115,9 @@ impl Client<'_> {
             "-f",
             "state=success",
             "-f",
-            "context=guard / guard (pull_request)",
+            &format!("context={context}"),
             "-f",
-            "description=Concord revalidated the exact Plumb Guard proof",
+            &format!("description={description}"),
         ])
         .await
         .map(|_| ())
