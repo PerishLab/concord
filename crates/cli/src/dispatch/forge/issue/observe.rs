@@ -1,9 +1,7 @@
 use concord_core::{Coordinate, Error, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::process::Stdio;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const LIMIT: usize = 16 * 1024;
 
@@ -35,35 +33,16 @@ struct Reply {
 pub async fn issue(coordinate: &Coordinate, command: &Path, timeout: u64) -> Result<Observed> {
     let query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){id issue(number:$number){id number url state updatedAt issueType{name}}}}";
     let selector = ".data.repository as $repository | $repository.issue | if . == null then null else {node: .id, stable: $repository.id, number: .number, url: .url, state: .state, kind: (.issueType.name // \"\"), updated_at: .updatedAt} end";
-    let mut process = Command::new(command);
-    process
+    let output = super::super::github::transport::Request::new(command, timeout, LIMIT)
         .args(["api", "graphql", "-f"])
         .arg(format!("query={query}"))
         .args(["-f", &format!("owner={}", coordinate.owner)])
         .args(["-f", &format!("name={}", coordinate.repository)])
         .args(["-F", &format!("number={}", coordinate.number)])
         .args(["--jq", selector])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .kill_on_drop(true);
-    let output = match tokio::time::timeout(Duration::from_secs(timeout), process.output()).await {
-        Ok(Ok(output)) => output,
-        Ok(Err(error)) => return Err(fault("command", error.to_string())),
-        Err(_) => return Err(fault("timeout", "GitHub Issue observation timed out")),
-    };
-    if !output.status.success() {
-        return Err(fault(
-            "provider",
-            "GitHub Issue observation was refused by the provider",
-        ));
-    }
-    if output.stdout.len() > LIMIT {
-        return Err(fault(
-            "malformed",
-            "GitHub Issue observation exceeds the reply limit",
-        ));
-    }
+        .run()
+        .await
+        .map_err(failure)?;
     let reply = match serde_json::from_slice::<Option<Reply>>(&output.stdout) {
         Ok(Some(reply)) => reply,
         Ok(None) => return Err(fault("missing", "GitHub Issue is not readable")),
@@ -72,6 +51,26 @@ pub async fn issue(coordinate: &Coordinate, command: &Path, timeout: u64) -> Res
         }
     };
     shape(coordinate, reply)
+}
+
+fn failure(failure: super::super::github::transport::Failure) -> Error {
+    use super::super::github::transport::{Failure, Stream};
+    match failure {
+        Failure::Spawn(_) | Failure::Exchange(_) => fault("command", failure.to_string()),
+        Failure::Timeout => fault("timeout", "GitHub Issue observation timed out"),
+        Failure::Refused { .. } => fault(
+            "provider",
+            "GitHub Issue observation was refused by the provider",
+        ),
+        Failure::Oversized(Stream::Stdout) => fault(
+            "malformed",
+            "GitHub Issue observation exceeds the reply limit",
+        ),
+        Failure::Oversized(Stream::Stderr) => fault(
+            "provider",
+            "GitHub Issue observation refusal exceeds the reply limit",
+        ),
+    }
 }
 
 fn shape(coordinate: &Coordinate, reply: Reply) -> Result<Observed> {

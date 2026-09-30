@@ -1,9 +1,6 @@
 use super::Diagnostic;
 use serde::Deserialize;
 use std::collections::BTreeMap;
-use std::process::Stdio;
-use std::time::Duration;
-use tokio::process::Command;
 
 const LIMIT: usize = 1024 * 1024;
 const QUERY: &str = r#"
@@ -128,42 +125,39 @@ pub(super) async fn search(request: Request<'_>) -> Search {
 }
 
 async fn page(request: &Request<'_>, after: Option<&str>) -> Result<RawSearch, Diagnostic> {
-    let mut process = Command::new(request.bounds.command);
-    process
-        .args(["api", "graphql", "-f"])
-        .arg(format!("query={QUERY}"))
-        .args(["-f", &format!("queryString={}", request.query)])
-        .args(["-F", &format!("first={}", request.bounds.first)])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .kill_on_drop(true);
-    if let Some(after) = after {
-        process.args(["-f", &format!("after={after}")]);
-    }
-    let output = match tokio::time::timeout(
-        Duration::from_secs(request.bounds.timeout),
-        process.output(),
+    let mut process = super::super::github::transport::Request::new(
+        request.bounds.command,
+        request.bounds.timeout,
+        LIMIT,
     )
-    .await
-    {
-        Ok(Ok(output)) => output,
-        Ok(Err(error)) => return Err(fault("command", error.to_string())),
-        Err(_) => return Err(fault("timeout", "GitHub Issue search timed out")),
-    };
-    if !output.status.success() {
-        return Err(fault(
+    .args(["api", "graphql", "-f"])
+    .arg(format!("query={QUERY}"))
+    .args(["-f", &format!("queryString={}", request.query)])
+    .args(["-F", &format!("first={}", request.bounds.first)]);
+    if let Some(after) = after {
+        process = process.args(["-f", &format!("after={after}")]);
+    }
+    let output = process.run().await.map_err(search_failure)?;
+    decode(&output.stdout)
+}
+
+fn search_failure(failure: super::super::github::transport::Failure) -> Diagnostic {
+    use super::super::github::transport::{Failure, Stream};
+    match failure {
+        Failure::Spawn(_) | Failure::Exchange(_) => fault("command", failure.to_string()),
+        Failure::Timeout => fault("timeout", "GitHub Issue search timed out"),
+        Failure::Refused { .. } => fault(
             "provider",
             "GitHub Issue search was refused by the provider",
-        ));
+        ),
+        Failure::Oversized(Stream::Stdout) => {
+            fault("malformed", "GitHub Issue search exceeds the reply limit")
+        }
+        Failure::Oversized(Stream::Stderr) => fault(
+            "provider",
+            "GitHub Issue search refusal exceeds the reply limit",
+        ),
     }
-    if output.stdout.len() > LIMIT {
-        return Err(fault(
-            "malformed",
-            "GitHub Issue search exceeds the reply limit",
-        ));
-    }
-    decode(&output.stdout)
 }
 
 fn decode(body: &[u8]) -> Result<RawSearch, Diagnostic> {

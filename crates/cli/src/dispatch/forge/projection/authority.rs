@@ -4,7 +4,6 @@ use concord_core::Coordinate;
 use plumb::seat::release::Authority;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
-use tokio::process::Command;
 
 pub(in crate::dispatch::forge) type Repository = (String, String);
 
@@ -48,12 +47,12 @@ impl Projection<'_> {
         &self,
         chunk: &[&Repository],
     ) -> std::result::Result<Vec<Option<String>>, Fault> {
-        let mut process = Command::new(self.command);
-        process
+        let mut process = self
+            .request()
             .args(["api", "graphql", "-f"])
             .arg(format!("query={}", query(chunk.len())));
         for (index, (owner, name)) in chunk.iter().enumerate() {
-            process
+            process = process
                 .args(["-f", &format!("o{index}={owner}")])
                 .args(["-f", &format!("n{index}={name}")]);
         }

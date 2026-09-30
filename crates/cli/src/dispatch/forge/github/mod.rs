@@ -1,10 +1,9 @@
+pub(super) mod transport;
+
 use super::projection::{Fault, PageRequest, Projection};
 use concord_core::Coordinate;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
-use std::process::Stdio;
-use std::time::Duration;
-use tokio::process::Command;
 
 const LIMIT: usize = 1024 * 1024;
 const QUERY: &str = r#"
@@ -175,47 +174,35 @@ impl Projection<'_> {
         coordinate: &Coordinate,
         request: &PageRequest,
     ) -> std::result::Result<RawIssue, Fault> {
-        let mut process = Command::new(self.command);
-        process
+        let process = self
+            .request()
             .args(["api", "graphql", "-f"])
             .arg(format!("query={QUERY}"))
             .args(["-f", &format!("owner={}", coordinate.owner)])
             .args(["-f", &format!("name={}", coordinate.repository)])
             .args(["-F", &format!("number={}", coordinate.number)])
             .args(["-F", &format!("first={}", request.size)]);
-        cursors(&mut process, request);
+        let process = cursors(process, request);
         decode(&self.run(process).await?)
     }
 
-    pub(super) async fn run(&self, mut process: Command) -> std::result::Result<Vec<u8>, Fault> {
-        process
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .kill_on_drop(true);
-        let output =
-            match tokio::time::timeout(Duration::from_secs(self.timeout), process.output()).await {
-                Ok(Ok(output)) => output,
-                Ok(Err(error)) => return Err(provider("command", error.to_string())),
-                Err(_) => return Err(provider("timeout", "GitHub Issue projection timed out")),
-            };
-        if !output.status.success() {
-            return Err(provider(
-                "provider",
-                "GitHub Issue projection was refused by the provider",
-            ));
-        }
-        if output.stdout.len() > LIMIT {
-            return Err(provider(
-                "malformed",
-                "GitHub Issue projection exceeds the reply limit",
-            ));
-        }
+    pub(super) fn request(&self) -> transport::Request<'_> {
+        transport::Request::new(self.command, self.timeout, LIMIT)
+    }
+
+    pub(super) async fn run(
+        &self,
+        process: transport::Request<'_>,
+    ) -> std::result::Result<Vec<u8>, Fault> {
+        let output = process.run().await.map_err(failure)?;
         Ok(output.stdout)
     }
 }
 
-fn cursors(process: &mut Command, request: &PageRequest) {
+fn cursors<'a>(
+    mut process: transport::Request<'a>,
+    request: &PageRequest,
+) -> transport::Request<'a> {
     for (name, cursor) in [
         ("subAfter", request.sub_issues_after.as_deref()),
         ("blockedAfter", request.blocked_by_after.as_deref()),
@@ -224,8 +211,29 @@ fn cursors(process: &mut Command, request: &PageRequest) {
         ("commentsAfter", request.comments_after.as_deref()),
     ] {
         if let Some(cursor) = cursor {
-            process.args(["-f", &format!("{name}={cursor}")]);
+            process = process.args(["-f", &format!("{name}={cursor}")]);
         }
+    }
+    process
+}
+
+fn failure(failure: transport::Failure) -> Fault {
+    use transport::{Failure, Stream};
+    match failure {
+        Failure::Spawn(_) | Failure::Exchange(_) => provider("command", failure.to_string()),
+        Failure::Timeout => provider("timeout", "GitHub Issue projection timed out"),
+        Failure::Refused { .. } => provider(
+            "provider",
+            "GitHub Issue projection was refused by the provider",
+        ),
+        Failure::Oversized(Stream::Stdout) => provider(
+            "malformed",
+            "GitHub Issue projection exceeds the reply limit",
+        ),
+        Failure::Oversized(Stream::Stderr) => provider(
+            "provider",
+            "GitHub Issue projection refusal exceeds the reply limit",
+        ),
     }
 }
 
