@@ -96,7 +96,7 @@ impl Dispatch {
             Command::Member(args) => member::run(&self.estate, args.command, self.json).await,
             Command::Artifact(args) => artifact::run(&self.estate, args.command, self.json).await,
             Command::Audit(_) => {
-                let report = self.estate.inspect().await?;
+                let report = self.estate.settled().await?;
                 let agrees = report.agrees();
                 emit(json!({"agreement": report}), self.json)?;
                 if agrees {

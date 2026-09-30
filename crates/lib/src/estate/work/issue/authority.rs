@@ -128,7 +128,7 @@ pub(super) mod delivery {
         snapshot: &plumb::delivery::Snapshot,
     ) -> Result<Resume> {
         schema(plan)?;
-        estate.ensure().await?;
+        estate.agreed().await?;
         let anchor = estate.issue(&plan.issue).await?;
         let integration = estate.integration(&plan.issue).await?;
         Contract {
