@@ -57,29 +57,22 @@ impl Projection<'_> {
                 kind,
                 updated: raw.updated_at,
                 parent: raw.parent.as_ref().map(reference).transpose()?,
-                sub_issues: raw
-                    .sub_issues
-                    .nodes
-                    .iter()
-                    .map(reference)
-                    .collect::<Result<Vec<_>>>()?,
-                blocked_by: raw
-                    .blocked_by
-                    .nodes
-                    .iter()
-                    .map(reference)
-                    .collect::<Result<Vec<_>>>()?,
-                blocking: raw
-                    .blocking
-                    .nodes
-                    .iter()
-                    .map(reference)
-                    .collect::<Result<Vec<_>>>()?,
+                sub_issues: references(&raw.sub_issues.nodes)?,
+                blocked_by: references(&raw.blocked_by.nodes)?,
+                blocking: references(&raw.blocking.nodes)?,
             },
             outcome,
             observed,
         })
     }
+}
+
+fn references(
+    raw: &[super::super::github::RawIssueNode],
+) -> Result<Vec<plumb::delivery::Reference>> {
+    let mut held = raw.iter().map(reference).collect::<Result<Vec<_>>>()?;
+    held.sort();
+    Ok(held)
 }
 
 fn reference(raw: &super::super::github::RawIssueNode) -> Result<plumb::delivery::Reference> {
