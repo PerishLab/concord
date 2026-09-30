@@ -26,20 +26,21 @@ pub async fn run(cli: args::Cli) -> Result<()> {
         );
         return Ok(());
     }
-    let config = Config::load(
+    let loaded = Config::load(
         cli.config.as_deref(),
         cli.root.as_deref(),
         cli.home.as_deref(),
         cli.releases.as_deref(),
     )?;
+    let config = loaded.config();
     let command = match cli.command {
-        Command::Skill(skill) => return skill::run(&config, skill.command, cli.json),
+        Command::Skill(skill) => return skill::run(config, skill.command, cli.json),
         Command::Config(args) => {
-            return configuration::run(&config, args.command, cli.json);
+            return configuration::run(config, args.command, cli.json);
         }
         command => command,
     };
-    let root = config.root()?;
+    let root = loaded.root()?;
     let seat = Seat::new(root.path());
     match command {
         Command::Issue(args) if matches!(args.command, crate::args::issue::Command::Bootstrap) => {
@@ -48,7 +49,10 @@ pub async fn run(cli: args::Cli) -> Result<()> {
         command => {
             Dispatch {
                 activity: activity::Run::new(cli.json),
-                estate: seat.open().await?,
+                estate: seat
+                    .open()
+                    .await
+                    .map_err(|error| loaded.absent(&root, error))?,
                 json: cli.json,
                 occupancy: occupancy::Run::new(cli.json),
             }
