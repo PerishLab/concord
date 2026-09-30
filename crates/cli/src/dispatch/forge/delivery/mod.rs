@@ -16,6 +16,7 @@ pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<()>
     match command {
         Delivery::Prepare {
             issue,
+            authority,
             revision,
             base,
             handoff,
@@ -26,6 +27,7 @@ pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<()>
                 estate,
                 handoff::Parameters {
                     issue: &issue,
+                    authority,
                     revision,
                     base,
                     carry: handoff,
@@ -50,7 +52,7 @@ pub(super) fn version(value: u64) -> Result<()> {
     ))
 }
 
-pub(super) const SHAPE: &str = r#"{"version":1,"plan":{"schema":"concord.issue-member-delivery/v4","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"authority":{},"delivery":{}}}"#;
+pub(super) const SHAPE: &str = r#"{"version":1,"plan":{"schema":"concord.issue-member-delivery/v5","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"authority":{"kind":"plumb"},"delivery":{}}}"#;
 
 #[cfg(test)]
 mod tests {

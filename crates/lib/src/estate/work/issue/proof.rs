@@ -98,7 +98,7 @@ impl Estate {
 
 pub(super) mod delivery {
     use super::super::super::integration::{self, TRACKING};
-    use super::super::delivery::{Member, member};
+    use super::super::delivery::{Authority, Member, member};
     use super::super::{IssueRelease, issue_stale};
     use crate::estate::{Estate, Guard, Proof};
     use crate::{Error, Reference, Result, git};
@@ -108,6 +108,7 @@ pub(super) mod delivery {
 
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct Settlement {
+        pub authority: Authority,
         pub issue: crate::estate::Coordinate,
         pub prepared: i64,
         pub revision: i64,
@@ -189,8 +190,18 @@ pub(super) mod delivery {
                     ),
                 ));
             }
-            plumb::delivery::landed(&source, &request.candidate, &request.merge)
-                .map_err(|error| Error::typed("concord.delivery.landed", error.message))?;
+            request
+                .authority
+                .validate::<super::super::authority::Plumb>(&held)?;
+            match &request.authority {
+                Authority::Plumb { .. } => {
+                    plumb::delivery::landed(&source, &request.candidate, &request.merge)
+                }
+                Authority::WharfNative { .. } => {
+                    plumb::delivery::native::landed(&source, &request.candidate, &request.merge)
+                }
+            }
+            .map_err(|error| Error::typed("concord.delivery.landed", error.message))?;
             let expected = Expectation::new(&held.branch, TRACKING, &target);
             let advanced = plumb::integration::advance(&source, &expected, &before)
                 .map_err(|error| Error::typed("concord.integration.advance", error.to_string()))?;

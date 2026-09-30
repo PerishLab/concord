@@ -2,6 +2,12 @@ use crate::activity::{Agent, Operator};
 use crate::{Error, Result};
 use std::path::{Path, PathBuf};
 
+pub(crate) fn search(
+    paths: &[&Path],
+) -> std::result::Result<std::ffi::OsString, std::env::JoinPathsError> {
+    std::env::join_paths(paths)
+}
+
 #[derive(Clone, Debug)]
 pub struct Root {
     path: PathBuf,

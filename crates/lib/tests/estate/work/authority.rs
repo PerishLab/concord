@@ -74,8 +74,11 @@ async fn stable() {
     let plan = issue_delivery::prepare::<Stable>(&estate, &request(&issue))
         .await
         .expect("stable authority accepts the proof");
-    assert_eq!(plan.authority.producer, authority.producer());
-    assert_eq!(plan.authority.depot, authority.depot());
+    let issue_delivery::Authority::Plumb { warrant, .. } = &plan.authority else {
+        panic!("expected Guard authority");
+    };
+    assert_eq!(warrant.producer, authority.producer());
+    assert_eq!(warrant.depot, authority.depot());
     issue_delivery::revalidate::<Stable>(&estate, &plan, &snapshot(), 2)
         .await
         .expect("stable authority remains accepted");

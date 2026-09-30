@@ -1,7 +1,7 @@
 mod boundary;
 mod completion;
 
-use concord_core::authority::{Plumb, Warrant};
+use concord_core::authority::Plumb;
 use concord_core::{
     Admission, Coordinate, Estate, IssueProving, Register, Repository, Seat, Start, issue_delivery,
 };
@@ -34,6 +34,7 @@ pub(super) fn released() -> Authority {
 
 pub(super) fn request(issue: &Coordinate) -> issue_delivery::Request {
     issue_delivery::Request {
+        authority: issue_delivery::Mode::Plumb,
         issue: issue.clone(),
         revision: 2,
         base: "main".into(),
@@ -162,13 +163,11 @@ async fn exact() {
     let plan = issue_delivery::prepare::<Plumb>(&estate, &request(&issue))
         .await
         .expect("prepare delivery");
-    assert_eq!(
-        plan.authority,
-        Warrant {
-            producer: compiled.producer().into(),
-            depot: compiled.depot().into(),
-        }
-    );
+    let issue_delivery::Authority::Plumb { warrant, .. } = &plan.authority else {
+        panic!("expected Guard authority");
+    };
+    assert_eq!(warrant.producer, compiled.producer());
+    assert_eq!(warrant.depot, compiled.depot());
     assert_eq!(plan.delivery.issue, snapshot);
     assert!(
         plan.delivery

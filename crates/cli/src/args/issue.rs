@@ -156,6 +156,12 @@ pub enum Delivery {
     #[command(about = "Prepare one exact Issue-led pull-request plan without provider mutation")]
     Prepare {
         issue: String,
+        #[arg(
+            long,
+            default_value = "plumb",
+            help = "Explicit proof authority: plumb or wharf-native"
+        )]
+        authority: concord_core::issue_delivery::Mode,
         #[arg(long)]
         revision: i64,
         #[arg(long, default_value = "main")]
@@ -173,6 +179,12 @@ pub enum Delivery {
     #[command(about = "Revalidate and merge one exact Issue-led pull-request plan")]
     Land {
         issue: String,
+        #[arg(
+            long,
+            default_value = "plumb",
+            help = "Must match the prepared proof authority"
+        )]
+        authority: concord_core::issue_delivery::Mode,
         #[arg(long, value_name = "PATH|-", default_value = "-")]
         plan: PathBuf,
         #[arg(long = "github-command")]

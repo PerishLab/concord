@@ -1,7 +1,7 @@
 use super::client::Client;
 use super::git::Git;
+use concord_core::issue_delivery::{Mode, Preparation};
 use concord_core::{Error, Reference, ReferenceKind, Result};
-use plumb::landing::Preparation;
 use std::path::Path;
 
 #[cfg(test)]
@@ -116,8 +116,10 @@ impl<'a> Service<'a> {
         self.validate(pull)
     }
 
-    pub async fn mark(&mut self) -> Result<()> {
-        self.client.mark(&self.preparation.candidate).await
+    pub async fn mark(&mut self, authority: Mode) -> Result<()> {
+        self.client
+            .mark(&self.preparation.candidate, authority)
+            .await
     }
 
     pub async fn settle(&mut self, number: i64, squash: &plumb::delivery::Squash) -> Result<()> {
