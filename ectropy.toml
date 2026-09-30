@@ -106,6 +106,46 @@ description = "One structured coordination observation of intersecting Claims he
 name = "ClaimOverlap"
 
 [[vocabulary.term]]
+description = "The bounded relation between two Members' committed path deltas."
+name = "CommittedOverlap"
+
+[[vocabulary.term]]
+description = "A Claim overlap whose observable committed deltas are disjoint."
+name = "DeclaredOnly"
+
+[[vocabulary.term]]
+description = "The availability state of evidence used to compare committed Member deltas."
+name = "CommittedEvidence"
+
+[[vocabulary.term]]
+description = "The recorded Member base commit is not present in its canonical repository."
+name = "MissingBase"
+
+[[vocabulary.term]]
+description = "One Member projection used only while observing committed path overlap."
+name = "OverlapMember"
+
+[[vocabulary.term]]
+description = "Testing whether two checkouts share one canonical Git repository."
+name = "same_repository"
+
+[[vocabulary.term]]
+description = "Classifying the committed path relation between two overlapping Members."
+name = "committed_overlap"
+
+[[vocabulary.term]]
+description = "Reading one Member's committed paths from a current or observable base."
+name = "committed_delta"
+
+[[vocabulary.term]]
+description = "Testing whether a commit object is available in one Git checkout."
+name = "commit_exists"
+
+[[vocabulary.term]]
+description = "Reading deterministic changed paths between two Git commits."
+name = "changed_paths"
+
+[[vocabulary.term]]
 description = "The pull or change kind carried by one declared forge coordinate."
 name = "ReferenceKind"
 

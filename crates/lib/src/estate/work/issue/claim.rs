@@ -1,3 +1,4 @@
+use super::super::overlap::{OverlapMember, committed_overlap, same_repository};
 use super::super::{ClaimOverlap, Estate};
 use super::{IssueWorktree, issue_stale};
 use crate::{Error, Result, git};
@@ -85,9 +86,15 @@ impl Estate {
             ));
         }
         let source = self.issue_source(&member)?;
-        let observations = self
-            .issue_overlaps(Some(member.key), &source, &claims)
-            .await?;
+        let subject = OverlapMember {
+            key: Some(member.key),
+            identity: member.issue.identity(),
+            path: self.issue_path(&anchor)?,
+            base: member.base.clone(),
+            claims: claims.clone(),
+            proof: member.proof.clone(),
+        };
+        let observations = self.issue_overlaps(&subject, &source).await?;
         if change.narrow {
             let path = self.issue_path(&anchor)?;
             if !git::at(&source).clean()? {
@@ -164,24 +171,32 @@ impl Estate {
 
     pub(super) async fn issue_overlaps(
         &self,
-        owner: Option<i64>,
+        subject: &OverlapMember,
         source: &Path,
-        claims: &[String],
     ) -> Result<Vec<ClaimOverlap>> {
-        let identity = git::at(source).identity()?;
         let mut observations = Vec::new();
         for member in self.issue_worktrees().await? {
-            if owner == Some(member.key) {
+            if subject.key == Some(member.key) {
                 continue;
             }
             let held = self.issue_source(&member)?;
-            if git::at(&held).identity()? == identity {
-                let paths = crate::claim::intersections(claims, &member.claims);
+            if same_repository(source, &held)? {
+                let paths = crate::claim::intersections(&subject.claims, &member.claims);
                 if !paths.is_empty() {
+                    let anchor = self.issue(&member.issue).await?;
+                    let peer = OverlapMember {
+                        key: Some(member.key),
+                        identity: member.issue.identity(),
+                        path: self.issue_path(&anchor)?,
+                        base: member.base.clone(),
+                        claims: member.claims.clone(),
+                        proof: member.proof.clone(),
+                    };
                     observations.push(ClaimOverlap {
                         code: "claim.overlap".to_string(),
-                        peer: member.issue.identity(),
+                        peer: peer.identity.clone(),
                         paths,
+                        committed: committed_overlap(subject, &peer),
                     });
                 }
             }

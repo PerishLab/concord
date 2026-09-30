@@ -20,12 +20,12 @@ pub(crate) use protocol::{claim, component};
 pub use config::{Root, host};
 pub use error::{Error, Result};
 pub use estate::{
-    Admission, Agreement, Anchor, BoundaryState, CheckoutState, ClaimOverlap, Coordinate, Estate,
-    Finding, Finish, Guard, Integration, IntegrationState, IssueArtifact, IssueClaiming,
-    IssueDeclaration, IssueImport, IssueMemberChange, IssueMemberStatus, IssueNarrowing,
-    IssueProving, IssueRelease, IssueRemoval, IssueRetirement, IssueWithdrawal, IssueWorktree,
-    Proof, Reconcile, Reference, ReferenceKind, Register, Rename, Repository, Seat, Start,
-    UpstreamState,
+    Admission, Agreement, Anchor, BoundaryState, CheckoutState, ClaimOverlap, CommittedEvidence,
+    CommittedOverlap, Coordinate, Estate, Finding, Finish, Guard, Integration, IntegrationState,
+    IssueArtifact, IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange,
+    IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval, IssueRetirement,
+    IssueWithdrawal, IssueWorktree, Proof, Reconcile, Reference, ReferenceKind, Register, Rename,
+    Repository, Seat, Start, UpstreamState,
 };
 pub use estate::{authority, issue_delivery, issue_landing};
 pub use protocol::PLUMB;
