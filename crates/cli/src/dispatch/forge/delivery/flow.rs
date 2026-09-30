@@ -93,6 +93,17 @@ impl Flow<'_> {
         )
         .await?;
         let mut held = provider.locate(resumed.reference.as_ref()).await?;
+        if let Some(number) = held
+            .as_ref()
+            .filter(|pull| !provider.current(pull))
+            .map(|pull| pull.number)
+        {
+            active(&resumed)?;
+            self.mutation().await?;
+            provider.publish().await?;
+            self.mutation().await?;
+            held = Some(provider.refresh(number).await?);
+        }
         if held.is_none() {
             active(&resumed)?;
             self.mutation().await?;

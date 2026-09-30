@@ -52,12 +52,29 @@ impl<'a> Service<'a> {
                 .client
                 .all(&self.preparation.base, &self.preparation.projection)
                 .await?;
+            pulls.retain(|pull| {
+                pull.state != State::Closed || pull.merge.is_some() || pull.merged.is_some()
+            });
             if pulls.len() > 1 {
                 return Err(stale("more than one pull matches the exact projection"));
             }
             pulls.pop()
         };
-        pull.map(|pull| self.validate(pull)).transpose()
+        match pull {
+            Some(pull) if pull.state == State::Open => Ok(Some(pull)),
+            pull => pull.map(|pull| self.validate(pull)).transpose(),
+        }
+    }
+
+    pub fn current(&self, pull: &Pull) -> bool {
+        super::model::contract(pull, self.preparation, self.client.repository).is_ok()
+    }
+
+    pub async fn refresh(&mut self, number: i64) -> Result<Pull> {
+        self.client
+            .edit(number, &self.preparation.title, &self.preparation.body)
+            .await?;
+        self.view(number).await
     }
 
     pub async fn publish(&self) -> Result<()> {

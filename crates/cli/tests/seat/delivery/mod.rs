@@ -3,6 +3,8 @@ mod handoff;
 #[cfg(unix)]
 mod provider;
 #[cfg(unix)]
+mod refresh;
+#[cfg(unix)]
 mod relations;
 
 #[cfg(unix)]
@@ -224,14 +226,14 @@ mod unix {
         command
     }
 
-    fn refused(output: &std::process::Output, code: &str) {
+    pub(super) fn refused(output: &std::process::Output, code: &str) {
         assert!(!output.status.success());
         let error: Value = serde_json::from_slice(&output.stderr).expect("land error");
         assert_eq!(error["error"]["code"], code);
         assert_ne!(error["error"]["code"], "concord.audit.refused");
     }
 
-    fn guard(member: &Path, repository: &str) {
+    pub(super) fn guard(member: &Path, repository: &str) {
         let authority = Authority::released().expect("compiled Plumb authority");
         let tree = text(member, &["rev-parse", "HEAD^{tree}"]);
         let mut proof = Descriptor {
@@ -277,7 +279,7 @@ mod unix {
         )
     }
 
-    fn success(space: &Path, arguments: &[&str]) -> Value {
+    pub(super) fn success(space: &Path, arguments: &[&str]) -> Value {
         let output = spawn::concord(space)
             .args(["--root", space.to_str().expect("root"), "--json"])
             .args(arguments)
