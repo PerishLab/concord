@@ -1,5 +1,5 @@
 use super::super::{Agreement, Anchor, Estate, IssueWorktree, Proof, fault};
-use crate::{PLUMB, Result, git};
+use crate::{Result, git};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -174,9 +174,9 @@ fn agreement(survey: &Survey<'_>, anchor: &Anchor, member: &IssueWorktree, repor
         report.fault("claim.shape", &subject, "Member Claims are not normalized");
     }
     if let Some(proof) = &member.proof
-        && !current(proof, member, &path)
+        && let Some(reason) = stale(proof, member, &path)
     {
-        report.observe("boundary.stale", subject, "Member Boundary proof is stale");
+        report.observe("boundary.stale", subject, reason);
     }
 }
 
@@ -267,12 +267,10 @@ fn assess(
     Ok(())
 }
 
-fn current(proof: &Proof, member: &IssueWorktree, path: &Path) -> bool {
-    if proof.schema != plumb::boundary::SCHEMA || proof.plumb != PLUMB {
-        return false;
+fn stale(proof: &Proof, member: &IssueWorktree, path: &Path) -> Option<String> {
+    let claim = crate::claim::digest(&member.claims);
+    match git::at(path).head() {
+        Ok(head) => proof.stale(&head, &claim),
+        Err(_) => Some("Member Boundary proof is stale: Member HEAD cannot be read".to_owned()),
     }
-    if git::at(path).head().ok().as_deref() != Some(proof.head.as_str()) {
-        return false;
-    }
-    proof.claim == crate::claim::digest(&member.claims)
 }
