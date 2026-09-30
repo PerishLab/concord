@@ -4,10 +4,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
-use std::time::Duration;
-use tokio::io::AsyncWriteExt;
-use tokio::process::Command;
 
 const BODY: usize = 65_536;
 const REPLY: usize = 16 * 1024;
@@ -208,59 +204,12 @@ async fn submit(command: &Path, subject: &str, body: &str, timeout: u64) -> Resu
         "variables": {"subject": subject, "body": body},
     }))
     .map_err(|error| Error::typed("concord.issue.comment.encode", error.to_string()))?;
-    let mut child = Command::new(command)
+    let output = super::super::github::transport::Request::new(command, timeout, REPLY)
         .args(["api", "graphql", "--input", "-"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true)
-        .spawn()
-        .map_err(|error| {
-            Error::typed(
-                "concord.issue.comment.command",
-                format!("cannot run GitHub command: {error}"),
-            )
-        })?;
-    let mut stdin = child.stdin.take().expect("piped GitHub stdin");
-    stdin.write_all(&request).await.map_err(|error| {
-        Error::typed(
-            "concord.issue.comment.indeterminate",
-            format!("GitHub comment completion is indeterminate: {error}"),
-        )
-    })?;
-    stdin.shutdown().await.map_err(|error| {
-        Error::typed(
-            "concord.issue.comment.indeterminate",
-            format!("GitHub comment completion is indeterminate: {error}"),
-        )
-    })?;
-    drop(stdin);
-    let output = tokio::time::timeout(Duration::from_secs(timeout), child.wait_with_output())
+        .input(&request)
+        .run()
         .await
-        .map_err(|_| {
-            Error::typed(
-                "concord.issue.comment.indeterminate",
-                "GitHub comment completion is indeterminate after timeout",
-            )
-        })?
-        .map_err(|error| {
-            Error::typed(
-                "concord.issue.comment.indeterminate",
-                format!("GitHub comment completion is indeterminate: {error}"),
-            )
-        })?;
-    if !output.status.success() {
-        return Err(Error::typed(
-            "concord.issue.comment.provider",
-            format!(
-                "GitHub refused Issue comment declaration: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            ),
-        ));
-    }
-    if output.stdout.len() > REPLY {
-        return Err(disagreement("GitHub comment reply exceeds the reply limit"));
-    }
+        .map_err(failure)?;
     let envelope = serde_json::from_slice::<Envelope>(&output.stdout)
         .map_err(|_| disagreement("GitHub comment reply is not valid JSON"))?;
     envelope
@@ -269,6 +218,28 @@ async fn submit(command: &Path, subject: &str, body: &str, timeout: u64) -> Resu
         .and_then(|addition| addition.edge)
         .map(|edge| edge.node)
         .ok_or_else(|| disagreement("GitHub comment reply named no comment"))
+}
+
+fn failure(failure: super::super::github::transport::Failure) -> Error {
+    use super::super::github::transport::{Failure, Stream};
+    match failure {
+        Failure::Spawn(_) => Error::typed("concord.issue.comment.command", failure.to_string()),
+        Failure::Refused { .. } => Error::typed(
+            "concord.issue.comment.provider",
+            format!("GitHub refused Issue comment declaration: {failure}"),
+        ),
+        Failure::Oversized(Stream::Stdout) => {
+            disagreement("GitHub comment reply exceeds the reply limit")
+        }
+        Failure::Oversized(Stream::Stderr) => Error::typed(
+            "concord.issue.comment.provider",
+            "GitHub comment refusal exceeds the reply limit",
+        ),
+        Failure::Exchange(_) | Failure::Timeout => Error::typed(
+            "concord.issue.comment.indeterminate",
+            format!("GitHub comment completion is indeterminate: {failure}"),
+        ),
+    }
 }
 
 fn verify(coordinate: &Coordinate, body: &str, reply: &Reply) -> Result<()> {
