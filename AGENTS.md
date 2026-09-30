@@ -1,5 +1,10 @@
 # Agents
 
+Read the canonical [PerishLab delivery governance](https://github.com/PerishLab/.github/blob/main/GOVERNANCE.md)
+at work start and again before delivery or Issue closure. That document owns
+organization-wide Issue, pull-request and acceptance policy; this file keeps
+repository-specific constraints without copying that policy.
+
 Concord is the executable control plane for one managed Space. GitHub Issues
 are the durable work ledger. One exact Keel estate is the sole authority for
 Issue-anchored local execution state; Git worktrees and Artifact directories
