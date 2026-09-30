@@ -1,3 +1,4 @@
+mod boundary;
 mod completion;
 
 use concord_core::authority::{Plumb, Warrant};

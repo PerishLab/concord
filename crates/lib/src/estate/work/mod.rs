@@ -32,10 +32,28 @@ pub struct Proof {
 
 impl Proof {
     pub fn current(&self, head: &str, claim: &str) -> bool {
-        self.linked() && self.head == head && self.claim == claim
+        self.stale(head, claim).is_none()
     }
 
-    fn linked(&self) -> bool {
-        self.schema == plumb::boundary::SCHEMA && self.plumb == crate::PLUMB
+    pub fn stale(&self, head: &str, claim: &str) -> Option<String> {
+        let reason = if self.schema != plumb::boundary::SCHEMA || self.plumb != crate::PLUMB {
+            format!(
+                "it was made with Plumb {} (Boundary schema {}), but this Concord links Plumb {} (Boundary schema {}); prove it again with this binary",
+                self.plumb,
+                self.schema,
+                crate::PLUMB,
+                plumb::boundary::SCHEMA,
+            )
+        } else if self.head != head {
+            format!(
+                "Member HEAD moved from {} to {head}; prove it again",
+                self.head
+            )
+        } else if self.claim != claim {
+            "the Member Claim changed since it was made; prove it again".to_owned()
+        } else {
+            return None;
+        };
+        Some(format!("Member Boundary proof is stale: {reason}"))
     }
 }

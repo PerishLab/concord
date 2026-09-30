@@ -248,11 +248,8 @@ pub(super) fn agreement(
     }
     let head = git::at(path).head()?;
     let digest = claim::digest(&member.claims);
-    if !proof.current(&head, &digest) {
-        return Err(Error::typed(
-            "concord.delivery.boundary",
-            "Member Boundary proof is stale",
-        ));
+    if let Some(reason) = proof.stale(&head, &digest) {
+        return Err(Error::typed("concord.delivery.boundary", reason));
     }
     Ok(())
 }
