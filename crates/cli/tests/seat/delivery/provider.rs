@@ -129,6 +129,16 @@ if [ "$1 $2" = "pr create" ]; then
   printf '%s\n' https://github.com/PerishLab/probe/pull/7
   exit 0
 fi
+if [ "$1 $2" = "pr edit" ]; then
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --title) printf '%s' "$2" > '{title}'; shift ;;
+      --body) printf '%s' "$2" > '{body}'; shift ;;
+    esac
+    shift
+  done
+  exit 0
+fi
 if [ "$1 $2" = "pr view" ]; then
   if [ -f '{hidden}' ] && [ "$(cat '{state}')" = MERGED ]; then rm '{hidden}'; printf '%s\n' hidden-readback >&2; exit 1; fi
   [ -f '{slow}' ] && sleep 1
