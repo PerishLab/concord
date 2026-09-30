@@ -15,6 +15,7 @@ pub struct Refusal {
 }
 
 pub struct Parameters<'a> {
+    pub authority: issue_delivery::Mode,
     pub issue: &'a str,
     pub revision: i64,
     pub base: String,
@@ -40,6 +41,7 @@ async fn request(estate: &Estate, parameters: &Parameters<'_>) -> Result<issue_d
     issue_delivery::prepare::<Plumb>(
         estate,
         &issue_delivery::Request {
+            authority: parameters.authority,
             issue,
             revision: parameters.revision,
             base: parameters.base.clone(),

@@ -1,5 +1,9 @@
 #[cfg(unix)]
+mod fixture;
+#[cfg(unix)]
 mod handoff;
+#[cfg(unix)]
+mod native;
 #[cfg(unix)]
 mod needs;
 #[cfg(unix)]
@@ -275,10 +279,8 @@ mod unix {
             platform: &proof.platform,
             actions: &proof.actions,
         };
-        format!(
-            "{:x}",
-            Sha256::digest(serde_json::to_vec(&claim).expect("claim"))
-        )
+        let bytes = serde_json::to_vec(&claim).expect("claim");
+        format!("{:x}", Sha256::digest(bytes))
     }
 
     pub(super) fn success(space: &Path, arguments: &[&str]) -> Value {

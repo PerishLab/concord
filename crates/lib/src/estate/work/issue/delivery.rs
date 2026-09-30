@@ -1,19 +1,31 @@
 use super::super::{Estate, Proof};
-use super::authority::{self, Authorities, Warrant};
+use super::authority::Authorities;
 use super::{IssueWorktree, issue_stale};
 use crate::{Error, Reference, Result, claim, git};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+#[path = "../delivery/engine.rs"]
+mod engine;
+#[path = "../delivery/gate.rs"]
+mod gate;
+#[path = "../delivery/model.rs"]
+mod model;
+#[path = "../delivery/process.rs"]
+mod process;
+
+pub use model::{Authority, Candidate, Mode, Preparation};
+
 pub use super::authority::delivery::{Resume, resume};
 pub use super::proof::delivery::{Completion, Settlement};
 
-pub const SCHEMA: &str = "concord.issue-member-delivery/v4";
-pub const READY: &str = "concord.issue-member-delivery-ready/v3";
+pub const SCHEMA: &str = "concord.issue-member-delivery/v5";
+pub const READY: &str = "concord.issue-member-delivery-ready/v4";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Request {
+    pub authority: Mode,
     pub issue: super::super::super::Coordinate,
     pub revision: i64,
     pub base: String,
@@ -31,8 +43,8 @@ pub struct Plan {
     pub revision: i64,
     pub member: Member,
     pub boundary: Proof,
-    pub authority: Warrant,
-    pub delivery: plumb::delivery::Plan,
+    pub authority: Authority,
+    pub delivery: Candidate,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -49,7 +61,7 @@ pub struct Member {
 pub struct Ready {
     pub schema: String,
     pub plan: Plan,
-    pub preparation: plumb::landing::Preparation,
+    pub preparation: Preparation,
     pub revision: i64,
     pub reference: Option<Reference>,
 }
@@ -66,24 +78,8 @@ struct Context {
 pub async fn prepare<A: Authorities>(estate: &Estate, request: &Request) -> Result<Plan> {
     let context = context(estate, &request.issue, request.revision).await?;
     agree(&context, &request.snapshot)?;
-    let pull = narrative(&context, &request.snapshot, &request.outcome)?;
-    let (authority, warrant) = authority::select::<A>(
-        &context.path,
-        &context.boundary.head,
-        "concord.delivery.authority",
-    )?;
-    let delivery = plumb::delivery::prepare(
-        plumb::delivery::Request {
-            root: &context.path,
-            repository: &request.snapshot.repository,
-            issue: &request.snapshot,
-            observed: request.observed,
-            base: &request.base,
-            pull: &pull,
-        },
-        &authority,
-    )
-    .map_err(refused)?;
+    let pull = narrative(&context, request)?;
+    let (authority, delivery) = engine::prepare::<A>(&context, request, &pull)?;
     Ok(Plan {
         schema: SCHEMA.to_string(),
         issue: context.issue,
@@ -91,7 +87,7 @@ pub async fn prepare<A: Authorities>(estate: &Estate, request: &Request) -> Resu
         revision: context.revision,
         member: member(&context.member),
         boundary: context.boundary,
-        authority: warrant,
+        authority,
         delivery,
     })
 }
@@ -110,24 +106,11 @@ pub async fn revalidate<A: Authorities>(
         ));
     }
     let context = context(estate, &plan.issue, resumed.revision).await?;
-    let authority = authority::keep::<A>(&plan.authority, "concord.delivery.authority")?;
-    let ready = plumb::delivery::revalidate(
-        plumb::delivery::Request {
-            root: &context.path,
-            repository: &plan.delivery.repository,
-            issue: snapshot,
-            observed,
-            base: &plan.delivery.base,
-            pull: &plan.delivery.pull,
-        },
-        &plan.delivery,
-        &authority,
-    )
-    .map_err(refused)?;
+    engine::revalidate::<A>(&context, plan, snapshot, observed)?;
     Ok(Ready {
         schema: READY.to_string(),
         plan: plan.clone(),
-        preparation: ready.preparation().clone(),
+        preparation: plan.delivery.preparation(),
         revision: resumed.revision,
         reference: resumed.reference,
     })
@@ -183,19 +166,22 @@ fn issue(coordinate: String) -> Error {
     )
 }
 
-fn narrative(
-    context: &Context,
-    snapshot: &plumb::delivery::Snapshot,
-    outcome: &str,
-) -> Result<plumb::delivery::Narrative> {
-    let outcome = outcome.trim();
+fn narrative(context: &Context, request: &Request) -> Result<plumb::delivery::Narrative> {
+    let outcome = request.outcome.trim();
     if outcome.is_empty() {
         return Err(Error::typed(
             "concord.delivery.outcome",
             "Issue Outcome section is empty",
         ));
     }
-    Ok(member(&context.member).narrative(snapshot, &context.boundary, outcome))
+    let mut pull = member(&context.member).narrative(&request.snapshot, &context.boundary, outcome);
+    if request.authority == Mode::WharfNative {
+        pull.body.push_str(&format!(
+            "\n\nRepository authority: `{}`\n\nFixed native gate: `python3 -B -m scripts.selfcheck` and `python3 -B -m unittest discover -s tests -t . -q`, with no inherited provider environment. Exact source/tree and Python/Git identities are carried by native candidate evidence; this is not a Plumb Guard proof.",
+            gate::AUTHORITY,
+        ));
+    }
+    Ok(pull)
 }
 
 impl Member {

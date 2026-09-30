@@ -47,6 +47,15 @@ of copying its answer here.
   refusal names the unreachable authority. The stable location is fixed;
   tests inject authorities through the `Authorities` trait, never through
   runtime configuration.
+- Wharf's native gate is a separate explicit authority, selected for both
+  preparation and landing. It admits only the registered `PerishLab/wharf`
+  repository node and never falls back from Guard. The released shared native
+  kernel refuses a Plumb-governed source or base. Concord runs only the fixed
+  selfcheck and unittest commands, with cleared inherited environment and a
+  constructed tool PATH, and binds implementation, source/tree, base and
+  Python/Git identity before each provider mutation. This environment boundary
+  is not a filesystem sandbox. Native evidence and status names never claim
+  Guard authority; exact provider readback and Member release remain required.
 - Optional Locus facts and the private activity ledger are observations only.
   They never establish authorship, ownership, presence, authorization, or
   lifecycle state and never replace a command result.
