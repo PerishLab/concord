@@ -1,5 +1,6 @@
 use super::super::Estate;
 use super::super::integration::{self, TRACKING};
+use super::super::overlap::OverlapMember;
 use super::super::provision::{Inventory, Provision};
 use super::{IssueMemberChange, IssueWorktree, branch, issue_stale};
 use crate::{Error, Result, component, git};
@@ -99,7 +100,15 @@ impl Estate {
             inspection: &inspection,
         }
         .apply()?;
-        let observations = self.issue_overlaps(None, &source, &claims).await?;
+        let subject = OverlapMember {
+            key: None,
+            identity: request.issue.identity(),
+            path: path.clone(),
+            base: target.clone(),
+            claims: claims.clone(),
+            proof: None,
+        };
+        let observations = self.issue_overlaps(&subject, &source).await?;
         let revision = anchor.revision + 1;
         let next = revision.to_string();
         let root = anchor.key.to_string();
@@ -169,9 +178,15 @@ impl Estate {
             member: replay.member.clone(),
             observations: self
                 .issue_overlaps(
-                    Some(replay.member.key),
+                    &OverlapMember {
+                        key: Some(replay.member.key),
+                        identity: replay.member.issue.identity(),
+                        path: replay.path.to_path_buf(),
+                        base: replay.member.base.clone(),
+                        claims: replay.claims.to_vec(),
+                        proof: replay.member.proof.clone(),
+                    },
                     Path::new(&replay.member.integration.path),
-                    replay.claims,
                 )
                 .await?,
         })

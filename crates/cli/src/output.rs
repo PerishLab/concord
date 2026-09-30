@@ -3,7 +3,7 @@ pub(crate) mod cookbook;
 mod member;
 
 use concord_core::occupancy::Occupancy;
-use concord_core::{ClaimOverlap, Error, Result};
+use concord_core::{ClaimOverlap, CommittedEvidence, CommittedOverlap, Error, Result};
 use plumb::skill::{Done, Record, Report};
 use serde_json::json;
 
@@ -74,6 +74,30 @@ pub fn observations(observations: &[ClaimOverlap]) {
             observation.peer,
             observation.paths.join(", ")
         );
+        match &observation.committed {
+            CommittedOverlap::DeclaredOnly => eprintln!(
+                "concord: observation: committed deltas are disjoint with {}",
+                observation.peer
+            ),
+            CommittedOverlap::Intersecting { paths } => eprintln!(
+                "concord: observation: committed delta intersects {} at {}",
+                observation.peer,
+                paths.join(", ")
+            ),
+            CommittedOverlap::Unavailable { member, reason } => eprintln!(
+                "concord: observation: committed-delta evidence for {member} is unavailable: {}",
+                evidence(*reason)
+            ),
+        }
+    }
+}
+
+fn evidence(reason: CommittedEvidence) -> &'static str {
+    match reason {
+        CommittedEvidence::Dirty => "dirty worktree",
+        CommittedEvidence::Stale => "stale Member state or Boundary proof",
+        CommittedEvidence::MissingBase => "base commit is missing",
+        CommittedEvidence::Unavailable => "Git evidence is unavailable",
     }
 }
 

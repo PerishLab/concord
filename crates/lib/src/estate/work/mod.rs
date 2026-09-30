@@ -15,7 +15,7 @@ pub use issue::{
     IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval, IssueRetirement,
     IssueWithdrawal, IssueWorktree, Start,
 };
-pub use overlap::ClaimOverlap;
+pub use overlap::{ClaimOverlap, CommittedEvidence, CommittedOverlap};
 use serde::{Deserialize, Serialize};
 pub use status::{BoundaryState, CheckoutState, IntegrationState, UpstreamState};
 
