@@ -2,6 +2,8 @@
 mod handoff;
 #[cfg(unix)]
 mod provider;
+#[cfg(unix)]
+mod relations;
 
 #[cfg(unix)]
 mod unix {
@@ -121,6 +123,7 @@ mod unix {
             &["member", "prove", "PerishLab/probe#1", "--revision", "1"],
         );
         super::handoff::verify(fixture.path(), provider);
+        super::relations::verify(fixture.path(), provider);
         assert_eq!(
             success(fixture.path(), &["issue", "show", "PerishLab/probe#1"])["anchor"]["revision"],
             2
