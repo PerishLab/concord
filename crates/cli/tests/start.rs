@@ -9,48 +9,50 @@ mod unix {
     use std::path::{Path, PathBuf};
 
     #[test]
+    fn faults() {
+        let fixture = tempfile::tempdir().expect("fixture");
+        let source = estate(fixture.path());
+        let foreign = fixture.path().join("foreign");
+        git(
+            &source,
+            &[
+                "worktree",
+                "add",
+                "--detach",
+                foreign.to_str().expect("foreign"),
+            ],
+        );
+        let provider = tool(fixture.path(), "fact", fact());
+        let output = spawn::concord(fixture.path())
+            .args(["--root", fixture.path().to_str().expect("Space")])
+            .args([
+                "member",
+                "start",
+                "PerishLab/concord#26",
+                "--claim",
+                "crates",
+            ])
+            .args(["--revision", "0", "--github-command"])
+            .arg(&provider)
+            .output()
+            .expect("run Concord");
+        assert!(!output.status.success());
+        let text = String::from_utf8_lossy(&output.stderr);
+        assert!(text.contains("agreement fault"), "{text}");
+        let subject = foreign.canonicalize().expect("foreign path");
+        assert!(
+            text.contains(&format!(
+                "concord:   integration.worktree.unknown {}",
+                subject.display()
+            )),
+            "{text}"
+        );
+    }
+
+    #[test]
     fn refusals() {
         let fixture = tempfile::tempdir().expect("fixture");
-        success(fixture.path(), &["issue", "bootstrap"]);
-        let issue = tool(
-            fixture.path(),
-            "issue",
-            json!({
-                "node": "I_execution", "stable": "R_concord", "number": 26,
-                "url": "https://github.com/PerishLab/concord/issues/26",
-                "state": "OPEN", "kind": "Feature", "updated_at": "one",
-            }),
-        );
-        success(
-            fixture.path(),
-            &[
-                "issue",
-                "attach",
-                "PerishLab/concord#26",
-                "--github-command",
-                issue.to_str().expect("Issue provider"),
-            ],
-        );
-        let source = repository(fixture.path(), "PerishLab/concord");
-        let provider = tool(
-            fixture.path(),
-            "repository",
-            json!({
-                "node": "R_concord", "coordinate": "PerishLab/concord", "branch": "main",
-            }),
-        );
-        success(
-            fixture.path(),
-            &[
-                "integration",
-                "register",
-                "PerishLab/concord",
-                "--path",
-                source.to_str().expect("source path"),
-                "--github-command",
-                provider.to_str().expect("repository provider"),
-            ],
-        );
+        estate(fixture.path());
         let unavailable = fixture.path().join("unavailable");
         executable(&unavailable, "#!/bin/sh\nexit 1\n");
         assert_eq!(
@@ -71,6 +73,50 @@ mod unix {
             invoke(fixture.path(), &truncated),
             "concord.member.observe.truncated"
         );
+    }
+
+    fn estate(space: &Path) -> PathBuf {
+        success(space, &["issue", "bootstrap"]);
+        let issue = tool(
+            space,
+            "issue",
+            json!({
+                "node": "I_execution", "stable": "R_concord", "number": 26,
+                "url": "https://github.com/PerishLab/concord/issues/26",
+                "state": "OPEN", "kind": "Feature", "updated_at": "one",
+            }),
+        );
+        success(
+            space,
+            &[
+                "issue",
+                "attach",
+                "PerishLab/concord#26",
+                "--github-command",
+                issue.to_str().expect("Issue provider"),
+            ],
+        );
+        let source = repository(space, "PerishLab/concord");
+        let provider = tool(
+            space,
+            "repository",
+            json!({
+                "node": "R_concord", "coordinate": "PerishLab/concord", "branch": "main",
+            }),
+        );
+        success(
+            space,
+            &[
+                "integration",
+                "register",
+                "PerishLab/concord",
+                "--path",
+                source.to_str().expect("source path"),
+                "--github-command",
+                provider.to_str().expect("repository provider"),
+            ],
+        );
+        source
     }
 
     fn invoke(space: &Path, provider: &Path) -> String {

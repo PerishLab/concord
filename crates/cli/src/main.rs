@@ -32,12 +32,36 @@ async fn main() {
             eprintln!("{}", failure(&error));
         } else {
             eprintln!("concord: {error}");
+            for fault in faults(&error) {
+                eprintln!("concord:   {fault}");
+            }
             if let Some(code) = output::cookbook::reference(error.code()) {
                 eprintln!("concord: see: concord cookbook {code}");
             }
         }
         std::process::exit(1);
     }
+}
+
+fn faults(error: &concord_core::Error) -> Vec<String> {
+    let Some(faults) = error
+        .details()
+        .and_then(|details| details["agreement"]["faults"].as_array())
+    else {
+        return Vec::new();
+    };
+    faults
+        .iter()
+        .map(|fault| {
+            let field = |name: &str| fault[name].as_str().unwrap_or("-").to_string();
+            format!(
+                "{} {}: {}",
+                field("code"),
+                field("subject"),
+                field("message")
+            )
+        })
+        .collect()
 }
 
 fn failure(error: &concord_core::Error) -> String {
