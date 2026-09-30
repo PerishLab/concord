@@ -9,7 +9,7 @@ paths = [".forgejo/**"]
 [[boundary]]
 allow = ["word"]
 note = "the GitHub GraphQL adapter preserves the provider wire dialect"
-paths = ["crates/cli/src/dispatch/forge/github.rs"]
+paths = ["crates/cli/src/dispatch/forge/github/mod.rs"]
 
 [[boundary]]
 allow = ["word"]

@@ -1,6 +1,9 @@
+mod render;
+
 #[cfg(unix)]
 mod unix {
     use super::super::spawn;
+    use super::render;
     use serde_json::{Value, json};
     use std::io::Write;
     use std::os::unix::fs::PermissionsExt;
@@ -17,7 +20,7 @@ mod unix {
             let fixture = tempfile::tempdir().expect("fixture");
             bootstrap(fixture.path());
             let session = format!("{agent}-session");
-            let body = rendered("Decision recorded.", agent, &session, None);
+            let body = render::body("Decision recorded.", agent, &session, None);
             let command = provider(fixture.path(), "OPEN", &body, Reply::Exact);
             let environment = [(variable, session.as_str())];
             let output = invoke(
@@ -40,7 +43,7 @@ mod unix {
 
         let fixture = tempfile::tempdir().expect("fixture");
         bootstrap(fixture.path());
-        let body = rendered("Handoff complete.", "codex", "thread-1", Some("lab/host-1"));
+        let body = render::body("Handoff complete.", "codex", "thread-1", Some("lab/host-1"));
         let command = provider(fixture.path(), "CLOSED", &body, Reply::Exact);
         let environment = [
             ("CODEX_THREAD_ID", "thread-1"),
@@ -104,11 +107,13 @@ mod unix {
             Case::new("refused", Reply::Refused, 10, "comment.provider"),
             Case::new("malformed", Reply::Malformed, 10, "comment.disagreement"),
             Case::new("different", Reply::Different, 10, "comment.disagreement"),
+            Case::new("oversized", Reply::Oversized, 10, "comment.disagreement"),
+            Case::new("large-refusal", Reply::Limit, 10, "comment.provider"),
             Case::new("timeout", Reply::Timeout, 1, "comment.indeterminate"),
         ] {
             let fixture = tempfile::tempdir().expect("fixture");
             bootstrap(fixture.path());
-            let body = rendered("Declaration", "codex", "thread", None);
+            let body = render::body("Declaration", "codex", "thread", None);
             let command = provider(fixture.path(), "OPEN", &body, case.reply);
             let environment = [("CODEX_THREAD_ID", "thread")];
             let output = invoke(
@@ -135,6 +140,8 @@ mod unix {
         Refused,
         Malformed,
         Different,
+        Oversized,
+        Limit,
         Timeout,
     }
     struct Case<'a> {
@@ -240,6 +247,8 @@ mod unix {
             Reply::Exact | Reply::Different => format!("printf '%s\\n' '{answer}'"),
             Reply::Refused => "printf refused >&2; exit 1".to_string(),
             Reply::Malformed => "printf broken".to_string(),
+            Reply::Oversized => "yes x | head -c 20000".to_string(),
+            Reply::Limit => "yes x | head -c 20000 >&2; exit 1".to_string(),
             Reply::Timeout => "sleep 2".to_string(),
         };
         tool(
@@ -268,20 +277,6 @@ mod unix {
         permissions.set_mode(0o700);
         std::fs::set_permissions(&path, permissions).expect("provider mode");
         path
-    }
-
-    fn rendered(prose: &str, agent: &str, session: &str, host: Option<&str>) -> String {
-        let value = host
-            .map(|host| format!("\"{host}\""))
-            .unwrap_or_else(|| "null".to_string());
-        let execution =
-            format!("{{\"agent\":\"{agent}\",\"session\":\"{session}\",\"host\":{value}}}");
-        let host = host
-            .map(|host| format!(" · host `{host}`"))
-            .unwrap_or_default();
-        format!(
-            "{prose}\n\n---\nConcord: `{agent}` session `{session}`{host}\n\n<!-- concord.issue-comment/v1\n{execution}\n-->"
-        )
     }
 
     fn request(space: &Path, body: &str, session: &str) {

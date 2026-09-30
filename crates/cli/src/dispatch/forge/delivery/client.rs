@@ -1,9 +1,10 @@
 use super::model::Pull;
-use super::pull::{answer, provider};
+use super::pull::provider;
 use concord_core::Result;
 use std::path::Path;
 use std::time::Duration;
-use tokio::process::Command;
+
+const LIMIT: usize = 1024 * 1024;
 
 const FIELDS: &str =
     "id,number,url,state,baseRefName,headRefOid,mergeCommit,mergedAt,updatedAt,title,body";
@@ -109,14 +110,13 @@ impl Client<'_> {
     }
 
     async fn gh(&mut self, args: &[&str]) -> Result<String> {
-        let output = tokio::time::timeout(
-            Duration::from_secs(self.timeout),
-            Command::new(self.command).args(args).output(),
-        )
-        .await
-        .map_err(|_| provider("GitHub command timed out"))?
-        .map_err(|error| provider(format!("cannot run GitHub command: {error}")))?;
-        answer(output, "gh")
+        let output =
+            super::super::github::transport::Request::new(self.command, self.timeout, LIMIT)
+                .args(args.iter().copied())
+                .run()
+                .await
+                .map_err(|failure| provider(failure.to_string()))?;
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 }
 

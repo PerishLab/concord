@@ -1,4 +1,4 @@
-#[path = "seat/comment.rs"]
+#[path = "seat/comment/mod.rs"]
 mod comment;
 #[path = "seat/delivery/mod.rs"]
 mod delivery;
