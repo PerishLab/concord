@@ -77,6 +77,7 @@ pub fn projection(root: &Path) -> String {
         "subIssuesSummary": {"total": 0, "completed": 0, "percentCompleted": 0},
         "blockedBy": connection(), "blocking": connection(),
         "timelineItems": connection(), "comments": connection(),
+        "labels": {"nodes": [], "pageInfo": {"hasNextPage": false}},
     });
     let projected = json!({"data": {"repository": {"issue": issue}}});
     let remote = root.join("remote.git");
@@ -93,6 +94,7 @@ pub fn projection(root: &Path) -> String {
     let failure = root.join("provider-failure");
     let delay = root.join("provider-delay");
     let relations = root.join("relationships");
+    let labels = root.join("labels");
     format!(
         r#"reply() {{
   state=$(cat '{state}')
@@ -104,6 +106,7 @@ if [ "$1 $2" = "api graphql" ]; then
   if [ -f '{failure}' ]; then rm '{failure}'; printf '%s\n' observe-failed >&2; exit 1; fi
   if [ -f '{delay}' ]; then rm '{delay}'; sleep 2; fi
   for argument in "$@"; do [ "$argument" = "--jq" ] && printf '%s\n' '{observed}' && exit 0; done
+  if [ -f '{labels}' ]; then printf '%s\n' '{projected}' | jq --slurpfile labels '{labels}' '.data.repository.issue.labels=$labels[0]'; exit 0; fi
   if [ -f '{relations}' ]; then printf '%s\n' '{projected}' | jq --slurpfile links '{relations}' '.data.repository.issue.blocking.nodes=$links[0] | .data.repository.issue.blocking.totalCount=($links[0]|length)'; exit 0; fi
   printf '%s\n' '{projected}'
   exit 0
@@ -181,6 +184,7 @@ exit 1"#,
         failure = failure.display(),
         delay = delay.display(),
         relations = relations.display(),
+        labels = labels.display(),
     )
 }
 
