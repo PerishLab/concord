@@ -161,6 +161,18 @@ impl Estate {
     }
 
     fn guard(&self) -> Result<File> {
+        let file = self.latch()?;
+        file.lock_exclusive()?;
+        Ok(file)
+    }
+
+    fn share(&self) -> Result<File> {
+        let file = self.latch()?;
+        file.lock_shared()?;
+        Ok(file)
+    }
+
+    fn latch(&self) -> Result<File> {
         let path = self.space.join(".concord.lock");
         let file = std::fs::OpenOptions::new()
             .read(true)
@@ -169,7 +181,6 @@ impl Estate {
             .truncate(false)
             .open(&path)?;
         at(&path).mode(0o600)?;
-        file.lock_exclusive()?;
         Ok(file)
     }
 }

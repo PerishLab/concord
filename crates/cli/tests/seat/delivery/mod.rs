@@ -12,7 +12,8 @@ mod provider;
 mod refresh;
 #[cfg(unix)]
 mod relations;
-
+#[cfg(unix)]
+mod settled;
 #[cfg(unix)]
 mod unix {
     use super::super::execution::unix::{self as execution, Facts, git, repository, text};

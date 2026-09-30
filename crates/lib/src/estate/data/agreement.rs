@@ -64,18 +64,30 @@ impl Estate {
         Ok(report)
     }
 
-    pub(super) async fn ensure(&self) -> Result<()> {
-        let report = self.inspect().await?;
-        if report.agrees() {
-            return Ok(());
-        }
-        let count = report.faults.len();
-        Err(Error::detailed(
-            "concord.audit.refused",
-            format!("estate has {count} agreement fault(s)"),
-            serde_json::json!({"agreement": report}),
-        ))
+    pub async fn settled(&self) -> Result<Agreement> {
+        let _shared = self.share()?;
+        self.inspect().await
     }
+
+    pub(super) async fn ensure(&self) -> Result<()> {
+        verdict(self.inspect().await?)
+    }
+
+    pub(super) async fn agreed(&self) -> Result<()> {
+        verdict(self.settled().await?)
+    }
+}
+
+fn verdict(report: Agreement) -> Result<()> {
+    if report.agrees() {
+        return Ok(());
+    }
+    let count = report.faults.len();
+    Err(Error::detailed(
+        "concord.audit.refused",
+        format!("estate has {count} agreement fault(s)"),
+        serde_json::json!({"agreement": report}),
+    ))
 }
 
 fn order(finding: &Finding) -> (String, String, String) {

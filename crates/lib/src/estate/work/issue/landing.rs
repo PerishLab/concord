@@ -140,7 +140,7 @@ async fn context(
     issue: &super::super::super::Coordinate,
     revision: i64,
 ) -> Result<Context> {
-    estate.ensure().await?;
+    estate.agreed().await?;
     let anchor = estate.issue(issue).await?;
     issue_stale(anchor.revision, revision)?;
     let member = estate.issue_member(issue).await?;
