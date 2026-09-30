@@ -92,6 +92,7 @@ pub fn projection(root: &Path) -> String {
     let create = root.join("fail-create");
     let failure = root.join("provider-failure");
     let delay = root.join("provider-delay");
+    let relations = root.join("relationships");
     format!(
         r#"reply() {{
   state=$(cat '{state}')
@@ -103,6 +104,7 @@ if [ "$1 $2" = "api graphql" ]; then
   if [ -f '{failure}' ]; then rm '{failure}'; printf '%s\n' observe-failed >&2; exit 1; fi
   if [ -f '{delay}' ]; then rm '{delay}'; sleep 2; fi
   for argument in "$@"; do [ "$argument" = "--jq" ] && printf '%s\n' '{observed}' && exit 0; done
+  if [ -f '{relations}' ]; then printf '%s\n' '{projected}' | jq --slurpfile links '{relations}' '.data.repository.issue.blocking.nodes=$links[0] | .data.repository.issue.blocking.totalCount=($links[0]|length)'; exit 0; fi
   printf '%s\n' '{projected}'
   exit 0
 fi
@@ -168,6 +170,7 @@ exit 1"#,
         create = create.display(),
         failure = failure.display(),
         delay = delay.display(),
+        relations = relations.display(),
     )
 }
 
