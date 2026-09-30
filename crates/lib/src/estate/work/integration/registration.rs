@@ -28,9 +28,13 @@ impl Estate {
                 "integration registration requires main to equal its fetched origin/main",
             ));
         }
-        if inspection.worktrees.len() != 1
-            || inspection.worktrees[0].path.canonicalize().ok().as_ref()
-                != Some(&inspection.checkout.path)
+        let worktrees = inspection
+            .worktrees
+            .iter()
+            .filter(|worktree| !worktree.staging)
+            .collect::<Vec<_>>();
+        if worktrees.len() != 1
+            || worktrees[0].path.canonicalize().ok().as_ref() != Some(&inspection.checkout.path)
         {
             return Err(Error::typed(
                 "concord.integration.worktrees",

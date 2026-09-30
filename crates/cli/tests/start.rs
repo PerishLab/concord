@@ -1,11 +1,14 @@
 #[path = "seat/spawn.rs"]
 mod spawn;
+#[cfg(unix)]
+#[path = "start/support.rs"]
+mod support;
 
 #[cfg(unix)]
 mod unix {
     use super::spawn;
+    use super::support::{executable, fact, git, repository, success, tool};
     use serde_json::{Value, json};
-    use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
 
     #[test]
@@ -22,8 +25,21 @@ mod unix {
                 foreign.to_str().expect("foreign"),
             ],
         );
+        let home = fixture.path().join("plumb");
+        let staging = home.join("tmp").join("guard-live");
+        std::fs::create_dir_all(home.join("tmp")).expect("staging root");
+        git(
+            &source,
+            &[
+                "worktree",
+                "add",
+                "--detach",
+                staging.to_str().expect("staging"),
+            ],
+        );
         let provider = tool(fixture.path(), "fact", fact());
         let output = spawn::concord(fixture.path())
+            .env("PLUMB_HOME", &home)
             .args(["--root", fixture.path().to_str().expect("Space")])
             .args([
                 "member",
@@ -47,6 +63,29 @@ mod unix {
             )),
             "{text}"
         );
+        let staged = staging.canonicalize().expect("staging path");
+        assert!(!text.contains(&staged.display().to_string()), "{text}");
+        git(
+            &source,
+            &[
+                "worktree",
+                "remove",
+                "--force",
+                foreign.to_str().expect("foreign"),
+            ],
+        );
+        let audit = spawn::concord(fixture.path())
+            .env("PLUMB_HOME", &home)
+            .args([
+                "--root",
+                fixture.path().to_str().expect("Space"),
+                "--json",
+                "audit",
+            ])
+            .output()
+            .expect("run audit");
+        let report: Value = serde_json::from_slice(&audit.stdout).expect("audit JSON");
+        assert_eq!(report["agreement"]["faults"], json!([]), "{report}");
     }
 
     #[test]
@@ -201,85 +240,5 @@ mod unix {
         assert!(!output.status.success());
         let error: Value = serde_json::from_slice(&output.stderr).expect("error JSON");
         error["error"].clone()
-    }
-
-    fn fact() -> Value {
-        json!({
-            "node": "I_execution", "stable": "R_concord",
-            "coordinate": "PerishLab/concord", "branch": "main", "number": 26,
-            "url": "https://github.com/PerishLab/concord/issues/26",
-            "state": "OPEN", "kind": "Feature", "leaves": 0, "truncated": false,
-            "rulesets": [{
-                "enforcement": "ACTIVE", "target": "BRANCH",
-                "include": ["~DEFAULT_BRANCH"], "exclude": [], "bypass": 0,
-                "truncated": false,
-                "rules": ["DELETION", "NON_FAST_FORWARD", "PULL_REQUEST"],
-            }],
-            "labels": {"names": [], "truncated": false},
-        })
-    }
-
-    fn tool(root: &Path, name: &str, reply: Value) -> PathBuf {
-        let path = root.join(name);
-        executable(&path, &format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
-        path
-    }
-
-    fn executable(path: &Path, body: &str) {
-        std::fs::write(path, body).expect("provider command");
-        let mut permissions = std::fs::metadata(path).expect("metadata").permissions();
-        permissions.set_mode(0o700);
-        std::fs::set_permissions(path, permissions).expect("provider mode");
-    }
-
-    fn repository(root: &Path, coordinate: &str) -> PathBuf {
-        let source = root.join("source");
-        let remote = root.join("remote.git");
-        std::fs::create_dir(&source).expect("source");
-        std::fs::create_dir(&remote).expect("remote");
-        git(&remote, &["init", "--bare"]);
-        git(&source, &["init", "-b", "main"]);
-        git(&source, &["config", "user.name", "Concord Test"]);
-        git(
-            &source,
-            &["config", "user.email", "concord@example.invalid"],
-        );
-        std::fs::write(source.join("README.md"), "fixture\n").expect("fixture");
-        git(&source, &["add", "README.md"]);
-        git(&source, &["commit", "-m", "fixture"]);
-        let github = format!("https://github.com/{coordinate}.git");
-        git(&source, &["remote", "add", "origin", &github]);
-        git(
-            &source,
-            &[
-                "config",
-                &format!("url.{}.insteadOf", remote.display()),
-                &github,
-            ],
-        );
-        git(&source, &["push", "-u", "origin", "main"]);
-        source
-    }
-
-    fn git(root: &Path, arguments: &[&str]) {
-        assert!(
-            std::process::Command::new("git")
-                .arg("-C")
-                .arg(root)
-                .args(arguments)
-                .status()
-                .expect("run Git")
-                .success()
-        );
-    }
-
-    fn success(space: &Path, arguments: &[&str]) -> Value {
-        let output = spawn::concord(space)
-            .args(["--root", space.to_str().expect("Space"), "--json"])
-            .args(arguments)
-            .output()
-            .expect("run Concord");
-        assert!(output.status.success());
-        serde_json::from_slice(&output.stdout).expect("Concord JSON")
     }
 }

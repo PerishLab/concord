@@ -41,7 +41,12 @@ impl Estate {
                 member.base.clone(),
             );
         }
-        for worktree in &request.inspection.worktrees {
+        for worktree in request
+            .inspection
+            .worktrees
+            .iter()
+            .filter(|worktree| !worktree.staging)
+        {
             let path = worktree
                 .path
                 .canonicalize()
