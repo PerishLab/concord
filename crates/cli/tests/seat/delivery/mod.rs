@@ -1,6 +1,8 @@
 #[cfg(unix)]
 mod handoff;
 #[cfg(unix)]
+mod needs;
+#[cfg(unix)]
 mod provider;
 #[cfg(unix)]
 mod refresh;

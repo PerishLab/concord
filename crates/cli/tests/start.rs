@@ -75,6 +75,62 @@ mod unix {
         );
     }
 
+    #[test]
+    fn needs() {
+        let fixture = tempfile::tempdir().expect("fixture");
+        estate(fixture.path());
+        let single = labelled(fixture.path(), &["needs:revalidation", "kind:bug"], false);
+        let error = refusal(fixture.path(), &single);
+        assert_eq!(error["code"], "concord.issue.needs");
+        let message = error["message"].as_str().expect("message");
+        assert!(message.contains("needs:revalidation"), "{message}");
+        assert!(!message.contains("kind:bug"), "{message}");
+        let double = labelled(
+            fixture.path(),
+            &["needs:owner", "needs:revalidation"],
+            false,
+        );
+        let error = refusal(fixture.path(), &double);
+        assert_eq!(error["code"], "concord.issue.needs");
+        let message = error["message"].as_str().expect("message");
+        assert!(message.contains("needs:owner"), "{message}");
+        assert!(message.contains("needs:revalidation"), "{message}");
+        let truncated = labelled(fixture.path(), &["kind:bug"], true);
+        assert_eq!(
+            invoke(fixture.path(), &truncated),
+            "concord.member.observe.truncated"
+        );
+        let foreign = labelled(fixture.path(), &["kind:bug"], false);
+        start(fixture.path(), &foreign);
+        let fixture = tempfile::tempdir().expect("fixture");
+        estate(fixture.path());
+        let bare = labelled(fixture.path(), &[], false);
+        start(fixture.path(), &bare);
+    }
+
+    fn labelled(space: &Path, names: &[&str], truncated: bool) -> PathBuf {
+        let mut reply = fact();
+        reply["labels"] = json!({"names": names, "truncated": truncated});
+        tool(space, &format!("labelled-{}", names.len()), reply)
+    }
+
+    fn start(space: &Path, provider: &Path) {
+        success(
+            space,
+            &[
+                "member",
+                "start",
+                "PerishLab/concord#26",
+                "--claim",
+                "crates",
+                "--revision",
+                "0",
+                "--github-command",
+                provider.to_str().expect("provider"),
+            ],
+        );
+    }
+
     fn estate(space: &Path) -> PathBuf {
         success(space, &["issue", "bootstrap"]);
         let issue = tool(
@@ -120,6 +176,13 @@ mod unix {
     }
 
     fn invoke(space: &Path, provider: &Path) -> String {
+        refusal(space, provider)["code"]
+            .as_str()
+            .expect("error code")
+            .to_string()
+    }
+
+    fn refusal(space: &Path, provider: &Path) -> Value {
         let output = spawn::concord(space)
             .args(["--root", space.to_str().expect("Space"), "--json"])
             .args([
@@ -137,10 +200,7 @@ mod unix {
             .expect("run Concord");
         assert!(!output.status.success());
         let error: Value = serde_json::from_slice(&output.stderr).expect("error JSON");
-        error["error"]["code"]
-            .as_str()
-            .expect("error code")
-            .to_string()
+        error["error"].clone()
     }
 
     fn fact() -> Value {
@@ -155,6 +215,7 @@ mod unix {
                 "truncated": false,
                 "rules": ["DELETION", "NON_FAST_FORWARD", "PULL_REQUEST"],
             }],
+            "labels": {"names": [], "truncated": false},
         })
     }
 

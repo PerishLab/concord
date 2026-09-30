@@ -235,6 +235,7 @@ pub(super) mod unix {
                 "truncated": false,
                 "rules": ["DELETION", "NON_FAST_FORWARD", "PULL_REQUEST"],
             }],
+            "labels": {"names": [], "truncated": false},
         })
     }
 

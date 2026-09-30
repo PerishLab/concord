@@ -69,6 +69,15 @@ fn book() -> Cookbook {
                 "A fresh Issue estate opens and `concord audit` agrees.",
             ),
         ),
+        entry(
+            "concord.issue.needs",
+            "The operated GitHub Issue carries one or more labels in the `needs:` namespace, such as `needs:revalidation`, so Concord refuses to start or deliver it.",
+            "Resolve what each named label asks for on the Issue itself, then remove those labels on GitHub and re-run the refused command. Concord never applies or removes these labels; labels on a parent Issue and labels outside the `needs:` namespace do not count.",
+            (
+                "Read the labels named by the refusal and the Issue's history that explains why each was applied.",
+                "The Issue carries no `needs:` label and the command proceeds past observation.",
+            ),
+        ),
     ])
     .expect("compiled Concord Cookbook must be valid")
 }

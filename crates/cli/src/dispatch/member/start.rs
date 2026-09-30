@@ -21,6 +21,14 @@ struct Reply {
     leaves: usize,
     truncated: bool,
     rulesets: Vec<Ruleset>,
+    labels: Labels,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Labels {
+    names: Vec<String>,
+    truncated: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,8 +53,8 @@ pub(super) async fn observe(
     command: &Path,
     timeout: u64,
 ) -> Result<Observation> {
-    let query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){id nameWithOwner defaultBranchRef{name} issue(number:$number){id number url state issueType{name} subIssuesSummary{total}} rulesets(first:100,includeParents:true){nodes{enforcement target conditions{refName{include exclude}} bypassActors(first:100){totalCount} rules(first:100){nodes{type}pageInfo{hasNextPage}}}pageInfo{hasNextPage}}}}";
-    let selector = ".data.repository as $r | $r.issue as $i | if $r == null or $i == null then null else {node:$i.id,stable:$r.id,coordinate:$r.nameWithOwner,branch:($r.defaultBranchRef.name // \"\"),number:$i.number,url:$i.url,state:$i.state,kind:($i.issueType.name // \"\"),leaves:$i.subIssuesSummary.total,truncated:$r.rulesets.pageInfo.hasNextPage,rulesets:[$r.rulesets.nodes[]|{enforcement:.enforcement,target:.target,include:(.conditions.refName.include // []),exclude:(.conditions.refName.exclude // []),bypass:.bypassActors.totalCount,truncated:.rules.pageInfo.hasNextPage,rules:[.rules.nodes[].type]}]} end";
+    let query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){id nameWithOwner defaultBranchRef{name} issue(number:$number){id number url state issueType{name} subIssuesSummary{total} labels(first:100){nodes{name} pageInfo{hasNextPage}}} rulesets(first:100,includeParents:true){nodes{enforcement target conditions{refName{include exclude}} bypassActors(first:100){totalCount} rules(first:100){nodes{type}pageInfo{hasNextPage}}}pageInfo{hasNextPage}}}}";
+    let selector = ".data.repository as $r | $r.issue as $i | if $r == null or $i == null then null else {node:$i.id,stable:$r.id,coordinate:$r.nameWithOwner,branch:($r.defaultBranchRef.name // \"\"),number:$i.number,url:$i.url,state:$i.state,kind:($i.issueType.name // \"\"),leaves:$i.subIssuesSummary.total,truncated:$r.rulesets.pageInfo.hasNextPage,rulesets:[$r.rulesets.nodes[]|{enforcement:.enforcement,target:.target,include:(.conditions.refName.include // []),exclude:(.conditions.refName.exclude // []),bypass:.bypassActors.totalCount,truncated:.rules.pageInfo.hasNextPage,rules:[.rules.nodes[].type]}],labels:{names:[$i.labels.nodes[].name],truncated:$i.labels.pageInfo.hasNextPage}} end";
     let mut process = Command::new(command);
     process
         .args(["api", "graphql", "-f"])
@@ -111,6 +119,13 @@ fn shape(issue: &Coordinate, reply: Reply) -> Result<Observation> {
             "Issue start requires one open typed repository-local leaf Issue",
         ));
     }
+    if reply.labels.truncated {
+        return Err(fault(
+            "truncated",
+            "GitHub Issue labels observation was truncated",
+        ));
+    }
+    needs(&reply.labels.names)?;
     if reply.branch != "main" {
         return Err(fault(
             "branch",
@@ -150,6 +165,27 @@ fn protected(ruleset: &Ruleset) -> bool {
     required
         .iter()
         .all(|wanted| ruleset.rules.iter().any(|found| found == wanted))
+}
+
+fn needs(names: &[String]) -> Result<()> {
+    let mut held = names
+        .iter()
+        .filter(|name| name.starts_with("needs:"))
+        .cloned()
+        .collect::<Vec<_>>();
+    if held.is_empty() {
+        return Ok(());
+    }
+    held.sort();
+    held.dedup();
+    Err(Error::detailed(
+        "concord.issue.needs",
+        format!(
+            "Issue carries {}; resolve it and remove the label before working it",
+            held.join(", ")
+        ),
+        serde_json::json!({"labels": held}),
+    ))
 }
 
 fn fault(kind: &str, message: impl Into<String>) -> Error {

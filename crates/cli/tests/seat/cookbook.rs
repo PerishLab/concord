@@ -38,6 +38,7 @@ fn inventory() {
             "concord.delivery.landed",
             "concord.delivery.provider",
             "concord.estate.upgrade_required",
+            "concord.issue.needs",
         ]
     );
 
