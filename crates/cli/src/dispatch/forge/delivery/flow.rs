@@ -191,9 +191,17 @@ impl Flow<'_> {
     }
 
     async fn observe(&self) -> Result<projection::Observation> {
-        super::super::projection::Projection::new(&self.command, 100, 1, self.timeout)
-            .delivery(&self.plan.issue)
-            .await
+        let observed =
+            super::super::projection::Projection::new(&self.command, 100, 1, self.timeout)
+                .delivery(&self.plan.issue)
+                .await?;
+        if observed.acceptance != self.plan.acceptance {
+            return Err(Error::typed(
+                "concord.acceptance.changed",
+                "delivery acceptance target, declaration, closure or remaining obligations changed; prepare a fresh plan",
+            ));
+        }
+        Ok(observed)
     }
 
     async fn attach(&self, pull: &pull::Pull, revision: i64) -> Result<i64> {

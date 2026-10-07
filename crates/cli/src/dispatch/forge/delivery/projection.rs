@@ -1,5 +1,6 @@
 use super::super::github::envelope;
 use super::super::projection::{PageRequest, Projection, fault};
+use concord_core::acceptance::{Report, Target};
 use concord_core::{Coordinate, Error, Result};
 use serde::Deserialize;
 
@@ -42,6 +43,7 @@ pub struct Observation {
     pub snapshot: plumb::delivery::Snapshot,
     pub outcome: String,
     pub observed: u64,
+    pub acceptance: Option<Report>,
 }
 
 impl Projection<'_> {
@@ -58,7 +60,7 @@ impl Projection<'_> {
             ));
         }
         let issue = super::super::shape::root(coordinate, &raw).map_err(fault)?;
-        self.labels(coordinate).await?;
+        let target = Target::select(&self.labels(coordinate).await?)?;
         let kind = raw
             .issue_type
             .as_ref()
@@ -77,6 +79,24 @@ impl Projection<'_> {
                 "GitHub Issue has no non-empty Outcome section",
             )
         })?;
+        let args = crate::args::acceptance::Observe {
+            issue: format!(
+                "{}/{}#{}",
+                coordinate.owner, coordinate.repository, coordinate.number
+            ),
+            command: self.command.to_path_buf(),
+            timeout: self.timeout,
+            pages: usize::from(self.max_pages),
+        };
+        let reviewed = crate::dispatch::acceptance::review(&args).await?;
+        if !reviewed.current(&issue.node, &kind, &raw.body) || reviewed.evaluation.target != target
+        {
+            return Err(Error::typed(
+                "concord.acceptance.changed",
+                "delivery snapshot and acceptance basis differ",
+            ));
+        }
+        let acceptance = Some(reviewed.report()?);
         let observed = super::super::projection::now();
         Ok(Observation {
             snapshot: plumb::delivery::Snapshot {
@@ -97,12 +117,13 @@ impl Projection<'_> {
             },
             outcome,
             observed,
+            acceptance,
         })
     }
 }
 
 impl Projection<'_> {
-    async fn labels(&self, coordinate: &Coordinate) -> Result<()> {
+    async fn labels(&self, coordinate: &Coordinate) -> Result<Vec<String>> {
         let process = self
             .request()
             .args(["api", "graphql", "-f"])
@@ -128,7 +149,13 @@ impl Projection<'_> {
                 "Issue delivery snapshot exceeds the native label bound",
             ));
         }
-        needs(labels.nodes.into_iter().map(|label| label.name))
+        let names = labels
+            .nodes
+            .into_iter()
+            .map(|label| label.name)
+            .collect::<Vec<_>>();
+        needs(names.iter().cloned())?;
+        Ok(names)
     }
 }
 

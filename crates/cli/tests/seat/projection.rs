@@ -203,7 +203,18 @@ mod unix {
             "comments": connection(vec![comment()]),
         });
         let value = json!({"data": {"repository": {"issue": issue}}});
-        format!("case \"$*\" in\n*plumb.toml*) {manifest} ;;\n*) printf '%s\\n' '{value}' ;;\nesac")
+        let mut strict = value.clone();
+        strict["data"]["repository"]["id"] = "R_concord".into();
+        let issue = &mut strict["data"]["repository"]["issue"];
+        issue["updated"] = issue["updatedAt"].clone();
+        issue["kind"] = issue["issueType"].clone();
+        let empty = json!({"total": 0, "nodes": [], "page": {"next": false, "cursor": null}});
+        for name in ["labels", "comments", "children", "blockers"] {
+            issue[name] = empty.clone();
+        }
+        format!(
+            "input=$(cat)\ncase \"$* $input\" in\n*plumb.toml*) {manifest} ;;\n*'labels(first:100,after:'*|*'children:subIssues'*) printf '%s\\n' '{strict}' ;;\n*) printf '%s\\n' '{value}' ;;\nesac"
+        )
     }
 
     fn pull() -> Value {

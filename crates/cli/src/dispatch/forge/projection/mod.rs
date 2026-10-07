@@ -219,6 +219,7 @@ pub struct Readiness {
     pub kind: String,
     pub ready: bool,
     pub checks: ReadinessChecks,
+    pub acceptance: concord_core::acceptance::Evaluation,
     pub reasons: Vec<String>,
     pub distribution_evidence: Vec<String>,
     pub observed_at: u64,

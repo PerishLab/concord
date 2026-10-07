@@ -11,6 +11,12 @@ pub struct Args {
 pub enum Command {
     #[command(about = "Read complete current acceptance labels and comment history")]
     Show(Observe),
+    #[command(about = "Interpret acceptance against live review freshness without writes")]
+    Evaluate(Observe),
+    #[command(
+        about = "Check current PR closing references against an explicit head without writes"
+    )]
+    Closing(Closing),
     #[command(about = "Prepare an Issue-bound declaration plan without provider writes")]
     Declare(Prepare),
     #[command(about = "Prepare an explicit predecessor amendment without provider writes")]
@@ -44,6 +50,8 @@ impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
             Self::Show(_) => "acceptance.show",
+            Self::Evaluate(_) => "acceptance.evaluate",
+            Self::Closing(_) => "acceptance.closing",
             Self::Declare(_) => "acceptance.declare",
             Self::Amend(_) => "acceptance.amend",
             Self::Judge(_) => "acceptance.judge",
@@ -58,4 +66,12 @@ pub struct Apply {
     pub prepare: Prepare,
     #[arg(long)]
     pub apply: bool,
+}
+
+#[derive(Clap)]
+pub struct Closing {
+    #[command(flatten)]
+    pub observe: Observe,
+    #[arg(long, value_name = "COMMIT")]
+    pub head: String,
 }

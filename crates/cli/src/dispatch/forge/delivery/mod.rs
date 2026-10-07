@@ -52,7 +52,7 @@ pub(super) fn version(value: u64) -> Result<()> {
     ))
 }
 
-pub(super) const SHAPE: &str = r#"{"version":1,"plan":{"schema":"concord.issue-member-delivery/v5","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"authority":{"kind":"plumb"},"delivery":{}}}"#;
+pub(super) const SHAPE: &str = r#"{"version":1,"plan":{"schema":"concord.issue-member-delivery/v6","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"authority":{"kind":"plumb"},"delivery":{},"acceptance":null}}"#;
 
 #[cfg(test)]
 mod tests {

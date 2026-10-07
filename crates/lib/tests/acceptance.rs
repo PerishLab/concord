@@ -1,7 +1,10 @@
 mod acceptance {
+    mod body;
+    mod evaluation;
     mod history;
     mod marker;
     mod plan;
+    mod report;
     mod validation;
 }
 

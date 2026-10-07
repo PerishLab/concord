@@ -48,6 +48,7 @@ async fn request(estate: &Estate, parameters: &Parameters<'_>) -> Result<issue_d
             snapshot: observed.snapshot,
             observed: observed.observed,
             outcome: observed.outcome,
+            acceptance: observed.acceptance,
         },
     )
     .await

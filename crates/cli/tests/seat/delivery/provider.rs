@@ -106,6 +106,15 @@ if [ "$1 $2" = "api graphql" ]; then
   if [ -f '{failure}' ]; then rm '{failure}'; printf '%s\n' observe-failed >&2; exit 1; fi
   if [ -f '{delay}' ]; then rm '{delay}'; sleep 2; fi
   for argument in "$@"; do [ "$argument" = "--jq" ] && printf '%s\n' '{observed}' && exit 0; done
+  if [ "$3" = "--input" ]; then
+    request=$(cat)
+    labels='{{"nodes":[]}}'
+    [ ! -f '{labels}' ] || labels=$(cat '{labels}')
+    declaration=''
+    [ ! -f '{declaration}' ] || declaration=$(cat '{declaration}')
+    printf '%s\n' '{projected}' | jq --argjson labels "$labels" --arg declaration "$declaration" '.data.repository.id="R_probe" | .data.repository.issue |= (.updated=.updatedAt | .kind=.issueType | .labels={{nodes:$labels.nodes,total:($labels.nodes|length),page:{{next:false,cursor:null}}}} | .comments={{nodes:(if $declaration == "" then [] else [{{id:"IC_decl",body:$declaration,url:"https://github.com/PerishLab/probe/issues/1#issuecomment-1"}}] end),total:(if $declaration == "" then 0 else 1 end),page:{{next:false,cursor:null}}}} | .children={{nodes:[],total:0,page:{{next:false,cursor:null}}}} | .blockers=.children)'
+    exit 0
+  fi
   if [ -f '{labels}' ]; then printf '%s\n' '{projected}' | jq --slurpfile labels '{labels}' '.data.repository.issue.labels=$labels[0]'; exit 0; fi
   if [ -f '{relations}' ]; then printf '%s\n' '{projected}' | jq --slurpfile links '{relations}' '.data.repository.issue.blocking.nodes=$links[0] | .data.repository.issue.blocking.totalCount=($links[0]|length)'; exit 0; fi
   printf '%s\n' '{projected}'
@@ -185,6 +194,7 @@ exit 1"#,
         delay = delay.display(),
         relations = relations.display(),
         labels = labels.display(),
+        declaration = root.join("declaration").display(),
     )
 }
 
