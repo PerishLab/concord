@@ -54,6 +54,12 @@ fn declaration() {
         mutation["query"]
             .as_str()
             .unwrap()
+            .contains("labelable{__typename ... on Issue{id}}")
+    );
+    assert!(
+        mutation["query"]
+            .as_str()
+            .unwrap()
             .contains("addLabelsToLabelable")
     );
     assert_eq!(

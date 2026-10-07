@@ -38,6 +38,12 @@ fn amendment() {
         removal["query"]
             .as_str()
             .unwrap()
+            .contains("labelable{__typename ... on Issue{id}}")
+    );
+    assert!(
+        removal["query"]
+            .as_str()
+            .unwrap()
             .contains("removeLabelsFromLabelable")
     );
     assert_eq!(
@@ -45,6 +51,12 @@ fn amendment() {
         json!({"issue": "I_issue", "labels": ["L_source"]})
     );
     let addition = world::request(&scratch.path().join("request-12"));
+    assert!(
+        addition["query"]
+            .as_str()
+            .unwrap()
+            .contains("labelable{__typename ... on Issue{id}}")
+    );
     assert!(
         addition["query"]
             .as_str()
@@ -59,6 +71,46 @@ fn amendment() {
         std::fs::read_to_string(scratch.path().join("calls")).unwrap(),
         "14\n"
     );
+}
+
+#[test]
+fn identity() {
+    let page = world::page();
+    let plan = world::prepared(&page, "declare", &world::intent());
+    let retained = world::retained(&page, &plan, &[]);
+    for case in ["foreign", "missing", "type", "null"] {
+        let mut reply = world::altered();
+        let labelable = &mut reply["data"]["alter"]["labelable"];
+        match case {
+            "foreign" => labelable["id"] = "I_foreign".into(),
+            "missing" => {
+                labelable.as_object_mut().unwrap().remove("id");
+            }
+            "type" => labelable["__typename"] = "PullRequest".into(),
+            "null" => *labelable = serde_json::Value::Null,
+            _ => unreachable!(),
+        }
+        let replies = [
+            retained.clone(),
+            retained.clone(),
+            world::catalog("source"),
+            retained.clone(),
+            retained.clone(),
+            reply,
+            retained.clone(),
+            retained.clone(),
+        ];
+        let scratch = tempfile::tempdir().unwrap();
+        let provider = world::provider(scratch.path(), &replies);
+        world::refused(
+            &world::invoke(scratch.path(), &provider, "apply", Some(&plan)),
+            "concord.acceptance.partial",
+        );
+        assert_eq!(
+            std::fs::read_to_string(scratch.path().join("calls")).unwrap(),
+            "8\n"
+        );
+    }
 }
 
 #[test]
