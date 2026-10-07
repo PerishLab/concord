@@ -7,8 +7,8 @@ use crate::args::acceptance::Observe;
 
 const LOOKUP: &str = "query($owner:String!,$name:String!,$label:String!){repository(owner:$owner,name:$name){id label(name:$label){id name}}}";
 const CREATE: &str = "mutation($repository:ID!,$name:String!){created:createLabel(input:{repositoryId:$repository,name:$name,color:\"5319e7\"}){label{id name}}}";
-const ADD: &str = "mutation($issue:ID!,$labels:[ID!]!){alter:addLabelsToLabelable(input:{labelableId:$issue,labelIds:$labels}){labelable{id}}}";
-const REMOVE: &str = "mutation($issue:ID!,$labels:[ID!]!){alter:removeLabelsFromLabelable(input:{labelableId:$issue,labelIds:$labels}){labelable{id}}}";
+const ADD: &str = "mutation($issue:ID!,$labels:[ID!]!){alter:addLabelsToLabelable(input:{labelableId:$issue,labelIds:$labels}){labelable{__typename ... on Issue{id}}}}";
+const REMOVE: &str = "mutation($issue:ID!,$labels:[ID!]!){alter:removeLabelsFromLabelable(input:{labelableId:$issue,labelIds:$labels}){labelable{__typename ... on Issue{id}}}}";
 
 pub(super) async fn resolve(
     args: &Observe,
@@ -49,7 +49,8 @@ pub(super) async fn resolve(
 pub(super) async fn alter(args: &Observe, issue: &str, label: &str, remove: bool) -> Result<()> {
     let query = if remove { REMOVE } else { ADD };
     let value = request(args, query, json!({"issue": issue, "labels": [label]})).await?;
-    if value.pointer("/data/alter/labelable/id") != Some(&json!(issue)) {
+    let labelable = &value["data"]["alter"]["labelable"];
+    if labelable["__typename"] != "Issue" || labelable["id"] != issue {
         return Err(super::fault(
             "reply",
             "label mutation named another or no Issue",

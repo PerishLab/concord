@@ -160,7 +160,7 @@ pub(super) fn catalog(target: &str) -> Value {
 }
 
 pub(super) fn altered() -> Value {
-    let alteration = json!({"labelable": {"id": "I_issue"}});
+    let alteration = json!({"labelable": {"__typename": "Issue", "id": "I_issue"}});
     json!({"data": {"alter": alteration}})
 }
 
