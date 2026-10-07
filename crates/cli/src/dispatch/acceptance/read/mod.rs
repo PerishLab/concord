@@ -1,3 +1,5 @@
+mod relations;
+
 use concord_core::{Coordinate, Result};
 use serde_json::json;
 use std::collections::BTreeSet;
@@ -16,11 +18,11 @@ pub(super) struct Reader<'a> {
     pub pages: usize,
 }
 
-struct Scan<T> {
-    items: Vec<T>,
-    cursor: Option<String>,
+pub(super) struct Scan<T> {
+    pub items: Vec<T>,
+    pub cursor: Option<String>,
     total: Option<usize>,
-    complete: bool,
+    pub complete: bool,
     seen: BTreeSet<String>,
 }
 
@@ -157,7 +159,7 @@ impl Reader<'_> {
 }
 
 impl<T> Scan<T> {
-    fn append(&mut self, connection: Connection<T>) -> Result<()> {
+    pub(super) fn append(&mut self, connection: Connection<T>) -> Result<()> {
         if self.total.is_some_and(|total| total != connection.total) {
             return Err(super::fault(
                 "changed",

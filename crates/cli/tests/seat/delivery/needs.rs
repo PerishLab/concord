@@ -1,6 +1,7 @@
 use super::super::execution::unix::{self as execution, Facts, git, repository};
 use super::provider::{consume, observer, projection, tool};
 use super::unix::{guard, prepare, refused, success};
+use concord_core::acceptance::{Marker, Target};
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -56,6 +57,86 @@ fn needs() {
 struct Seat<'a> {
     space: &'a Path,
     provider: String,
+}
+
+#[test]
+fn acceptance() {
+    for mode in ["source", "release", "edited", "removed", "orphan"] {
+        let fixture = tempfile::tempdir().unwrap();
+        let seat = Seat::open(fixture.path());
+        seat.change();
+        let target = if mode == "release" {
+            Target::Release
+        } else {
+            Target::Source
+        };
+        seat.label(&[target.label()], false);
+        let marker = Marker::Declaration {
+            target,
+            promise: "Merge first, then verify every promised endpoint".into(),
+        }
+        .render()
+        .unwrap();
+        std::fs::write(seat.space.join("declaration"), &marker).unwrap();
+        let revision = seat.revision();
+        let prepared = prepare(seat.space, &seat.provider, &revision, true)
+            .output()
+            .unwrap();
+        assert!(
+            prepared.status.success(),
+            "{}",
+            String::from_utf8_lossy(&prepared.stderr)
+        );
+        let plan: Value = serde_json::from_slice(&prepared.stdout).unwrap();
+        let body = plan["plan"]["delivery"]["pull"]["body"].as_str().unwrap();
+        assert!(body.starts_with("Refs PerishLab/probe#1"));
+        assert!(body.contains(target.label()));
+        assert!(body.contains("Remaining obligations"));
+        assert!(body.contains("no current closure judgment"));
+        assert!(body.contains("IC_decl"));
+        assert!(!body.contains("Closes PerishLab/probe#1"));
+        assert_eq!(
+            plan["plan"]["acceptance"]["evaluation"]["closure"],
+            Value::Null
+        );
+        match mode {
+            "edited" => {
+                let changed = Marker::Declaration {
+                    target,
+                    promise: "Expanded endpoint after preparation".into(),
+                }
+                .render()
+                .unwrap();
+                std::fs::write(seat.space.join("declaration"), changed).unwrap();
+            }
+            "removed" => {
+                seat.label(&[], false);
+                std::fs::remove_file(seat.space.join("declaration")).unwrap();
+            }
+            "orphan" => seat.label(&[], false),
+            _ => {}
+        }
+        let landed = consume(seat.space, &seat.provider, &prepared.stdout);
+        if matches!(mode, "edited" | "removed" | "orphan") {
+            let code = if mode == "orphan" {
+                "concord.acceptance.protocol"
+            } else {
+                "concord.acceptance.changed"
+            };
+            refused(&landed, code);
+            assert!(!seat.space.join("pull-state").exists());
+            assert_eq!(seat.revision(), revision);
+        } else {
+            assert!(
+                landed.status.success(),
+                "{}",
+                String::from_utf8_lossy(&landed.stderr)
+            );
+            let delivery: Value = serde_json::from_slice(&landed.stdout).unwrap();
+            assert_eq!(delivery["merged"], true);
+            assert!(body.contains("verification: `none`"));
+        }
+    }
 }
 
 impl<'a> Seat<'a> {

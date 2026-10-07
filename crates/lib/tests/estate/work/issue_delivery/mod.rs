@@ -41,6 +41,7 @@ pub(super) fn request(issue: &Coordinate) -> issue_delivery::Request {
         snapshot: snapshot(),
         observed: 1,
         outcome: "Concord owns Issue-led delivery.".into(),
+        acceptance: None,
     }
 }
 

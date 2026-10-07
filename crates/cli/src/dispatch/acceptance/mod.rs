@@ -1,9 +1,14 @@
 mod apply;
+mod clock;
+mod evaluate;
+mod freshness;
 mod labels;
 mod model;
 mod plan;
 mod prepare;
 mod read;
+
+pub(super) use evaluate::read as review;
 
 use crate::args::acceptance::{Command, Observe};
 use concord_core::acceptance::History;
@@ -19,6 +24,8 @@ pub async fn run(command: Command, output: bool) -> Result<()> {
             show(snapshot, history, target)
         }
         Command::Declare(args) => prepare::run(args, prepare::Purpose::Declaration).await?,
+        Command::Evaluate(args) => evaluate::run(args).await?,
+        Command::Closing(args) => return evaluate::closing(args, output).await,
         Command::Amend(args) => prepare::run(args, prepare::Purpose::Amendment).await?,
         Command::Judge(args) => prepare::run(args, prepare::Purpose::Closure).await?,
         Command::Apply(args) => apply::run(args).await?,

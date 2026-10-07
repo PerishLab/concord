@@ -19,8 +19,8 @@ pub use model::{Authority, Candidate, Mode, Preparation};
 pub use super::authority::delivery::{Resume, resume};
 pub use super::proof::delivery::{Completion, Settlement};
 
-pub const SCHEMA: &str = "concord.issue-member-delivery/v5";
-pub const READY: &str = "concord.issue-member-delivery-ready/v4";
+pub const SCHEMA: &str = "concord.issue-member-delivery/v6";
+pub const READY: &str = "concord.issue-member-delivery-ready/v5";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -32,6 +32,7 @@ pub struct Request {
     pub snapshot: plumb::delivery::Snapshot,
     pub observed: u64,
     pub outcome: String,
+    pub acceptance: Option<crate::acceptance::Report>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -45,6 +46,7 @@ pub struct Plan {
     pub boundary: Proof,
     pub authority: Authority,
     pub delivery: Candidate,
+    pub acceptance: Option<crate::acceptance::Report>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -89,6 +91,7 @@ pub async fn prepare<A: Authorities>(estate: &Estate, request: &Request) -> Resu
         boundary: context.boundary,
         authority,
         delivery,
+        acceptance: request.acceptance.clone(),
     })
 }
 
@@ -175,6 +178,9 @@ fn narrative(context: &Context, request: &Request) -> Result<plumb::delivery::Na
         ));
     }
     let mut pull = member(&context.member).narrative(&request.snapshot, &context.boundary, outcome);
+    let acceptance = request.acceptance.as_ref().map(crate::acceptance::Report::render)
+        .unwrap_or_else(|| "## Acceptance\n\nTarget: not adopted. Remaining obligations: review every current Issue condition and record any source, release or consumer evidence it requires before manual closure. Merge alone is not acceptance completion.".into());
+    pull.body.push_str(&format!("\n\n{acceptance}"));
     if request.authority == Mode::WharfNative {
         pull.body.push_str(&format!(
             "\n\nRepository authority: `{}`\n\nFixed native gate: `python3 -B -m scripts.selfcheck` and `python3 -B -m unittest discover -s tests -t . -q`, with no inherited provider environment. Exact source/tree and Python/Git identities are carried by native candidate evidence; this is not a Plumb Guard proof.",
