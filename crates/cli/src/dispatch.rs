@@ -1,3 +1,4 @@
+mod acceptance;
 mod activity;
 mod artifact;
 mod configuration;
@@ -34,6 +35,7 @@ pub async fn run(cli: args::Cli) -> Result<()> {
     )?;
     let config = loaded.config();
     let command = match cli.command {
+        Command::Acceptance(args) => return acceptance::run(args.command, cli.json).await,
         Command::Skill(skill) => return skill::run(config, skill.command, cli.json),
         Command::Config(args) => {
             return configuration::run(config, args.command, cli.json);
@@ -86,7 +88,10 @@ impl Dispatch {
             }
         }
         let result = match command {
-            Command::Config(_) | Command::Cookbook(_) | Command::Skill(_) => {
+            Command::Acceptance(_)
+            | Command::Config(_)
+            | Command::Cookbook(_)
+            | Command::Skill(_) => {
                 unreachable!("handled before estate open")
             }
             Command::Issue(args) => forge::run(&self.estate, args.command, self.json).await,

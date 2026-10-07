@@ -11,7 +11,8 @@ const MUTATION: &str = "mutation($subject:ID!,$body:String!){addComment(input:{s
 const SEMANTICS: &str =
     "execution fields are caller-environment observations, not identity or authority";
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Execution {
     pub agent: String,
     pub session: String,
@@ -51,7 +52,7 @@ struct Edge {
 }
 
 #[derive(Deserialize)]
-struct Reply {
+pub(in crate::dispatch) struct Reply {
     id: String,
     url: String,
     body: String,
@@ -99,7 +100,7 @@ pub fn output(comment: Declared, json: bool) -> Result<()> {
     Ok(())
 }
 
-fn execution() -> Result<Execution> {
+pub(in crate::dispatch) fn execution() -> Result<Execution> {
     let operator = Operator::detect().ok_or_else(|| {
         Error::typed(
             "concord.issue.comment.operator",
@@ -113,7 +114,7 @@ fn execution() -> Result<Execution> {
     })
 }
 
-fn render(prose: &str, execution: &Execution) -> Result<String> {
+pub(in crate::dispatch) fn render(prose: &str, execution: &Execution) -> Result<String> {
     let prose = prose.trim_end();
     if prose.trim().is_empty() {
         return Err(Error::typed(
@@ -198,7 +199,12 @@ fn bounded(mut reader: impl Read, label: &str) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-async fn submit(command: &Path, subject: &str, body: &str, timeout: u64) -> Result<Reply> {
+pub(in crate::dispatch) async fn submit(
+    command: &Path,
+    subject: &str,
+    body: &str,
+    timeout: u64,
+) -> Result<Reply> {
     let request = serde_json::to_vec(&json!({
         "query": MUTATION,
         "variables": {"subject": subject, "body": body},
@@ -242,7 +248,11 @@ fn failure(failure: super::super::github::transport::Failure) -> Error {
     }
 }
 
-fn verify(coordinate: &Coordinate, body: &str, reply: &Reply) -> Result<()> {
+pub(in crate::dispatch) fn verify(
+    coordinate: &Coordinate,
+    body: &str,
+    reply: &Reply,
+) -> Result<()> {
     let prefix = format!(
         "https://github.com/{}/{}/issues/{}#issuecomment-",
         coordinate.owner, coordinate.repository, coordinate.number

@@ -5,7 +5,7 @@ use concord_core::{Admission, Anchor, Coordinate, Error, Estate, Reconcile, Resu
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-mod comment;
+pub(super) mod comment;
 mod observe;
 
 const SCHEMA: &str = "concord.issue-delivery/v1";
