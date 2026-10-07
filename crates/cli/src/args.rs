@@ -1,3 +1,4 @@
+pub(crate) mod acceptance;
 pub(crate) mod artifact;
 pub(crate) mod audit;
 pub(crate) mod integration;
@@ -33,6 +34,8 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
+    #[command(about = "Observe acceptance and prepare explicit Issue-bound write plans")]
+    Acceptance(acceptance::Args),
     #[command(about = "Inspect Concord configuration")]
     Config(Config),
     #[command(about = "Read code-addressed recovery guidance")]
@@ -54,6 +57,7 @@ pub enum Command {
 impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
+            Self::Acceptance(args) => args.command.name(),
             Self::Config(args) => args.command.name(),
             Self::Cookbook(_) => "cookbook",
             Self::Issue(args) => args.command.name(),
@@ -67,6 +71,7 @@ impl Command {
 
     pub(crate) fn activity(&self) -> Option<Vec<&str>> {
         match self {
+            Self::Acceptance(_) => None,
             Self::Issue(_) => None,
             Self::Integration(_) => None,
             Self::Member(args) => args.command.activity(),

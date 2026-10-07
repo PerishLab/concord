@@ -1,3 +1,4 @@
+pub mod acceptance;
 #[path = "runtime/activity.rs"]
 pub mod activity;
 #[path = "runtime/config.rs"]

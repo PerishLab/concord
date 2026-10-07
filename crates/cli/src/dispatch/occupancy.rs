@@ -97,7 +97,7 @@ fn seeds(command: &args::Command) -> Option<Vec<Seed<'_>>> {
         args::Command::Member(args) => member(&args.command),
         args::Command::Issue(args) => issue(&args.command),
         args::Command::Artifact(args) => artifact(&args.command),
-        args::Command::Integration(_) => None,
+        args::Command::Integration(_) | args::Command::Acceptance(_) => None,
         args::Command::Config(_)
         | args::Command::Cookbook(_)
         | args::Command::Audit(_)
