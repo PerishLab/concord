@@ -5,6 +5,10 @@ use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
+
+const HOLD: Duration = Duration::from_secs(1);
 
 #[tokio::test(flavor = "current_thread")]
 async fn completion() {
@@ -109,10 +113,14 @@ async fn completion() {
         .await
         .expect_err("different merge result");
     assert_eq!(wrong.code(), "concord.delivery.merge");
+    let writer = hold(_temp.path(), &source);
+    let began = Instant::now();
     let completed = estate
         .complete(&integration, &settlement)
         .await
         .expect("synchronize and release");
+    assert!(began.elapsed() >= HOLD, "completion read a writer's state");
+    writer.join().expect("writer");
     assert_eq!(completed.revision, 4);
     assert_eq!(completed.head, merge);
     assert!(completed.released);
@@ -142,6 +150,26 @@ async fn completion() {
         .expect("released completion replay");
     assert_eq!(replay.revision, 4);
     assert!(!replay.released);
+}
+
+fn hold(space: &Path, source: &Path) -> JoinHandle<()> {
+    let stray = space.join(".issues/I_stray/worktree");
+    let path = stray.to_str().expect("stray path").to_string();
+    git(source, &["worktree", "add", "--detach", &path]);
+    let lock = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(space.join(".concord.lock"))
+        .expect("estate lock");
+    lock.lock().expect("writer lock");
+    let source = source.to_path_buf();
+    std::thread::spawn(move || {
+        std::thread::sleep(HOLD);
+        git(&source, &["worktree", "remove", "--force", &path]);
+        lock.unlock().expect("writer unlock");
+    })
 }
 
 fn git(root: &Path, args: &[&str]) {

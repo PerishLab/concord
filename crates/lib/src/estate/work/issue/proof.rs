@@ -129,7 +129,7 @@ pub(super) mod delivery {
 
     impl Estate {
         pub async fn complete(&self, guard: &Guard, request: &Settlement) -> Result<Completion> {
-            self.ensure().await?;
+            self.agreed().await?;
             let anchor = self.issue(&request.issue).await?;
             issue_stale(anchor.revision, request.revision)?;
             let held = self.integration(&request.issue).await?;
