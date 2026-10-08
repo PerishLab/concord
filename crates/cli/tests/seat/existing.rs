@@ -7,6 +7,61 @@ mod unix {
     use std::path::{Path, PathBuf};
 
     #[test]
+    fn retirement() {
+        let fixture = tempfile::tempdir().expect("fixture");
+        let space = fixture.path();
+        success(space, &["issue", "bootstrap"]);
+        let source = repository(space, "PerishLab/concord");
+        let provider = tool(
+            space,
+            "repository",
+            format!(
+                "printf '%s\\n' '{}'",
+                json!({
+                    "node": "R_concord", "coordinate": "PerishLab/concord", "branch": "main",
+                })
+            ),
+        );
+        success(
+            space,
+            &[
+                "integration",
+                "register",
+                "PerishLab/concord",
+                "--path",
+                source.to_str().expect("source"),
+                "--github-command",
+                provider.to_str().expect("provider"),
+            ],
+        );
+        std::fs::rename(&source, space.join("removed")).expect("domain removal");
+        let args = [
+            "integration",
+            "retire",
+            "PerishLab/concord",
+            "--node",
+            "R_concord",
+            "--key",
+            "1",
+        ];
+        let preview = success(space, &args);
+        assert_eq!(preview["retirement"]["applied"], false);
+        assert_eq!(
+            success(space, &["integration", "list"])["integrations"]
+                .as_array()
+                .expect("list")
+                .len(),
+            1
+        );
+        let mut apply = args.to_vec();
+        apply.push("--apply");
+        assert_eq!(success(space, &apply)["retirement"]["applied"], true);
+        assert_eq!(success(space, &["audit"])["agreement"]["faults"], json!([]));
+        assert!(space.join("removed/.git").is_dir());
+        assert!(!source.exists());
+    }
+
+    #[test]
     fn relationships() {
         let fixture = tempfile::tempdir().expect("fixture");
         success(fixture.path(), &["issue", "bootstrap"]);

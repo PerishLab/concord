@@ -2,11 +2,11 @@ use concord_core::{Admission, Coordinate, Finish, Register, Repository, Seat, St
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-struct World {
-    estate: concord_core::Estate,
-    source: PathBuf,
+pub(super) struct World {
+    pub(super) estate: concord_core::Estate,
+    pub(super) source: PathBuf,
     remote: PathBuf,
-    temp: tempfile::TempDir,
+    pub(super) temp: tempfile::TempDir,
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -116,7 +116,7 @@ async fn unchanged() {
     );
 }
 
-async fn world() -> World {
+pub(super) async fn world() -> World {
     let temp = tempfile::tempdir().expect("temporary Space");
     let source = temp.path().join("source");
     let remote = temp.path().join("remote.git");
@@ -166,7 +166,7 @@ async fn world() -> World {
     }
 }
 
-async fn admit(world: &World, number: i64, node: &str) -> Coordinate {
+pub(super) async fn admit(world: &World, number: i64, node: &str) -> Coordinate {
     let issue =
         Coordinate::parse(&format!("PerishLab/concord#{number}")).expect("Issue coordinate");
     world
