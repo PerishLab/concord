@@ -1,6 +1,7 @@
 mod read;
 mod reconcile;
 pub(in crate::estate) mod registration;
+mod retirement;
 
 use crate::{Error, Result};
 use fs2::FileExt;

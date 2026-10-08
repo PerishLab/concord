@@ -1,6 +1,6 @@
 use super::emit;
 use crate::args::integration::Command as IntegrationCommand;
-use concord_core::{Error, Estate, Register, Rename, Repository, Result};
+use concord_core::{Error, Estate, Integration, Register, Rename, Repository, Result};
 use serde::Deserialize;
 use serde_json::json;
 use std::path::Path;
@@ -23,6 +23,16 @@ pub async fn run(estate: &Estate, command: IntegrationCommand, output: bool) -> 
             json!({"integrations": estate.integrations().await?}),
             output,
         ),
+        IntegrationCommand::Retire {
+            repository,
+            node,
+            key,
+            apply,
+        } => {
+            let held = select(estate, &repository, &node, key).await?;
+            let retired = estate.retire(&held, apply).await?;
+            emit(retirement(retired, apply), output)
+        }
         IntegrationCommand::Register {
             repository,
             path,
@@ -56,6 +66,20 @@ pub async fn run(estate: &Estate, command: IntegrationCommand, output: bool) -> 
             emit(json!({"integration": integration}), output)
         }
     }
+}
+
+fn retirement(integration: Integration, applied: bool) -> serde_json::Value {
+    json!({"retirement": {"integration": integration, "applied": applied}})
+}
+
+async fn select(estate: &Estate, repository: &str, node: &str, key: i64) -> Result<Integration> {
+    let repository = Repository::parse(repository)?;
+    estate.integrations().await?.into_iter()
+        .find(|held| held.key == key && held.node == node && held.repository == repository)
+        .ok_or_else(|| Error::typed(
+            "concord.integration.changed",
+            "no Integration matches the exact key, node and repository; reread integration list",
+        ))
 }
 
 async fn observe(repository: &Repository, command: &Path, timeout: u64) -> Result<Observed> {

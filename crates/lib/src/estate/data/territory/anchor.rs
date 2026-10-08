@@ -213,7 +213,15 @@ fn assess(
     let observed = match super::super::work::integration::registration::observe(&path) {
         Ok(observed) => observed,
         Err(error) => {
-            report.fault("integration.agreement", subject, error.to_string());
+            let message = if !path.exists() {
+                format!(
+                    "{error}; if the operator intentionally removed this idle repository, preflight concord integration retire {subject} --node {} --key {}; apply only after reviewing that exact registration",
+                    integration.node, integration.key,
+                )
+            } else {
+                error.to_string()
+            };
+            report.fault("integration.agreement", subject, message);
             return Ok(());
         }
     };
