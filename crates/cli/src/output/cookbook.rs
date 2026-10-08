@@ -43,6 +43,15 @@ fn book() -> Cookbook {
             ),
         ),
         entry(
+            "concord.delivery.branches",
+            "The delivering repository holds a local or origin branch outside its Issue branch set: `main`, `release/vX.Y.Z`, the branches of live Members in that repository and their `land/` projections, and `<type>/<number>` of an open Issue of that type in that repository.",
+            "Delete each named branch, or give work worth keeping an open Issue and rename the branch to `<type>/<number>`, then re-run the refused command. Concord never deletes these branches itself and inspects no other repository.",
+            (
+                "Read the refusal's branch list, with each branch's place and reason, and inspect `git log main..<branch>` before deleting anything.",
+                "The repository holds only branches in the Issue branch set and delivery proceeds past the branch check.",
+            ),
+        ),
+        entry(
             "concord.delivery.landed",
             "After a squash merge, the fetched base head differs from the verified candidate in parent, tree or authority evidence. Native delivery also refuses lost or contradictory native proof.",
             "Do not blindly retry a completed merge. Compare the exact head and candidate under the selected authority, reverify what main actually holds, and land any repair as a new Issue-led change. Never fabricate a Guard proof for native delivery or force Member release past failed readback. Synchronize the integration checkout through the verified lifecycle.",

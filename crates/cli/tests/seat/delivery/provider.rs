@@ -103,6 +103,7 @@ pub fn projection(root: &Path) -> String {
   jq -cn --arg id PR_node --argjson number 7 --arg url https://github.com/PerishLab/probe/pull/7 --arg state "$state" --arg base "$(cat '{base}')" --arg head "$candidate" --arg merge "$merge" --arg title "$(cat '{title}')" --arg body "$(cat '{body}')" '{{id:$id,number:$number,url:$url,state:$state,baseRefName:$base,headRefOid:$head,mergeCommit:(if $merge == "" then null else {{oid:$merge}} end),mergedAt:(if $merge == "" then null else "2026-09-29T00:00:02Z" end),updatedAt:"2026-09-29T00:00:03Z",title:$title,body:$body}}'
 }}
 if [ "$1 $2" = "api graphql" ]; then
+  case "$*" in *"query Branches"*) cat '{branches}' || exit 1; exit 0 ;; esac
   if [ -f '{failure}' ]; then rm '{failure}'; printf '%s\n' observe-failed >&2; exit 1; fi
   if [ -f '{delay}' ]; then rm '{delay}'; sleep 2; fi
   for argument in "$@"; do [ "$argument" = "--jq" ] && printf '%s\n' '{observed}' && exit 0; done
@@ -197,6 +198,7 @@ exit 1"#,
         relations = relations.display(),
         labels = labels.display(),
         declaration = root.join("declaration").display(),
+        branches = root.join("branch-issues").display(),
     )
 }
 

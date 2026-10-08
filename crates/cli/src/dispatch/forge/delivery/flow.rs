@@ -1,4 +1,4 @@
-use super::{SHAPE, handoff::Refusal, projection, pull, settle, version};
+use super::{SHAPE, branches, handoff::Refusal, projection, pull, settle, version};
 use crate::args::issue::Delivery;
 use crate::dispatch::{emit, input};
 use concord_core::authority::Plumb;
@@ -83,6 +83,15 @@ impl Flow<'_> {
         let observed = self.observe().await?;
         let mut resumed =
             issue_delivery::resume::<Plumb>(self.estate, &self.plan, &observed.snapshot).await?;
+        if !resumed.released {
+            branches::clean(
+                self.estate,
+                &self.plan.member.integration,
+                &self.command,
+                self.timeout,
+            )
+            .await?;
+        }
         let preparation = self.plan.delivery.preparation();
         let identity = if resumed.released {
             Path::new(&self.plan.member.integration.path)

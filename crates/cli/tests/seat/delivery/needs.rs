@@ -3,7 +3,7 @@ use super::provider::{consume, observer, projection, tool};
 use super::unix::{guard, prepare, refused, success};
 use concord_core::acceptance::{Marker, Target};
 use serde_json::{Value, json};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn needs() {
@@ -54,9 +54,13 @@ fn needs() {
     );
 }
 
+#[path = "branches.rs"]
+mod branches;
+
 struct Seat<'a> {
     space: &'a Path,
     provider: String,
+    source: PathBuf,
 }
 
 #[test]
@@ -219,6 +223,7 @@ impl<'a> Seat<'a> {
         Self {
             space,
             provider: command,
+            source,
         }
     }
 

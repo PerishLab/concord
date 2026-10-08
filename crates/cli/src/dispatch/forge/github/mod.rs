@@ -1,3 +1,4 @@
+pub(super) mod issues;
 pub(super) mod transport;
 
 use super::projection::{Fault, PageRequest, Projection};
