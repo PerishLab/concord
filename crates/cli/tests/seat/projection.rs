@@ -153,7 +153,7 @@ mod unix {
     }
 
     fn locus(space: &Path, provider: &str) {
-        let report = space.join("projection.jsonl");
+        let spool = space.join("projection-spool");
         let output = spawn::concord(space)
             .args(["--root", space.to_str().expect("root path"), "--json"])
             .args([
@@ -164,12 +164,12 @@ mod unix {
                 provider,
             ])
             .env("CONCORD_LOCUS_ENABLED", "true")
-            .env("CONCORD_LOCUS_REPORT_FILE", &report)
+            .env("CONCORD_LOCUS_REPORT_SPOOL", &spool)
             .env("CODEX_THREAD_ID", "projection-thread")
             .output()
             .expect("observe projection");
         assert!(output.status.success());
-        let atoms = std::fs::read_to_string(report).expect("Locus report");
+        let atoms = std::fs::read_to_string(spool.join("active.jsonl")).expect("Locus spool");
         let event = atoms
             .lines()
             .map(|line| serde_json::from_str::<Value>(line).expect("Locus atom"))
@@ -178,6 +178,8 @@ mod unix {
         assert_eq!(event["payload"]["shape"], "issue.brief");
         assert_eq!(event["payload"]["outcome"], "fresh");
         assert_eq!(event["context"]["concord.command"], "issue.brief");
+        assert_eq!(event["producer"], "concord");
+        assert!(event["id"].is_string());
         for absent in ["title", "body", "url", "reply", "credential"] {
             assert!(event["payload"].get(absent).is_none());
         }

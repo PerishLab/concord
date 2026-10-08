@@ -62,6 +62,12 @@ of copying its answer here.
 - Optional Locus facts and the private activity ledger are observations only.
   They never establish authorship, ownership, presence, authorization, or
   lifecycle state and never replace a command result.
+- Locus observation is on only with `CONCORD_LOCUS_ENABLED`. Concord reports
+  as producer `concord` through the Locus spool at
+  `CONCORD_LOCUS_REPORT_SPOOL`, bounded by `CONCORD_LOCUS_REPORT_CEILING`
+  (default 512 MiB) in `CONCORD_LOCUS_REPORT_SEGMENT` segments (default
+  16 MiB). The retired `CONCORD_LOCUS_REPORT_FILE` refuses visibly and leaves
+  observation off rather than being ignored.
 - Issue briefs, relationship graphs and closure readiness are bounded live
   GitHub projections. They retain exact provider cursors and observation time,
   distinguish structural parentage from blocking, never cache lifecycle state,
