@@ -240,7 +240,7 @@ mod unix {
             "timelineItems": connection(vec![pull()], more),
             "comments": connection(Vec::<Value>::new(), false),
         });
-        let value = json!({"data": {"repository": {"issue": issue}}});
+        let value = json!({"data": {"repository": {"issue": issue, "issues": connection(Vec::new(), false)}}});
         format!("printf '%s\\n' '{value}'")
     }
 

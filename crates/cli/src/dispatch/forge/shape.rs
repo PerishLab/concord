@@ -46,6 +46,7 @@ pub(super) fn issue(raw: &RawIssueNode) -> std::result::Result<Issue, Fault> {
     };
     validate(raw, &coordinate)?;
     Ok(Issue {
+        automation: None,
         node: raw.id.clone(),
         coordinate,
         url: raw.url.clone(),

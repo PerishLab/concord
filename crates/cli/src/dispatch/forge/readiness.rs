@@ -20,6 +20,9 @@ impl Projection<'_> {
             )
             .await
             .map_err(|error| refuse(started, error))?;
+        if held.kind == "Auto" {
+            return Ok(automation(held));
+        }
         let authorities = self
             .authorities(&trust(&held.issue.coordinate, &held.pulls))
             .await
@@ -70,13 +73,34 @@ impl Projection<'_> {
             kind: held.kind,
             ready: reasons.is_empty() && accepted,
             checks,
-            acceptance: reviewed.evaluation,
+            acceptance: Some(reviewed.evaluation),
+            automation: None,
             reasons,
             distribution_evidence: distribution,
             observed_at: projection::now(),
         };
         projection::record("issue.ready", started.elapsed(), "fresh");
         Ok(readiness)
+    }
+}
+
+fn automation(held: projection::CompleteIssue) -> Readiness {
+    let automation = concord_core::automation::held(&held.kind, &held.body, &held.issue.state);
+    let children = held.sub_issues.iter().all(|issue| issue.state == "closed");
+    let blockers = held.blocked_by.iter().all(|issue| issue.state == "closed");
+    let (checks, mut reasons) = conditions(&held.body, &held.kind, children, blockers);
+    reasons.push("Auto is automation-held: Plumb owns verification and closure; Concord projects current facts read-only".to_string());
+    Readiness {
+        schema: projection::READINESS,
+        issue: held.issue,
+        kind: held.kind,
+        ready: false,
+        checks,
+        acceptance: None,
+        automation,
+        reasons,
+        distribution_evidence: Vec::new(),
+        observed_at: projection::now(),
     }
 }
 
@@ -153,6 +177,7 @@ pub(super) fn outcome(body: &str, kind: &str) -> Option<String> {
 
 fn required_sections(kind: &str) -> &'static [&'static str] {
     match kind.to_ascii_lowercase().as_str() {
+        "auto" => &["operation", "target", "change", "acceptance", "non-goals"],
         "feature" => &["problem", "outcome", "acceptance", "non-goals"],
         "bug" => &[
             "problem",

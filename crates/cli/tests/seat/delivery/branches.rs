@@ -14,6 +14,7 @@ fn branches() {
     let remote = space.join("remote.git");
     for branch in [
         "release/v1.2.3",
+        "auto/55",
         "feature/7",
         "task/5",
         "bug/6",
@@ -23,6 +24,7 @@ fn branches() {
     ] {
         git(&remote, &["branch", branch, "main"]);
     }
+    git(&seat.source, &["branch", "auto/56"]);
     git(&seat.source, &["branch", "topic"]);
     let issues = json!({"data": {"repository": {
         "i5": issue("CLOSED", "Task"),

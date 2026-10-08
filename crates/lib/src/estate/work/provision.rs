@@ -41,12 +41,14 @@ impl Estate {
                 member.base.clone(),
             );
         }
-        for worktree in request
-            .inspection
-            .worktrees
-            .iter()
-            .filter(|worktree| !worktree.staging)
-        {
+        for worktree in request.inspection.worktrees.iter().filter(|worktree| {
+            !worktree.staging
+                && worktree
+                    .branch
+                    .as_deref()
+                    .and_then(crate::automation::branch)
+                    .is_none()
+        }) {
             let path = worktree
                 .path
                 .canonicalize()

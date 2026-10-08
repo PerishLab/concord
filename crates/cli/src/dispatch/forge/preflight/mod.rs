@@ -1,3 +1,4 @@
+mod automation;
 mod existing;
 mod github;
 
@@ -52,6 +53,8 @@ pub struct Execution {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Candidate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub automation: Option<concord_core::automation::Held>,
     pub issue: Issue,
     pub kind: String,
     pub updated: String,
@@ -191,8 +194,12 @@ fn candidate(
     if signals.is_empty() {
         return None;
     }
+    let kind = raw.issue_type.map(|kind| kind.name).unwrap_or_default();
+    let automation = concord_core::automation::held(&kind, &raw.body, &raw.state);
     Some(Candidate {
+        automation,
         issue: Issue {
+            automation: None,
             node: raw.id,
             coordinate: Coordinate {
                 owner: proposal.owner.clone(),
@@ -203,7 +210,7 @@ fn candidate(
             title: raw.title,
             state: raw.state.to_ascii_lowercase(),
         },
-        kind: raw.issue_type.map(|kind| kind.name).unwrap_or_default(),
+        kind,
         updated: raw.updated_at,
         signals,
         execution: Execution {

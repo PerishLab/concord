@@ -94,6 +94,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
         } => {
             let coordinate = Coordinate::parse(&issue)?;
             let observed = observe::issue(&coordinate, &command, timeout).await?;
+            concord_core::automation::admit(&observed.kind)?;
             let anchor = estate
                 .admit(&Admission {
                     node: observed.node,
@@ -164,6 +165,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             let anchor = Coordinate::parse(&issue)?;
             let coordinate = Coordinate::parse(&coordinate)?;
             let observed = observe::issue(&coordinate, &command, timeout).await?;
+            concord_core::automation::admit(&observed.kind)?;
             let anchor = estate
                 .reconcile(&Reconcile {
                     anchor,

@@ -40,6 +40,7 @@ fn inventory() {
             "concord.delivery.native",
             "concord.delivery.provider",
             "concord.estate.upgrade_required",
+            "concord.issue.automation",
             "concord.issue.needs",
         ]
     );

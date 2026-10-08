@@ -50,6 +50,10 @@ pub struct PullRelation {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Existing {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub observations: Vec<super::automation::Observation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub automation: Option<concord_core::automation::Held>,
     pub schema: &'static str,
     pub issue: Issue,
     pub kind: String,
@@ -82,7 +86,9 @@ pub async fn run(estate: &Estate, request: Request<'_>) -> Result<Existing> {
         Ok(complete) => complete,
         Err(fault) => {
             return Ok(Existing {
+                observations: Vec::new(),
                 schema: SCHEMA,
+                automation: None,
                 issue: placeholder(&coordinate),
                 kind: String::new(),
                 execution: empty(),
@@ -99,6 +105,18 @@ pub async fn run(estate: &Estate, request: Request<'_>) -> Result<Existing> {
     };
     let anchors = estate.issues().await?;
     let members = estate.issue_worktrees().await?;
+    let observed = super::automation::observe(
+        estate,
+        &coordinate,
+        &super::Bounds {
+            command: request.command,
+            first: request.page_size,
+            pages: request.max_pages,
+            timeout: request.timeout,
+        },
+        &members,
+    )
+    .await;
     let occupancy = estate.occupancy()?;
     let root = held(&members, &complete.issue.node);
     let view = View {
@@ -130,7 +148,11 @@ pub async fn run(estate: &Estate, request: Request<'_>) -> Result<Existing> {
         &view,
     )?;
     relationships.sort_by_key(|held| (held.kind.clone(), held.issue.coordinate.number));
+    let automation =
+        concord_core::automation::held(&complete.kind, &complete.body, &complete.issue.state);
     Ok(Existing {
+        observations: observed.observations,
+        automation,
         schema: SCHEMA,
         issue: complete.issue,
         kind: complete.kind,
@@ -144,8 +166,8 @@ pub async fn run(estate: &Estate, request: Request<'_>) -> Result<Existing> {
                 pull,
             })
             .collect(),
-        diagnostics: Vec::new(),
-        complete: true,
+        diagnostics: observed.diagnostics,
+        complete: observed.complete,
         observed_at: projection::now(),
     })
 }
@@ -240,6 +262,7 @@ fn empty() -> Execution {
 
 fn placeholder(coordinate: &Coordinate) -> Issue {
     Issue {
+        automation: None,
         node: String::new(),
         coordinate: coordinate.clone(),
         url: String::new(),

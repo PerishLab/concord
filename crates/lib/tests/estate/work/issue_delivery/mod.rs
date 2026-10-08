@@ -239,20 +239,17 @@ pub(super) fn snapshot() -> plumb::delivery::Snapshot {
 }
 
 fn proof(tree: String, producer: &str, depot: &str) -> Descriptor {
-    let mut proof = Descriptor {
-        schema: plumb::guard::SCHEMA.into(),
-        repository: "PerishLab/probe".into(),
-        tree,
-        plumb: producer.into(),
-        depot: depot.into(),
-        platform: plumb::config::platform(),
-        actions: vec![Action {
-            name: "guard/test".into(),
-            input: "3".repeat(64),
-            world: "4".repeat(64),
-        }],
-        digest: String::new(),
-    };
+    let mut proof: Descriptor = serde_json::from_value(serde_json::json!({
+        "schema": plumb::guard::SCHEMA,
+        "repository": "PerishLab/probe",
+        "tree": tree,
+        "plumb": producer,
+        "depot": depot,
+        "platform": plumb::config::platform(),
+        "actions": [{"name": "guard/test", "input": "3".repeat(64), "world": "4".repeat(64)}],
+        "digest": ""
+    }))
+    .expect("legacy Guard proof fixture");
     let claim = Claim {
         schema: &proof.schema,
         repository: &proof.repository,

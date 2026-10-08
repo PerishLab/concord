@@ -1,6 +1,8 @@
 pub mod acceptance;
 #[path = "runtime/activity.rs"]
 pub mod activity;
+#[path = "protocol/automation.rs"]
+pub mod automation;
 #[path = "runtime/config.rs"]
 mod config;
 #[path = "runtime/error.rs"]

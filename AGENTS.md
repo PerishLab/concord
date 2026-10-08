@@ -29,6 +29,9 @@ of copying its answer here.
   Member, Claim, Boundary and pull-reference state relates directly to one
   Anchor and uses its stable node identity beneath `.issues`; Issue title and
   coordinate changes cannot move local payload.
+- Auto Issues remain automation-held and read-only. Plumb owns their operation,
+  branches, pull requests, verification and lifecycle. Concord observes their
+  overlap with human Claims without acquiring custody or excluding work.
 - A Claim is a normalized declaration used for coordination and one Member's
   Boundary proof. It is not ownership, a lease, or a global exclusion lock.
   Overlap between Members sharing one canonical repository is an observation,
