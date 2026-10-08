@@ -20,6 +20,9 @@ struct Settings {
 #[cascade(section)]
 struct Report {
     file: PathBuf,
+    spool: PathBuf,
+    ceiling: u64,
+    segment: u64,
 }
 
 #[derive(Debug, Default, PartialEq, Cascade)]
@@ -34,6 +37,9 @@ pub(crate) struct Run {
 }
 
 static COMMAND: OnceLock<Context> = OnceLock::new();
+
+const CEILING: u64 = 512 * 1024 * 1024;
+const SEGMENT: u64 = 16 * 1024 * 1024;
 
 impl Run {
     pub(crate) fn start(command: &'static str) -> Option<Self> {
@@ -99,10 +105,8 @@ fn load() -> Option<(Engine, Context)> {
     if !settings.enabled {
         return None;
     }
-    if settings.report.file.as_os_str().is_empty() {
-        eprintln!(
-            "concord locus config: CONCORD_LOCUS_REPORT_FILE is required when observation is enabled"
-        );
+    if let Some(problem) = refusal(&settings.report) {
+        eprintln!("concord locus config: {problem}");
         return None;
     }
     match build(settings) {
@@ -114,14 +118,38 @@ fn load() -> Option<(Engine, Context)> {
     }
 }
 
+fn refusal(report: &Report) -> Option<&'static str> {
+    if !report.file.as_os_str().is_empty() {
+        return Some(
+            "CONCORD_LOCUS_REPORT_FILE is retired; set CONCORD_LOCUS_REPORT_SPOOL to a spool directory",
+        );
+    }
+    if report.spool.as_os_str().is_empty() {
+        return Some("CONCORD_LOCUS_REPORT_SPOOL is required when observation is enabled");
+    }
+    None
+}
+
 fn build(settings: Settings) -> Result<(Engine, Context), locus::Error> {
     let trace = Role::trace();
+    let report = settings.report;
+    let ceiling = if report.ceiling == 0 {
+        CEILING
+    } else {
+        report.ceiling
+    };
+    let segment = if report.segment == 0 {
+        SEGMENT
+    } else {
+        report.segment
+    };
     let mut policy = Policy::default()
+        .producer("concord")
         .collector(
             "codex.thread",
             collector::Spec::environment("CODEX_THREAD_ID", 512),
         )
-        .reporter(reporter::Spec::file(settings.report.file));
+        .reporter(reporter::Spec::spool(report.spool, ceiling, segment));
     if !settings.trace.file.as_os_str().is_empty() {
         policy = policy.generator(trace.clone(), generator::Spec::shared(settings.trace.file));
     }

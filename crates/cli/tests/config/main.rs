@@ -1,8 +1,10 @@
-#[path = "seat/spawn.rs"]
+#[path = "../seat/spawn.rs"]
 mod spawn;
 
-#[path = "seat/identity.rs"]
+#[path = "../seat/identity.rs"]
 mod identity;
+
+mod observation;
 
 use serde_json::Value;
 use std::fs;

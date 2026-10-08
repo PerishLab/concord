@@ -14,7 +14,7 @@ pub(super) fn image(scratch: &Path, binary: &Path) -> Command {
     }
     command
         .env("CONCORD_LOCUS_ENABLED", "false")
-        .env("CONCORD_LOCUS_REPORT_FILE", scratch.join("stray.jsonl"))
+        .env("CONCORD_LOCUS_REPORT_SPOOL", scratch.join("stray-spool"))
         .env_remove("CLAUDE_CODE_SESSION_ID")
         .env_remove("GROK_SESSION_ID")
         .env_remove("CODEX_THREAD_ID");
