@@ -1,3 +1,4 @@
+mod branches;
 mod client;
 mod flow;
 mod git;
@@ -6,8 +7,6 @@ mod model;
 mod projection;
 mod pull;
 mod settle;
-#[cfg(test)]
-mod squash;
 
 use crate::args::issue::Delivery;
 use concord_core::{Error, Estate, Result};

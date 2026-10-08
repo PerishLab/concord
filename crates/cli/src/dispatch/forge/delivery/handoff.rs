@@ -38,6 +38,14 @@ async fn request(estate: &Estate, parameters: &Parameters<'_>) -> Result<issue_d
     let observed = Projection::new(parameters.command, 100, 1, parameters.timeout)
         .delivery(&issue)
         .await?;
+    let member = estate.issue_member(&issue).await?;
+    super::branches::clean(
+        estate,
+        &member.integration,
+        parameters.command,
+        parameters.timeout,
+    )
+    .await?;
     issue_delivery::prepare::<Plumb>(
         estate,
         &issue_delivery::Request {

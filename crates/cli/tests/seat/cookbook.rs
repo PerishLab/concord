@@ -35,6 +35,7 @@ fn inventory() {
         codes,
         [
             "concord.boundary.refused",
+            "concord.delivery.branches",
             "concord.delivery.landed",
             "concord.delivery.native",
             "concord.delivery.provider",
