@@ -52,8 +52,9 @@ impl<'a> Service<'a> {
                 .client
                 .all(&self.preparation.base, &self.preparation.projection)
                 .await?;
+            let candidate = &self.preparation.candidate;
             pulls.retain(|pull| {
-                pull.state != State::Closed || pull.merge.is_some() || pull.merged.is_some()
+                pull.state == State::Open || (merged(pull) && &pull.head == candidate)
             });
             if pulls.len() > 1 {
                 return Err(stale("more than one pull matches the exact projection"));
@@ -170,4 +171,8 @@ pub(super) fn stale(message: impl Into<String>) -> Error {
 
 pub(super) fn provider(message: impl Into<String>) -> Error {
     Error::typed("concord.delivery.provider", message)
+}
+
+fn merged(pull: &Pull) -> bool {
+    pull.merge.is_some() || pull.merged.is_some()
 }

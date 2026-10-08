@@ -156,6 +156,16 @@ impl Flow<'_> {
                     base: self.plan.delivery.base.clone(),
                     candidate: self.plan.delivery.candidate.clone(),
                     merge: merge.clone(),
+                    pushed: vec![
+                        plumb::delivery::Pushed {
+                            branch: self.plan.delivery.projection.clone(),
+                            head: self.plan.delivery.candidate.clone(),
+                        },
+                        plumb::delivery::Pushed {
+                            branch: self.plan.delivery.branch.clone(),
+                            head: self.plan.delivery.source.clone(),
+                        },
+                    ],
                 },
             )
             .await?;
@@ -170,6 +180,7 @@ impl Flow<'_> {
                 "merge": merge,
                 "integration": {"head": completion.head},
                 "released": completion.released,
+                "retired": completion.retired,
                 "merged": true,
             }),
             output,

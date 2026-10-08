@@ -114,7 +114,22 @@ impl Estate {
     }
 }
 
-pub(super) fn branch(node: &str) -> String {
+pub(super) fn branch(kind: &str, number: i64) -> Result<String> {
+    let prefix = match kind {
+        "Feature" => "feature",
+        "Bug" => "bug",
+        "Task" => "task",
+        _ => {
+            return Err(Error::typed(
+                "concord.member.kind",
+                format!("Issue type {kind} names no Member branch; only Feature, Bug and Task do"),
+            ));
+        }
+    };
+    Ok(format!("{prefix}/{number}"))
+}
+
+pub(super) fn legacy(node: &str) -> String {
     let digest = Sha256::digest(node.as_bytes());
     format!("concord/issue-{digest:x}")
 }

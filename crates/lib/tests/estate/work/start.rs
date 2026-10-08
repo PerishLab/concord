@@ -33,15 +33,26 @@ async fn provisioning() {
         issue: issue.clone(),
         node: "I_execution".to_string(),
         stable: "R_concord".to_string(),
+        kind: "Task".to_string(),
         claims: vec!["crates".to_string()],
         revision: 0,
     };
+    let untyped = world
+        .estate
+        .start(&Start {
+            kind: "Epic".to_string(),
+            ..request.clone()
+        })
+        .await
+        .expect_err("an Issue type outside Feature, Bug and Task names no branch");
+    assert_eq!(untyped.code(), "concord.member.kind");
     let member = world
         .estate
         .start(&request)
         .await
         .expect("start Member")
         .member;
+    assert_eq!(member.branch, "task/26");
     assert_eq!(member.base, advanced);
     assert_eq!(text(&world.source, &["rev-parse", "HEAD"]), advanced);
     assert_eq!(
@@ -77,6 +88,7 @@ async fn unchanged() {
             issue: issue.clone(),
             node: "I_research".to_string(),
             stable: "R_concord".to_string(),
+            kind: "Task".to_string(),
             claims: vec!["docs".to_string()],
             revision: 0,
         })

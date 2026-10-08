@@ -109,6 +109,7 @@ pub(super) async fn fixture(producer: &str, depot: &str) -> Fixture {
             issue: issue.clone(),
             node: "I_delivery".into(),
             stable: "R_probe".into(),
+            kind: "Task".to_string(),
             claims: vec!["topic.md".into()],
             revision: 0,
         })

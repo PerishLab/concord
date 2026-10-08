@@ -95,6 +95,16 @@ async fn completion() {
         base: plan.delivery.base.clone(),
         candidate: plan.delivery.candidate.clone(),
         merge: merge.clone(),
+        pushed: vec![
+            plumb::delivery::Pushed {
+                branch: plan.delivery.projection.clone(),
+                head: plan.delivery.candidate.clone(),
+            },
+            plumb::delivery::Pushed {
+                branch: plan.delivery.branch.clone(),
+                head: plan.delivery.source.clone(),
+            },
+        ],
     };
     let integration = estate
         .integration(&issue)
@@ -124,6 +134,25 @@ async fn completion() {
     assert_eq!(completed.revision, 4);
     assert_eq!(completed.head, merge);
     assert!(completed.released);
+    assert_eq!(
+        completed.retired.deleted,
+        [
+            plan.delivery.projection.clone(),
+            plan.delivery.branch.clone()
+        ]
+    );
+    assert!(
+        completed.retired.kept.is_empty(),
+        "{:?}",
+        completed.retired.kept
+    );
+    assert_eq!(
+        text(
+            &source,
+            &["branch", "--list", plan.delivery.branch.as_str()]
+        ),
+        ""
+    );
     assert_eq!(text(&source, &["rev-parse", "HEAD"]), completed.head);
     assert_eq!(
         estate

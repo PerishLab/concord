@@ -2,7 +2,6 @@
 pub(super) mod unix {
     use super::super::spawn;
     use serde_json::{Value, json};
-    use sha2::{Digest, Sha256};
     use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
     use std::process::{Command, Output};
@@ -69,7 +68,7 @@ pub(super) mod unix {
         );
         let pending = fixture.path().join(".issues/I_execution/worktree");
         std::fs::create_dir_all(pending.parent().expect("Issue seat")).expect("Issue seat");
-        let branch = format!("concord/issue-{:x}", Sha256::digest(b"I_execution"));
+        let branch = "feature/26".to_string();
         git(
             &source,
             &[

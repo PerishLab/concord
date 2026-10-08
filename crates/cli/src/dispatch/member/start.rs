@@ -9,15 +9,15 @@ const LIMIT: usize = 32 * 1024;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Reply {
-    node: String,
-    stable: String,
+pub(super) struct Reply {
+    pub node: String,
+    pub stable: String,
     coordinate: String,
     branch: String,
     number: i64,
     url: String,
     state: String,
-    kind: String,
+    pub kind: String,
     leaves: usize,
     truncated: bool,
     rulesets: Vec<Ruleset>,
@@ -43,16 +43,7 @@ struct Ruleset {
     rules: Vec<String>,
 }
 
-pub(super) struct Observation {
-    pub node: String,
-    pub stable: String,
-}
-
-pub(super) async fn observe(
-    issue: &Coordinate,
-    command: &Path,
-    timeout: u64,
-) -> Result<Observation> {
+pub(super) async fn observe(issue: &Coordinate, command: &Path, timeout: u64) -> Result<Reply> {
     let query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){id nameWithOwner defaultBranchRef{name} issue(number:$number){id number url state issueType{name} subIssuesSummary{total} labels(first:100){nodes{name} pageInfo{hasNextPage}}} rulesets(first:100,includeParents:true){nodes{enforcement target conditions{refName{include exclude}} bypassActors(first:100){totalCount} rules(first:100){nodes{type}pageInfo{hasNextPage}}}pageInfo{hasNextPage}}}}";
     let selector = ".data.repository as $r | $r.issue as $i | if $r == null or $i == null then null else {node:$i.id,stable:$r.id,coordinate:$r.nameWithOwner,branch:($r.defaultBranchRef.name // \"\"),number:$i.number,url:$i.url,state:$i.state,kind:($i.issueType.name // \"\"),leaves:$i.subIssuesSummary.total,truncated:$r.rulesets.pageInfo.hasNextPage,rulesets:[$r.rulesets.nodes[]|{enforcement:.enforcement,target:.target,include:(.conditions.refName.include // []),exclude:(.conditions.refName.exclude // []),bypass:.bypassActors.totalCount,truncated:.rules.pageInfo.hasNextPage,rules:[.rules.nodes[].type]}],labels:{names:[$i.labels.nodes[].name],truncated:$i.labels.pageInfo.hasNextPage}} end";
     let mut process = Command::new(command);
@@ -90,7 +81,7 @@ pub(super) async fn observe(
     shape(issue, reply)
 }
 
-fn shape(issue: &Coordinate, reply: Reply) -> Result<Observation> {
+fn shape(issue: &Coordinate, reply: Reply) -> Result<Reply> {
     let expected = format!(
         "https://github.com/{}/{}/issues/{}",
         issue.owner, issue.repository, issue.number
@@ -144,10 +135,7 @@ fn shape(issue: &Coordinate, reply: Reply) -> Result<Observation> {
             "effective main rules must require pull requests and block deletion and force pushes without bypass",
         ));
     }
-    Ok(Observation {
-        node: reply.node,
-        stable: reply.stable,
-    })
+    Ok(reply)
 }
 
 fn protected(ruleset: &Ruleset) -> bool {
