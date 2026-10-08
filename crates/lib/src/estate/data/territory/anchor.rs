@@ -249,11 +249,14 @@ fn assess(
         );
     }
     let mut found = BTreeSet::new();
-    for worktree in observed
-        .worktrees
-        .iter()
-        .filter(|worktree| !worktree.staging)
-    {
+    for worktree in observed.worktrees.iter().filter(|worktree| {
+        !worktree.staging
+            && worktree
+                .branch
+                .as_deref()
+                .and_then(crate::automation::branch)
+                .is_none()
+    }) {
         let Some(path) = worktree.path.canonicalize().ok() else {
             continue;
         };

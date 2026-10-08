@@ -6,7 +6,7 @@ mod delivery;
 mod execution;
 #[path = "seat/existing.rs"]
 mod existing;
-#[path = "seat/issue.rs"]
+#[path = "seat/issue/mod.rs"]
 mod issue;
 #[path = "seat/preflight.rs"]
 mod preflight;

@@ -1,5 +1,8 @@
 pub(super) mod authority;
 mod page;
+mod readiness;
+
+pub use readiness::{Readiness, ReadinessChecks};
 
 use concord_core::{Coordinate, Error, Result};
 use serde::Serialize;
@@ -91,7 +94,9 @@ fn brief(
             )
         })?
         .to_string();
+    let automation = concord_core::automation::held(&kind, &raw.body, &issue.state);
     Ok(Brief {
+        automation,
         schema: BRIEF,
         issue,
         kind,
@@ -117,6 +122,8 @@ fn brief(
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Issue {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub automation: Option<concord_core::automation::Held>,
     pub node: String,
     #[serde(flatten)]
     pub coordinate: Coordinate,
@@ -156,6 +163,8 @@ pub struct SubIssueSummary {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Brief {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub automation: Option<concord_core::automation::Held>,
     pub schema: &'static str,
     pub issue: Issue,
     pub kind: String,
@@ -198,30 +207,6 @@ pub struct Graph {
     pub edges: Vec<Edge>,
     pub diagnostics: Vec<Diagnostic>,
     pub complete: bool,
-    pub observed_at: u64,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct ReadinessChecks {
-    pub required_sections: bool,
-    pub acceptance_nonempty: bool,
-    pub acceptance_settled: bool,
-    pub acceptance_total: usize,
-    pub acceptance_open: usize,
-    pub sub_issues_closed: bool,
-    pub blockers_closed: bool,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct Readiness {
-    pub schema: &'static str,
-    pub issue: Issue,
-    pub kind: String,
-    pub ready: bool,
-    pub checks: ReadinessChecks,
-    pub acceptance: concord_core::acceptance::Evaluation,
-    pub reasons: Vec<String>,
-    pub distribution_evidence: Vec<String>,
     pub observed_at: u64,
 }
 

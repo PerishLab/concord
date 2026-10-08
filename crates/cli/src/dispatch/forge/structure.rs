@@ -19,13 +19,15 @@ impl Projection<'_> {
                     ]),
                 )
                 .await;
-            let held = match held {
+            let mut held = match held {
                 Ok(held) => held,
                 Err(error) => {
                     walk.fault(subject, error.code, error.message);
                     continue;
                 }
             };
+            held.issue.automation =
+                concord_core::automation::held(&held.kind, &held.body, &held.issue.state);
             walk.nodes.insert(subject.clone(), held.issue.clone());
             let mut related = relationships(&subject, held);
             related.sort_by_key(|(issue, _)| projection::key(&issue.coordinate));

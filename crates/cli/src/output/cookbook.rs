@@ -34,6 +34,15 @@ pub(crate) fn reference(code: &str) -> Option<String> {
 fn book() -> Cookbook {
     Cookbook::new([
         entry(
+            "concord.issue.automation",
+            "The selected Auto Issue is automation-held and has no Concord Anchor or Member.",
+            "Read its operation and state through Issue projections. Plumb owns follow, verification, recovery and closure. Diagnose the recorded blocker and rerun its owner; any business-source repair belongs to an ordinary typed Issue and its Member.",
+            (
+                "Read the exact Auto Issue, linked pull, stopped-step evidence and native blockers without attaching it.",
+                "The owning automation resumes within its registered paths, or an ordinary Issue carries the required human repair.",
+            ),
+        ),
+        entry(
             "concord.boundary.refused",
             "A Member Claim or Boundary proof does not authorize the observed committed delta.",
             "Inspect the Member's normalized Claim and committed diff. Narrow the change or explicitly revise the Claim, then create a fresh Boundary proof against the resulting HEAD.",
@@ -44,7 +53,7 @@ fn book() -> Cookbook {
         ),
         entry(
             "concord.delivery.branches",
-            "The delivering repository holds a local or origin branch outside its Issue branch set: `main`, `release/vX.Y.Z`, the branches of live Members in that repository and their `land/` projections, and `<type>/<number>` of an open Issue of that type in that repository.",
+            "The delivering repository holds a local or origin branch outside its Issue branch set: `main`, `release/vX.Y.Z`, automation-held `auto/<number>` refs, the branches of live Members in that repository and their `land/` projections, and `<type>/<number>` of an open Issue of that type in that repository.",
             "Delete each named branch, or give work worth keeping an open Issue and rename the branch to `<type>/<number>`, then re-run the refused command. Concord never deletes these branches itself and inspects no other repository.",
             (
                 "Read the refusal's branch list, with each branch's place and reason, and inspect `git log main..<branch>` before deleting anything.",

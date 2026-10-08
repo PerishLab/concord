@@ -99,6 +99,9 @@ pub(super) async fn clean(
 }
 
 fn judge(branch: &str, main: &str, live: &BTreeSet<String>) -> Verdict {
+    if concord_core::automation::branch(branch).is_some() {
+        return Verdict::Held;
+    }
     if branch == main || live.contains(branch) || release(branch) {
         return Verdict::Held;
     }

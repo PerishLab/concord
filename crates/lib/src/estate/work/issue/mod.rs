@@ -115,6 +115,7 @@ impl Estate {
 }
 
 pub(super) fn branch(kind: &str, number: i64) -> Result<String> {
+    crate::automation::admit(kind)?;
     let prefix = match kind {
         "Feature" => "feature",
         "Bug" => "bug",

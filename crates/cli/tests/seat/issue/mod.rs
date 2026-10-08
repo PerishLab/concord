@@ -1,4 +1,9 @@
 #[cfg(unix)]
+mod automation;
+#[cfg(unix)]
+mod fixture;
+
+#[cfg(unix)]
 mod unix {
     use super::super::spawn;
     use serde_json::{Value, json};

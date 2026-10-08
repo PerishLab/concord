@@ -243,20 +243,17 @@ mod unix {
     pub(super) fn guard(member: &Path, repository: &str) {
         let authority = Authority::released().expect("compiled Plumb authority");
         let tree = text(member, &["rev-parse", "HEAD^{tree}"]);
-        let mut proof = Descriptor {
-            schema: plumb::guard::SCHEMA.into(),
-            repository: repository.into(),
-            tree,
-            plumb: authority.producer().into(),
-            depot: authority.depot().into(),
-            platform: plumb::config::platform(),
-            actions: vec![Action {
-                name: "guard/test".into(),
-                input: "3".repeat(64),
-                world: "4".repeat(64),
-            }],
-            digest: String::new(),
-        };
+        let mut proof: Descriptor = serde_json::from_value(serde_json::json!({
+            "schema": plumb::guard::SCHEMA,
+            "repository": repository,
+            "tree": tree,
+            "plumb": authority.producer(),
+            "depot": authority.depot(),
+            "platform": plumb::config::platform(),
+            "actions": [{"name": "guard/test", "input": "3".repeat(64), "world": "4".repeat(64)}],
+            "digest": ""
+        }))
+        .expect("legacy Guard proof fixture");
         proof.digest = digest(&proof);
         let token = proof.encode().expect("proof");
         git(
