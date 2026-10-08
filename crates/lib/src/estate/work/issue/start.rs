@@ -2,7 +2,7 @@ use super::super::Estate;
 use super::super::integration::{self, TRACKING};
 use super::super::overlap::OverlapMember;
 use super::super::provision::{Inventory, Provision};
-use super::{IssueMemberChange, IssueWorktree, branch, issue_stale};
+use super::{IssueMemberChange, IssueWorktree, branch, issue_stale, legacy};
 use crate::{Error, Result, component, git};
 use plumb::integration::{Expectation, Relation};
 use std::path::{Path, PathBuf};
@@ -14,6 +14,7 @@ struct Replay<'a> {
     claims: &'a [String],
     path: &'a Path,
     target: &'a str,
+    name: &'a str,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -21,6 +22,7 @@ pub struct Start {
     pub issue: super::super::super::Coordinate,
     pub node: String,
     pub stable: String,
+    pub kind: String,
     pub claims: Vec<String>,
     pub revision: i64,
 }
@@ -30,6 +32,7 @@ impl Estate {
         component("Issue node", &request.node)?;
         component("repository node", &request.stable)?;
         let claims = crate::claim::normalize(&request.claims)?;
+        let name = branch(&request.kind, request.issue.number)?;
         let anchor = self.issue(&request.issue).await?;
         observed(&anchor.node, &request.node, "Issue")?;
         let integration = self.integration(&anchor.coordinate).await?;
@@ -87,11 +90,11 @@ impl Estate {
                     claims: &claims,
                     path: &path,
                     target: &target,
+                    name: &name,
                 })
                 .await;
         }
         issue_stale(anchor.revision, request.revision)?;
-        let name = branch(&anchor.node);
         Provision {
             source: &source,
             path: &path,
@@ -224,7 +227,9 @@ impl Replay<'_> {
         {
             return Err(Error::new("revision or repository changed"));
         }
-        if self.member.branch != branch(&self.anchor.node) || self.member.base != self.target {
+        let named =
+            self.member.branch == self.name || self.member.branch == legacy(&self.anchor.node);
+        if !named || self.member.base != self.target {
             return Err(Error::new("branch or baseline changed"));
         }
         if self.member.claims != self.claims || self.member.proof.is_some() {

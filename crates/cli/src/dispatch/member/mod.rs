@@ -30,6 +30,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                         issue,
                         node: observed.node,
                         stable: observed.stable,
+                        kind: observed.kind,
                         claims: claim,
                         revision,
                     })

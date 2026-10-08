@@ -118,6 +118,7 @@ pub(super) mod delivery {
         pub base: String,
         pub candidate: String,
         pub merge: String,
+        pub pushed: Vec<plumb::delivery::Pushed>,
     }
 
     #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -125,6 +126,7 @@ pub(super) mod delivery {
         pub revision: i64,
         pub head: String,
         pub released: bool,
+        pub retired: plumb::delivery::Retired,
     }
 
     impl Estate {
@@ -193,7 +195,7 @@ pub(super) mod delivery {
             request
                 .authority
                 .validate::<super::super::authority::Plumb>(&held)?;
-            match &request.authority {
+            let landed = match &request.authority {
                 Authority::Plumb { .. } => {
                     plumb::delivery::landed(&source, &request.candidate, &request.merge)
                 }
@@ -220,10 +222,12 @@ pub(super) mod delivery {
             } else {
                 request.revision
             };
+            let retired = landed.retire(&source, &held.remote, &request.pushed);
             Ok(Completion {
                 revision,
                 head: target,
                 released: active,
+                retired,
             })
         }
     }

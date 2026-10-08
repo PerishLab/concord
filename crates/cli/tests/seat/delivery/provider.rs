@@ -98,7 +98,7 @@ pub fn projection(root: &Path) -> String {
     format!(
         r#"reply() {{
   state=$(cat '{state}')
-  candidate=$(git --git-dir='{remote}' rev-parse "refs/heads/$(cat '{head}')") || exit 1
+  candidate=$(cat '{merge}.head' 2>/dev/null || git --git-dir='{remote}' rev-parse "refs/heads/$(cat '{head}')") || exit 1
   merge=$(cat '{merge}' 2>/dev/null || true)
   jq -cn --arg id PR_node --argjson number 7 --arg url https://github.com/PerishLab/probe/pull/7 --arg state "$state" --arg base "$(cat '{base}')" --arg head "$candidate" --arg merge "$merge" --arg title "$(cat '{title}')" --arg body "$(cat '{body}')" '{{id:$id,number:$number,url:$url,state:$state,baseRefName:$base,headRefOid:$head,mergeCommit:(if $merge == "" then null else {{oid:$merge}} end),mergedAt:(if $merge == "" then null else "2026-09-29T00:00:02Z" end),updatedAt:"2026-09-29T00:00:03Z",title:$title,body:$body}}'
 }}
@@ -138,6 +138,7 @@ if [ "$1 $2" = "pr create" ]; then
     shift
   done
   printf '%s' OPEN > '{state}'
+  rm -f '{merge}' '{merge}.head'
   printf '%s\n' https://github.com/PerishLab/probe/pull/7
   exit 0
 fi
@@ -174,6 +175,7 @@ if [ "$1 $2" = "pr merge" ]; then
   commit=$(printf '%s\n\n%s\n' "$subject" "$message" | git -c user.name=GitHub -c user.email=noreply@github.com commit-tree "$tree" -p "$parent") || exit 1
   git update-ref refs/heads/main "$commit" || exit 1
   printf '%s' "$commit" > '{merge}'
+  printf '%s' "$candidate" > '{merge}.head'
   printf '%s' MERGED > '{state}'
   exit 0
 fi

@@ -88,6 +88,7 @@ impl World {
                 issue: issue.clone(),
                 node: node.to_string(),
                 stable: stable.to_string(),
+                kind: "Task".to_string(),
                 claims: vec!["crates".to_string()],
                 revision: 0,
             })
@@ -135,6 +136,7 @@ impl World {
                 issue,
                 node: "I_foreign".to_string(),
                 stable: "R_plumb".to_string(),
+                kind: "Task".to_string(),
                 claims: vec!["crates".to_string()],
                 revision: 0,
             })

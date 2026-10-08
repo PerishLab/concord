@@ -79,6 +79,7 @@ async fn lifecycle() {
             issue: issue.clone(),
             node: "I_execution".to_string(),
             stable: "R_concord".to_string(),
+            kind: "Task".to_string(),
             claims: vec!["crates".to_string()],
             revision: 0,
         })
@@ -87,7 +88,7 @@ async fn lifecycle() {
         .member;
     assert_eq!(member.issue, issue);
     assert_eq!(member.node, "I_execution");
-    assert!(member.branch.starts_with("concord/issue-"));
+    assert_eq!(member.branch, "task/26");
     let path = temp.path().join(".issues/I_execution/worktree");
     assert!(path.join(".git").is_file());
     let duplicate = estate
@@ -95,6 +96,7 @@ async fn lifecycle() {
             issue: issue.clone(),
             node: "I_execution".to_string(),
             stable: "R_concord".to_string(),
+            kind: "Task".to_string(),
             claims: vec!["docs".to_string()],
             revision: 1,
         })
