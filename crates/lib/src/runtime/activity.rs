@@ -17,6 +17,7 @@ pub enum Agent {
     Claude,
     Grok,
     Codex,
+    Santi,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -78,6 +79,7 @@ impl Agent {
             Self::Claude => "claude",
             Self::Grok => "grok",
             Self::Codex => "codex",
+            Self::Santi => "santi",
         }
     }
 }
