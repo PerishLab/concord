@@ -166,13 +166,16 @@ fn reasons(missing: &[&str], checks: &ReadinessChecks) -> Vec<String> {
 }
 
 pub(super) fn outcome(body: &str, kind: &str) -> Option<String> {
-    let name = match kind.to_ascii_lowercase().as_str() {
+    sections(body)
+        .remove(heading(kind))
+        .filter(|outcome| !outcome.trim().is_empty())
+}
+
+pub(super) fn heading(kind: &str) -> &'static str {
+    match kind.to_ascii_lowercase().as_str() {
         "bug" => "expected outcome",
         _ => "outcome",
-    };
-    sections(body)
-        .remove(name)
-        .filter(|outcome| !outcome.trim().is_empty())
+    }
 }
 
 fn required_sections(kind: &str) -> &'static [&'static str] {
@@ -202,6 +205,33 @@ mod tests {
         let held = sections(body);
         assert_eq!(held["outcome"], "Done");
         assert_eq!(checkboxes(&held["acceptance"]), (2, 1));
+    }
+
+    #[test]
+    fn headings() {
+        for (kind, heading, other) in [
+            ("Bug", "Expected outcome", "Outcome"),
+            ("Feature", "Outcome", "Expected outcome"),
+            ("Task", "Outcome", "Expected outcome"),
+        ] {
+            for body in [
+                "".to_string(),
+                format!("## {heading}\n \n"),
+                format!("## {other}\nWrong"),
+            ] {
+                assert_eq!(outcome(&body, kind), None, "{kind}: {body}");
+            }
+            assert_eq!(
+                outcome(&format!("## {heading}\nFixed"), kind).as_deref(),
+                Some("Fixed")
+            );
+        }
+        assert_eq!(outcome("## Expected result\nFixed", "Bug"), None);
+        assert_eq!(
+            outcome("## Expected outcome\nFixed", "bUg").as_deref(),
+            Some("Fixed")
+        );
+        assert_eq!(outcome("## Expected outcome\nFixed", " Bug "), None);
     }
 
     #[test]

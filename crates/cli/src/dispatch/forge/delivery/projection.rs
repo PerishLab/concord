@@ -74,9 +74,18 @@ impl Projection<'_> {
             })?
             .to_string();
         let outcome = super::super::readiness::outcome(&raw.body, &kind).ok_or_else(|| {
-            Error::typed(
+            let section = super::super::readiness::heading(&kind);
+            let heading = if section == "expected outcome" {
+                "Expected outcome"
+            } else {
+                "Outcome"
+            };
+            Error::detailed(
                 "concord.delivery.outcome",
-                "GitHub Issue has no non-empty Outcome section",
+                format!(
+                    "GitHub Issue type {kind} requires a non-empty {heading} section; add `## {heading}` with the required outcome text"
+                ),
+                serde_json::json!({"kind": kind, "section": section}),
             )
         })?;
         let args = crate::args::acceptance::Observe {

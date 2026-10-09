@@ -1,5 +1,5 @@
 use super::super::super::execution::unix::git;
-use super::super::provider::consume;
+use super::super::provider::{consume, projection, tool};
 use super::super::unix::{prepare, refused};
 use super::Seat;
 use serde_json::{Value, json};
@@ -98,4 +98,71 @@ fn branches() {
 
 fn issue(state: &str, kind: &str) -> Value {
     json!({"__typename": "Issue", "state": state, "issueType": {"name": kind}})
+}
+
+#[test]
+fn sections() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    let seat = Seat::open(fixture.path());
+    for (kind, heading, section) in [
+        ("Bug", "Expected outcome", "expected outcome"),
+        ("Feature", "Outcome", "outcome"),
+        ("Task", "Outcome", "outcome"),
+    ] {
+        for body in [
+            "",
+            &format!("## {heading}\n \n"),
+            &format!("## {heading}\nFixed"),
+        ] {
+            let encoded = serde_json::to_string(body).unwrap();
+            let script = projection(seat.space).replace("Task", kind).replace(
+                "## Outcome\\nPipe exact plan",
+                &encoded[1..encoded.len() - 1],
+            );
+            let provider = tool(seat.space, "outcome-provider", script);
+            let structured = invoke(&seat, &provider, true);
+            assert!(!structured.status.success());
+            let error: Value = serde_json::from_slice(&structured.stderr).expect("error JSON");
+            if body.ends_with("Fixed") {
+                assert_ne!(
+                    error["error"]["code"], "concord.delivery.outcome",
+                    "{error}"
+                );
+                continue;
+            }
+            assert_eq!(
+                error["error"]["code"], "concord.delivery.outcome",
+                "{error}"
+            );
+            assert_eq!(error["error"]["details"]["kind"], kind);
+            assert_eq!(error["error"]["details"]["section"], section);
+            let message = error["error"]["message"].as_str().unwrap();
+            assert!(message.contains(&format!("type {kind}")));
+            assert!(message.contains(&format!("`## {heading}`")));
+            let human = invoke(&seat, &provider, false);
+            assert!(!human.status.success());
+            assert!(String::from_utf8_lossy(&human.stderr).contains(message));
+        }
+    }
+}
+
+fn invoke(seat: &Seat<'_>, provider: &std::path::Path, json: bool) -> std::process::Output {
+    let mut command = super::super::super::spawn::concord(seat.space);
+    command.args(["--root", seat.space.to_str().unwrap()]);
+    if json {
+        command.arg("--json");
+    }
+    command
+        .args([
+            "issue",
+            "delivery",
+            "prepare",
+            "PerishLab/probe#1",
+            "--revision",
+            &seat.revision(),
+            "--github-command",
+            provider.to_str().unwrap(),
+        ])
+        .output()
+        .expect("prepare")
 }
