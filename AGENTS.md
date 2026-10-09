@@ -62,12 +62,14 @@ of copying its answer here.
 - Optional Locus facts and the private activity ledger are observations only.
   They never establish authorship, ownership, presence, authorization, or
   lifecycle state and never replace a command result.
-- Locus observation is on only with `CONCORD_LOCUS_ENABLED`. Concord reports
-  as producer `concord` through the Locus spool at
-  `CONCORD_LOCUS_REPORT_SPOOL`, bounded by `CONCORD_LOCUS_REPORT_CEILING`
-  (default 512 MiB) in `CONCORD_LOCUS_REPORT_SEGMENT` segments (default
-  16 MiB). The retired `CONCORD_LOCUS_REPORT_FILE` refuses visibly and leaves
-  observation off rather than being ignored.
+- Locus observation is configured only in the `[locus]` section of
+  `concord.toml`: `enabled = true` turns it on, and an optional `endpoint`
+  names the `locus-api` (otherwise the unified `LOCUS_API` value, otherwise
+  `http://127.0.0.1:43308`). No other Locus setting is read from the
+  environment. Concord reports as producer `concord` through the Locus `api`
+  reporter into a buffer under its data home (`state/locus`), and its trace is
+  the single agent session it recognises. Any `CONCORD_LOCUS_*` variable is
+  refused visibly and leaves observation off.
 - Issue briefs, relationship graphs and closure readiness are bounded live
   GitHub projections. They retain exact provider cursors and observation time,
   distinguish structural parentage from blocking, never cache lifecycle state,
@@ -88,7 +90,8 @@ of copying its answer here.
 - Keep protocol agreement separate from coordination and health observations.
   An observation may guide an operator but cannot authorize or block work.
 - Tests spawn Concord only through the shared test seat, which clears inherited
-  `CONCORD_` configuration and redirects observation output into the fixture.
+  `CONCORD_` configuration and `LOCUS_API` and points the home at the fixture,
+  so no test reads the operator's `concord.toml` or writes its Locus buffer.
 
 ## Repository
 

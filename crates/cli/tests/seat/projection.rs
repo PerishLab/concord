@@ -153,7 +153,16 @@ mod unix {
     }
 
     fn locus(space: &Path, provider: &str) {
-        let spool = space.join("projection-spool");
+        let config = space.join("home").join(".concord");
+        std::fs::create_dir_all(&config).expect("config home");
+        let closed = std::net::TcpListener::bind("127.0.0.1:0").expect("listen");
+        let endpoint = format!("http://{}", closed.local_addr().expect("address"));
+        drop(closed);
+        std::fs::write(
+            config.join("concord.toml"),
+            format!("[locus]\nenabled = true\nendpoint = \"{endpoint}\"\n"),
+        )
+        .expect("config");
         let output = spawn::concord(space)
             .args(["--root", space.to_str().expect("root path"), "--json"])
             .args([
@@ -163,13 +172,13 @@ mod unix {
                 "--github-command",
                 provider,
             ])
-            .env("CONCORD_LOCUS_ENABLED", "true")
-            .env("CONCORD_LOCUS_REPORT_SPOOL", &spool)
             .env("CODEX_THREAD_ID", "projection-thread")
             .output()
             .expect("observe projection");
         assert!(output.status.success());
-        let atoms = std::fs::read_to_string(spool.join("active.jsonl")).expect("Locus spool");
+        let atoms =
+            std::fs::read_to_string(config.join("state").join("locus").join("active.jsonl"))
+                .expect("Locus buffer");
         let event = atoms
             .lines()
             .map(|line| serde_json::from_str::<Value>(line).expect("Locus atom"))
