@@ -35,5 +35,5 @@ targets = [
 [workflow.hash.guard]
 "rust" = ["suite://cargo"]
 "test" = ["*"]
-"ectropy" = ["ectropy.toml", "crates", "skills"]
+"ectropy" = ["ectropy.toml", "crates"]
 "plumb" = ["*"]
