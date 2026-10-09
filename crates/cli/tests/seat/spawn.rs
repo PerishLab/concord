@@ -12,9 +12,12 @@ pub(super) fn image(scratch: &Path, binary: &Path) -> Command {
             command.env_remove(name);
         }
     }
+    let home = scratch.join("home");
     command
-        .env("CONCORD_LOCUS_ENABLED", "false")
-        .env("CONCORD_LOCUS_REPORT_SPOOL", scratch.join("stray-spool"))
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .env("LOCALAPPDATA", home.join("data"))
+        .env_remove("LOCUS_API")
         .env_remove("CLAUDE_CODE_SESSION_ID")
         .env_remove("GROK_SESSION_ID")
         .env_remove("CODEX_THREAD_ID");

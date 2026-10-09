@@ -750,9 +750,9 @@ dependencies = [
 
 [[package]]
 name = "locus"
-version = "0.4.1"
+version = "0.4.2"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "4bc30023667e77e680b857cc7ffd00455e63ec7bf6a9885c974137b345fadd13"
+checksum = "02aade60fecc1697ca4aaf4e83bff0f427b866af10f227b384e63dfd4266572c"
 dependencies = [
  "getrandom 0.3.4",
  "locus-macro",
@@ -762,9 +762,9 @@ dependencies = [
 
 [[package]]
 name = "locus-macro"
-version = "0.4.1"
+version = "0.4.2"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "f9e5da35d7fefce3b40ab2c5a647d14b90171f5fdd086d85c9f1bccc6e5424c4"
+checksum = "cfd1d460a020fad813aa4a53867a31d7110759cb85ff61fbd2df536e3ccbcea2"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -59,6 +59,16 @@ pub(crate) fn operator() -> Option<Operator> {
     }
 }
 
+pub fn session() -> Option<String> {
+    operator().map(|operator| operator.session)
+}
+
+pub fn retired(prefix: &str) -> Option<String> {
+    std::env::vars_os()
+        .filter_map(|(name, _)| name.into_string().ok())
+        .find(|name| name.starts_with(prefix))
+}
+
 pub fn host() -> Result<Option<String>> {
     let Some(value) = std::env::var_os("CONCORD_HOST_ID") else {
         return Ok(None);

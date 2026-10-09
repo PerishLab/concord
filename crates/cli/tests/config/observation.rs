@@ -1,81 +1,104 @@
-use super::{path, process};
+use super::{expected, process};
 use serde_json::Value;
 use std::fs;
+use std::io::{Read, Write};
+use std::net::TcpListener;
+use std::path::PathBuf;
 use std::process::Output;
+use std::thread;
 
 struct Observed(tempfile::TempDir);
 
 impl Observed {
-    fn new() -> Self {
-        Self(tempfile::tempdir().expect("home"))
+    fn new(config: &str) -> Self {
+        let home = tempfile::tempdir().expect("home");
+        let file = expected(home.path());
+        fs::create_dir_all(file.parent().expect("config directory")).expect("config directory");
+        fs::write(&file, config).expect("config");
+        Self(home)
     }
 
-    fn run(&self, pairs: &[(&str, String)]) -> Output {
+    fn run(&self, pairs: &[(&str, &str)]) -> Output {
         let mut command = process(self.0.path(), &["config", "path"]);
-        command.env("CONCORD_LOCUS_ENABLED", "true");
-        command.env_remove("CONCORD_LOCUS_REPORT_SPOOL");
-        command.envs(pairs.iter().map(|(name, value)| (name, value)));
+        command.envs(pairs.iter().copied());
         command.output().expect("observe concord")
+    }
+
+    fn buffer(&self) -> PathBuf {
+        expected(self.0.path())
+            .parent()
+            .expect("data home")
+            .join("state")
+            .join("locus")
     }
 }
 
 #[test]
 fn retired() {
-    let home = Observed::new();
-    let (old, spool) = (home.0.path().join("old.jsonl"), home.0.path().join("spool"));
-    let output = home.run(&[
-        ("CONCORD_LOCUS_REPORT_FILE", path(&old)),
-        ("CONCORD_LOCUS_REPORT_SPOOL", path(&spool)),
-    ]);
+    let home = Observed::new("[locus]\nenabled = true\n");
+    let output = home.run(&[("CONCORD_LOCUS_ENABLED", "true")]);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(output.status.success() && stderr.contains("CONCORD_LOCUS_REPORT_FILE is retired"));
-    assert!(!old.exists() && !spool.exists());
+    assert!(output.status.success());
+    assert!(
+        stderr.contains("CONCORD_LOCUS_ENABLED is retired"),
+        "{stderr}"
+    );
+    assert!(!home.buffer().exists());
 }
 
 #[test]
-fn spooled() {
-    let home = Observed::new();
-    let spool = home.0.path().join("spool");
-    let pairs = [
-        ("CONCORD_LOCUS_REPORT_SPOOL", path(&spool)),
-        ("CONCORD_LOCUS_REPORT_CEILING", "8192".to_string()),
-        ("CONCORD_LOCUS_REPORT_SEGMENT", "2048".to_string()),
-    ];
-    let losses: usize = (0..60)
-        .map(|_| home.run(&pairs))
-        .inspect(|output| assert!(output.status.success()))
-        .map(|output| {
-            String::from_utf8_lossy(&output.stderr)
-                .matches("reporter.loss")
-                .count()
-        })
-        .sum();
-    let segments: Vec<_> = fs::read_dir(&spool)
-        .expect("spool")
-        .map(|entry| entry.expect("entry").path())
-        .filter(|path| {
-            let name = path.file_name().unwrap_or_default().to_string_lossy();
-            name == "active.jsonl" || name.starts_with("sealed-")
-        })
+fn disabled() {
+    let home = Observed::new("");
+    let output = home.run(&[]);
+    assert!(output.status.success() && output.stderr.is_empty());
+    assert!(!home.buffer().exists());
+}
+
+#[test]
+fn configured() {
+    let closed = TcpListener::bind("127.0.0.1:0").expect("listen");
+    let endpoint = format!("http://{}", closed.local_addr().expect("address"));
+    drop(closed);
+    let home = Observed::new(&format!(
+        "[locus]\nenabled = true\nendpoint = \"{endpoint}\"\n"
+    ));
+    let output = home.run(&[("CLAUDE_CODE_SESSION_ID", "session-1")]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success());
+    assert!(stderr.contains("reporter.registration"), "{stderr}");
+    let active = fs::read_to_string(home.buffer().join("active.jsonl")).expect("buffer");
+    let atoms: Vec<Value> = active
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("atom"))
         .collect();
-    let bytes: u64 = segments
-        .iter()
-        .map(|path| fs::metadata(path).expect("size").len())
-        .sum();
-    assert!(bytes <= 8192 && losses > 0, "{bytes} {losses}");
-    assert!(
-        !fs::read_to_string(spool.join("loss.jsonl"))
-            .expect("ledger")
-            .is_empty()
-    );
-    for line in segments.iter().flat_map(|path| {
-        fs::read_to_string(path)
-            .expect("segment")
-            .lines()
-            .map(String::from)
-            .collect::<Vec<_>>()
-    }) {
-        let atom: Value = serde_json::from_str(&line).expect("atom");
-        assert!(atom["producer"] == "concord" && atom["id"].is_string());
+    assert!(atoms.len() >= 2);
+    for atom in atoms {
+        assert_eq!(atom["producer"], "concord");
+        assert_eq!(atom["context"]["locus.trace"], "session-1");
     }
+}
+
+#[test]
+fn unified() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("listen");
+    let endpoint = format!("http://{}", listener.local_addr().expect("address"));
+    thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let mut request = Vec::new();
+        let mut chunk = [0; 4096];
+        while !request.ends_with(b"}") {
+            let read = stream.read(&mut chunk).expect("read");
+            request.extend_from_slice(&chunk[..read]);
+        }
+        stream
+            .write_all(b"HTTP/1.1 204 No Content\r\nconnection: close\r\n\r\n")
+            .expect("reply");
+    });
+    let home = Observed::new("[locus]\nenabled = true\n");
+    let output = home.run(&[("LOCUS_API", &endpoint)]);
+    assert!(output.status.success() && output.stderr.is_empty());
+    assert_eq!(
+        fs::read_to_string(home.buffer().join("registration")).expect("marker"),
+        endpoint
+    );
 }
