@@ -91,6 +91,12 @@ of copying its answer here.
 - Tests spawn Concord only through the shared test seat, which clears inherited
   `CONCORD_` configuration and `LOCUS_API` and points the home at the fixture,
   so no test reads the operator's `concord.toml` or writes its Locus buffer.
+- Native Santi association observes both `SANTI_SOUL_ID` and `SANTI_STRAND_ID`.
+  Each is a nonempty ASCII letter/digit or `-_.` coordinate; their combined
+  `soul:strand` session is at most 512 bytes. Missing or malformed components,
+  or another valid agent session alongside them, yield no unique association.
+  The existing session-shaped comment and estate records remain unchanged;
+  these caller-environment observations are never identity or authority.
 
 ## Repository
 

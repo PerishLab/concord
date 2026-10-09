@@ -20,6 +20,8 @@ pub(super) fn image(scratch: &Path, binary: &Path) -> Command {
         .env_remove("LOCUS_API")
         .env_remove("CLAUDE_CODE_SESSION_ID")
         .env_remove("GROK_SESSION_ID")
-        .env_remove("CODEX_THREAD_ID");
+        .env_remove("CODEX_THREAD_ID")
+        .env_remove("SANTI_SOUL_ID")
+        .env_remove("SANTI_STRAND_ID");
     command
 }

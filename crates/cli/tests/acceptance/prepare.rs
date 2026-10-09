@@ -155,3 +155,31 @@ fn closed() {
         "concord.acceptance.closed",
     );
 }
+
+#[test]
+fn invalid() {
+    for values in [
+        vec![("SANTI_SOUL_ID", "soul")],
+        vec![("SANTI_STRAND_ID", "ss")],
+        vec![("SANTI_SOUL_ID", "soul"), ("SANTI_STRAND_ID", "")],
+        vec![("SANTI_SOUL_ID", "bad soul"), ("SANTI_STRAND_ID", "ss")],
+        vec![("SANTI_SOUL_ID", "soul"), ("SANTI_STRAND_ID", "ss:invalid")],
+        vec![
+            ("SANTI_SOUL_ID", "soul"),
+            ("SANTI_STRAND_ID", "ss"),
+            ("GROK_SESSION_ID", "grok"),
+        ],
+    ] {
+        let scratch = tempfile::tempdir().unwrap();
+        let provider = world::provider(scratch.path(), &[]);
+        let input = scratch.path().join("input.json");
+        std::fs::write(&input, serde_json::to_vec(&world::intent()).unwrap()).unwrap();
+        let mut command = world::command(scratch.path(), &provider, "declare");
+        command.args(["--input", input.to_str().unwrap()]);
+        for (name, value) in values {
+            command.env(name, value);
+        }
+        world::refused(&command.output().unwrap(), "concord.issue.comment.operator");
+        assert!(!scratch.path().join("calls").exists());
+    }
+}

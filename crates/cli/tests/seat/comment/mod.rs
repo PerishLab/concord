@@ -12,17 +12,32 @@ mod unix {
 
     #[test]
     fn declarations() {
-        for (variable, agent) in [
-            ("CLAUDE_CODE_SESSION_ID", "claude"),
-            ("GROK_SESSION_ID", "grok"),
-            ("CODEX_THREAD_ID", "codex"),
+        for (agent, environment, session) in [
+            (
+                "claude",
+                vec![("CLAUDE_CODE_SESSION_ID", "claude-session")],
+                "claude-session",
+            ),
+            (
+                "grok",
+                vec![("GROK_SESSION_ID", "grok-session")],
+                "grok-session",
+            ),
+            (
+                "codex",
+                vec![("CODEX_THREAD_ID", "codex-session")],
+                "codex-session",
+            ),
+            (
+                "santi",
+                vec![("SANTI_SOUL_ID", "soul-1"), ("SANTI_STRAND_ID", "strand-1")],
+                "soul-1:strand-1",
+            ),
         ] {
             let fixture = tempfile::tempdir().expect("fixture");
             bootstrap(fixture.path());
-            let session = format!("{agent}-session");
-            let body = render::body("Decision recorded.", agent, &session, None);
+            let body = render::body("Decision recorded.", agent, session, None);
             let command = provider(fixture.path(), "OPEN", &body, Reply::Exact);
-            let environment = [(variable, session.as_str())];
             let output = invoke(
                 fixture.path(),
                 Run {
@@ -38,7 +53,7 @@ mod unix {
             assert_eq!(value["comment"]["execution"]["host"], Value::Null);
             let semantics = value["comment"]["semantics"].as_str().expect("semantics");
             assert!(semantics.contains("observations"));
-            request(fixture.path(), &body, &session);
+            request(fixture.path(), &body, session);
         }
 
         let fixture = tempfile::tempdir().expect("fixture");
@@ -62,44 +77,8 @@ mod unix {
         request(fixture.path(), &body, "thread-1");
     }
 
-    #[test]
-    fn validation() {
-        for (name, environment, code) in [
-            ("missing", vec![], "concord.issue.comment.operator"),
-            (
-                "ambiguous",
-                vec![
-                    ("CODEX_THREAD_ID", "thread"),
-                    ("GROK_SESSION_ID", "session"),
-                ],
-                "concord.issue.comment.operator",
-            ),
-            (
-                "host",
-                vec![
-                    ("CODEX_THREAD_ID", "thread"),
-                    ("CONCORD_HOST_ID", "not allowed"),
-                ],
-                "concord.host.invalid",
-            ),
-        ] {
-            let fixture = tempfile::tempdir().expect("fixture");
-            bootstrap(fixture.path());
-            let command = refusing(fixture.path(), name);
-            let output = invoke(
-                fixture.path(),
-                Run {
-                    command: &command,
-                    body: "Declaration",
-                    environment: &environment,
-                    timeout: 10,
-                },
-            );
-            assert!(!output.status.success(), "{name}");
-            assert!(String::from_utf8_lossy(&output.stderr).contains(code));
-            assert!(!fixture.path().join("called").exists());
-        }
-    }
+    #[path = "validation.rs"]
+    mod validation;
 
     #[test]
     fn outcomes() {
@@ -170,12 +149,19 @@ mod unix {
     }
 
     fn bootstrap(space: &Path) {
-        let output = spawn::concord(space)
-            .args(["--root", space.to_str().expect("root")])
-            .args(["issue", "bootstrap"])
-            .output()
-            .expect("bootstrap");
-        assert!(output.status.success());
+        assert!(
+            spawn::concord(space)
+                .args([
+                    "--root",
+                    space.to_str().expect("root"),
+                    "issue",
+                    "bootstrap"
+                ])
+                .output()
+                .expect("bootstrap")
+                .status
+                .success()
+        );
     }
 
     fn invoke(space: &Path, run: Run<'_>) -> Output {
@@ -258,13 +244,6 @@ mod unix {
                 arguments.display(),
                 request.display(),
             ),
-        )
-    }
-
-    fn refusing(space: &Path, name: &str) -> PathBuf {
-        tool(
-            space,
-            &format!("touch '{}/called'; exit 99 # {name}", space.display()),
         )
     }
 

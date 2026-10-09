@@ -53,10 +53,34 @@ pub(crate) fn operator() -> Option<Operator> {
             }
         }
     }
+    let soul = std::env::var_os("SANTI_SOUL_ID");
+    let strand = std::env::var_os("SANTI_STRAND_ID");
+    if soul.is_some() || strand.is_some() {
+        let soul = soul?.into_string().ok()?;
+        let strand = strand?.into_string().ok()?;
+        if !coordinate(&soul) || !coordinate(&strand) {
+            return None;
+        }
+        let operator = Operator {
+            agent: Agent::Santi,
+            session: format!("{soul}:{strand}"),
+        };
+        if !operator.valid() {
+            return None;
+        }
+        found.push(operator);
+    }
     match found.len() {
         1 => found.pop(),
         _ => None,
     }
+}
+
+fn coordinate(value: &str) -> bool {
+    !value.is_empty()
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.')
+        })
 }
 
 pub fn session() -> Option<String> {

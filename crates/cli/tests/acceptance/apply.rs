@@ -179,3 +179,40 @@ pub(super) fn amendment() -> (Value, Value) {
     let plan = world::prepared(&page, "amend", &intent);
     (page, plan)
 }
+
+#[test]
+fn retained() {
+    let page = world::page();
+    let prepared = tempfile::tempdir().unwrap();
+    let provider = world::provider(prepared.path(), &[page.clone(), page.clone()]);
+    let input = prepared.path().join("input.json");
+    std::fs::write(&input, serde_json::to_vec(&world::intent()).unwrap()).unwrap();
+    let mut command = world::command(prepared.path(), &provider, "declare");
+    command.args(["--input", input.to_str().unwrap()]);
+    command
+        .env("SANTI_SOUL_ID", "soul_default")
+        .env("SANTI_STRAND_ID", "ss_native");
+    let plan = world::decoded(&command.output().unwrap());
+    assert_eq!(plan["plan"]["execution"]["agent"], "santi");
+    assert_eq!(
+        plan["plan"]["execution"]["session"],
+        "soul_default:ss_native"
+    );
+    let complete = world::retained(&page, &plan, &["acceptance:source"]);
+    let replies = [complete.clone(), complete];
+    let scratch = tempfile::tempdir().unwrap();
+    let provider = world::provider(scratch.path(), &replies);
+    let path = scratch.path().join("plan.json");
+    std::fs::write(&path, serde_json::to_vec(&plan).unwrap()).unwrap();
+    let mut command = world::command(scratch.path(), &provider, "apply");
+    command.args(["--input", path.to_str().unwrap(), "--apply"]);
+    command
+        .env("SANTI_SOUL_ID", "soul_default")
+        .env("SANTI_STRAND_ID", "ss_native");
+    let value = world::decoded(&command.output().unwrap());
+    assert_eq!(value["acceptance"]["execution"]["agent"], "santi");
+    assert_eq!(
+        value["acceptance"]["execution"]["session"],
+        "soul_default:ss_native"
+    );
+}
