@@ -34,16 +34,17 @@ impl Observed {
 }
 
 #[test]
-fn retired() {
-    let home = Observed::new("[locus]\nenabled = true\n");
-    let output = home.run(&[("CONCORD_LOCUS_ENABLED", "true")]);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(output.status.success());
-    assert!(
-        stderr.contains("CONCORD_LOCUS_ENABLED is retired"),
-        "{stderr}"
-    );
-    assert!(!home.buffer().exists());
+fn transparent() {
+    let home = Observed::new(&format!(
+        "[locus]\nenabled = true\nendpoint = \"{}\"\n",
+        serve()
+    ));
+    let output = home.run(&[
+        ("CONCORD_LOCUS_ENABLED", "false"),
+        ("CONCORD_LOCUS_REPORT_FILE", "/nonexistent/concord.jsonl"),
+    ]);
+    assert!(output.status.success() && output.stderr.is_empty());
+    assert!(home.buffer().join("active.jsonl").is_file());
 }
 
 #[test]
@@ -80,6 +81,17 @@ fn configured() {
 
 #[test]
 fn unified() {
+    let endpoint = serve();
+    let home = Observed::new("[locus]\nenabled = true\n");
+    let output = home.run(&[("LOCUS_API", &endpoint)]);
+    assert!(output.status.success() && output.stderr.is_empty());
+    assert_eq!(
+        fs::read_to_string(home.buffer().join("registration")).expect("marker"),
+        endpoint
+    );
+}
+
+fn serve() -> String {
     let listener = TcpListener::bind("127.0.0.1:0").expect("listen");
     let endpoint = format!("http://{}", listener.local_addr().expect("address"));
     thread::spawn(move || {
@@ -94,11 +106,5 @@ fn unified() {
             .write_all(b"HTTP/1.1 204 No Content\r\nconnection: close\r\n\r\n")
             .expect("reply");
     });
-    let home = Observed::new("[locus]\nenabled = true\n");
-    let output = home.run(&[("LOCUS_API", &endpoint)]);
-    assert!(output.status.success() && output.stderr.is_empty());
-    assert_eq!(
-        fs::read_to_string(home.buffer().join("registration")).expect("marker"),
-        endpoint
-    );
+    endpoint
 }

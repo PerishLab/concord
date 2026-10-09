@@ -79,10 +79,6 @@ pub(crate) fn projection(shape: &str, provider: (&str, &str), duration: u64, out
 }
 
 fn load(config: Option<&Path>) -> Option<(Engine, Context)> {
-    if let Some(name) = concord_core::retired("CONCORD_LOCUS_") {
-        eprintln!("concord locus config: {name} is retired; configure [locus] in concord.toml");
-        return None;
-    }
     let path = crate::config::Config::path(config).ok()?;
     if !path.is_file() {
         return None;

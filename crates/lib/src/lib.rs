@@ -20,7 +20,7 @@ mod protocol;
 
 pub(crate) use protocol::{claim, component};
 
-pub use config::{Root, host, retired, session};
+pub use config::{Root, host, session};
 pub use error::{Error, Result};
 pub use estate::{
     Admission, Agreement, Anchor, BoundaryState, CheckoutState, ClaimOverlap, CommittedEvidence,
