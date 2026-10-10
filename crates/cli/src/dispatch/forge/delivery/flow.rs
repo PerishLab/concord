@@ -2,6 +2,7 @@ use super::{SHAPE, branches, handoff::Refusal, projection, pull, settle, version
 use crate::args::issue::Delivery;
 use crate::dispatch::{emit, input};
 use concord_core::authority::Plumb;
+use concord_core::issue_delivery::Check;
 use concord_core::{Coordinate, Error, Estate, IssueDeclaration, Result, issue_delivery};
 use serde::Deserialize;
 use serde_json::json;
@@ -115,16 +116,16 @@ impl Flow<'_> {
             .map(|pull| pull.number)
         {
             active(&resumed)?;
-            self.mutation().await?;
+            self.mutation(Check::Confirm).await?;
             provider.publish().await?;
-            self.mutation().await?;
+            self.mutation(Check::Confirm).await?;
             held = Some(provider.refresh(number).await?);
         }
         if held.is_none() {
             active(&resumed)?;
-            self.mutation().await?;
+            self.mutation(Check::Confirm).await?;
             provider.publish().await?;
-            self.mutation().await?;
+            self.mutation(Check::Confirm).await?;
             held = Some(provider.raise().await?);
         }
         let mut held = held.expect("missing pull was created");
@@ -136,9 +137,9 @@ impl Flow<'_> {
         }
         if held.state == pull::State::Open {
             active(&resumed)?;
-            self.mutation().await?;
+            self.mutation(Check::Execute).await?;
             provider.mark(self.plan.authority.mode()).await?;
-            let ready = self.mutation().await?;
+            let ready = self.mutation(Check::Confirm).await?;
             let squash = settle::squash(&ready.preparation)?;
             let attempted = provider.settle(held.number, &squash).await;
             held = provider.view(held.number).await?;
@@ -196,14 +197,14 @@ impl Flow<'_> {
         )
     }
 
-    async fn mutation(&self) -> Result<issue_delivery::Ready> {
+    async fn mutation(&self, check: Check) -> Result<issue_delivery::Ready> {
         pull::fetch(&self.plan.delivery.root).await?;
         let observed = self.observe().await?;
         let ready = issue_delivery::revalidate::<Plumb>(
             self.estate,
             &self.plan,
-            &observed.snapshot,
-            observed.observed,
+            (&observed.snapshot, observed.observed),
+            check,
         )
         .await?;
         settle::exact(&ready.preparation).await?;

@@ -79,9 +79,14 @@ async fn stable() {
     };
     assert_eq!(warrant.producer, authority.producer());
     assert_eq!(warrant.depot, authority.depot());
-    issue_delivery::revalidate::<Stable>(&estate, &plan, &snapshot(), 2)
-        .await
-        .expect("stable authority remains accepted");
+    issue_delivery::revalidate::<Stable>(
+        &estate,
+        &plan,
+        (&snapshot(), 2),
+        issue_delivery::Check::Execute,
+    )
+    .await
+    .expect("stable authority remains accepted");
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -129,9 +134,14 @@ async fn moved() {
     let plan = issue_delivery::prepare::<Stable>(&estate, &request(&issue))
         .await
         .expect("prepared under stable");
-    let error = issue_delivery::revalidate::<Offline>(&estate, &plan, &snapshot(), 2)
-        .await
-        .expect_err("stable moved after preparation");
+    let error = issue_delivery::revalidate::<Offline>(
+        &estate,
+        &plan,
+        (&snapshot(), 2),
+        issue_delivery::Check::Execute,
+    )
+    .await
+    .expect_err("stable moved after preparation");
     assert_eq!(error.code(), "concord.delivery.authority");
     assert!(error.message().contains("re-guard"), "{}", error.message());
     assert!(error.message().contains(authority.producer()));

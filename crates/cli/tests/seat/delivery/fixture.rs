@@ -185,6 +185,6 @@ fn checks(root: &Path, space: &Path) {
     std::fs::create_dir(root.join("tests")).expect("tests");
     std::fs::write(root.join("scripts/__init__.py"), "").expect("module");
     std::fs::write(root.join("tests/__init__.py"), "").expect("module");
-    std::fs::write(root.join("scripts/selfcheck.py"), format!("import os\nfrom pathlib import Path\nassert os.environ['PATH']\nassert not any(k.startswith(('GH_', 'GITHUB_', 'CLOUDFLARE_', 'WHARF_', 'CONCORD_')) for k in os.environ)\nassert not Path({:?}).exists()\n", space.join("fail-gate").to_str().expect("flag"))).expect("selfcheck");
+    std::fs::write(root.join("scripts/selfcheck.py"), format!("import os\nfrom pathlib import Path\nassert os.environ['PATH']\nassert not any(k.startswith(('GH_', 'GITHUB_', 'CLOUDFLARE_', 'WHARF_', 'CONCORD_')) for k in os.environ)\nassert not Path({:?}).exists()\nopen({:?}, \"a\").write(\"gate\\n\")\n", space.join("fail-gate").to_str().expect("flag"), space.join("gate-runs").to_str().expect("runs"))).expect("selfcheck");
     std::fs::write(root.join("tests/test_native.py"), "import os\nimport unittest\nclass Native(unittest.TestCase):\n def test_world(self):\n  self.assertTrue(os.environ['PATH'])\n  self.assertFalse(any(k.startswith(('GH_', 'GITHUB_', 'CLOUDFLARE_', 'WHARF_', 'CONCORD_')) for k in os.environ))\n").expect("test");
 }

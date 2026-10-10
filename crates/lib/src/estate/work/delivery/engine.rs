@@ -1,5 +1,5 @@
 use super::super::authority::{self, Authorities};
-use super::{Authority, Candidate, Context, Mode, Plan, Request, gate, model, refused};
+use super::{Authority, Candidate, Check, Context, Mode, Plan, Request, gate, model, refused};
 use crate::Result;
 
 pub(super) fn prepare<A: Authorities>(
@@ -43,8 +43,8 @@ pub(super) fn prepare<A: Authorities>(
 pub(super) fn revalidate<A: Authorities>(
     context: &Context,
     plan: &Plan,
-    snapshot: &plumb::delivery::Snapshot,
-    observed: u64,
+    (snapshot, observed): (&plumb::delivery::Snapshot, u64),
+    check: Check,
 ) -> Result<()> {
     let input = plumb::delivery::Request {
         root: &context.path,
@@ -62,13 +62,19 @@ pub(super) fn revalidate<A: Authorities>(
         }
         Authority::WharfNative { evidence } => {
             model::admit(&context.member.integration)?;
-            plumb::delivery::native::revalidate(
-                input,
-                &plan.delivery.native(evidence),
-                &gate::Wharf,
-            )
-            .map_err(refused)?;
+            native(input, &plan.delivery.native(evidence), check).map_err(refused)?;
         }
     }
     Ok(())
+}
+
+fn native(
+    input: plumb::delivery::Request<'_>,
+    expected: &plumb::delivery::native::Plan,
+    check: Check,
+) -> std::result::Result<plumb::delivery::native::Plan, plumb::landing::Refusal> {
+    match check {
+        Check::Execute => plumb::delivery::native::revalidate(input, expected, &gate::Wharf),
+        Check::Confirm => plumb::delivery::native::confirm(input, expected, &gate::Wharf),
+    }
 }
