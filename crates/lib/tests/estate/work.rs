@@ -4,5 +4,6 @@ mod issue_delivery;
 mod issue_execution;
 mod overlap;
 mod proof;
+mod recovery;
 mod retirement;
 mod start;

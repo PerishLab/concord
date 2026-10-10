@@ -4,7 +4,7 @@ use serde_json::Value;
 #[test]
 fn query() {
     let fixture = tempfile::tempdir().expect("fixture");
-    let code = "concord.estate.upgrade_required";
+    let code = "concord.member.cleanup";
     let plain = run(fixture.path(), &["cookbook", code]);
     assert!(plain.status.success());
     let plain = String::from_utf8(plain.stdout).expect("human Cookbook output");
@@ -34,6 +34,7 @@ fn inventory() {
     assert_eq!(
         codes,
         [
+            "concord.audit.refused",
             "concord.boundary.refused",
             "concord.delivery.branches",
             "concord.delivery.landed",
@@ -43,6 +44,7 @@ fn inventory() {
             "concord.estate.upgrade_required",
             "concord.issue.automation",
             "concord.issue.needs",
+            "concord.member.cleanup",
         ]
     );
 

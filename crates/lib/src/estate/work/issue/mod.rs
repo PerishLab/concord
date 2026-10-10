@@ -3,6 +3,7 @@ pub mod authority;
 mod claim;
 pub mod delivery;
 pub mod landing;
+#[path = "../member/mod.rs"]
 mod lifecycle;
 mod proof;
 mod reference;
@@ -16,7 +17,7 @@ use std::path::PathBuf;
 
 pub use artifact::{IssueArtifact, IssueImport, IssueRemoval};
 pub use claim::{IssueClaiming, IssueMemberChange, IssueNarrowing};
-pub use lifecycle::{Finish, IssueMemberStatus, IssueRelease, IssueRetirement};
+pub use lifecycle::{Finish, IssueMemberStatus, IssueRelease, IssueRetirement, Recovery};
 pub use proof::IssueProving;
 pub use reference::{IssueDeclaration, IssueWithdrawal};
 pub use start::Start;

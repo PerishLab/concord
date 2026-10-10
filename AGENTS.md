@@ -93,6 +93,11 @@ of copying its answer here.
 - Fail closed when the estate, coordinates, external seats, source identity,
   branch, or Git worktree metadata disagree. Read-only diagnosis remains
   available.
+- Member cleanup restores the original clean branch/head if external removal or
+  estate settlement fails. Exact `member recover` restores only a declared
+  missing Member at its retained Boundary head or unchanged base, under the
+  estate lock, with no unrelated agreement faults and no overwritten payload.
+  Recovery preserves revision and proof; normal lifecycle gates still own release.
 - Keep `.concord`, `.issues`, execution seats, and Artifacts private.
   Never edit or infer managed state by hand.
 - Lock the Space, re-read the relevant revision, compare, and commit one Keel

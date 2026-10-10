@@ -126,6 +126,7 @@ fn member(command: &args::member::Command) -> Option<Vec<Seed<'_>>> {
         | Command::Narrow { issue, .. }
         | Command::Prove { issue, .. }
         | Command::Release { issue, .. }
+        | Command::Recover { issue, .. }
         | Command::Complete { issue, .. }
         | Command::Retire { issue, .. } => issue.as_str(),
         Command::Reference { command } => command.issue(),

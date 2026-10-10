@@ -70,6 +70,16 @@ pub enum Command {
         #[arg(long)]
         apply: bool,
     },
+    #[command(about = "Restore one declared missing Member at its exact retained head")]
+    Recover {
+        issue: String,
+        #[arg(long)]
+        revision: i64,
+        #[arg(long)]
+        head: String,
+        #[arg(long)]
+        apply: bool,
+    },
     #[command(about = "Complete one unchanged Issue Member without delivery")]
     Complete {
         issue: String,
@@ -162,6 +172,7 @@ impl Command {
             Self::Landing { command } => command.name(),
             Self::Reference { command } => command.name(),
             Self::Release { .. } => "member.release",
+            Self::Recover { .. } => "member.recover",
             Self::Complete { .. } => "member.complete",
             Self::Retire { .. } => "member.retire",
         }
@@ -176,6 +187,7 @@ impl Command {
             | Self::Narrow { issue, .. }
             | Self::Prove { issue, .. }
             | Self::Release { issue, .. }
+            | Self::Recover { issue, .. }
             | Self::Complete { issue, .. }
             | Self::Retire { issue, .. } => Some(vec![issue]),
             Self::Landing { command } => Some(vec![command.issue()]),

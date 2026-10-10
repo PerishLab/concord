@@ -1,4 +1,8 @@
 #[cfg(unix)]
+#[path = "issue/recovery.rs"]
+mod recovery;
+
+#[cfg(unix)]
 pub(super) mod unix {
     use super::super::spawn;
     use serde_json::{Value, json};
@@ -148,6 +152,7 @@ pub(super) mod unix {
             success(fixture.path(), &["issue", "show", "PerishLab/concord#26"])["anchor"]["revision"],
             2
         );
+        super::recovery::run(fixture.path(), &source, &pending);
         let completed = success(
             fixture.path(),
             &[
@@ -247,13 +252,18 @@ pub(super) mod unix {
         std::fs::set_permissions(path, permissions).expect("provider mode");
     }
 
-    fn success(space: &Path, arguments: &[&str]) -> Value {
+    pub(super) fn success(space: &Path, arguments: &[&str]) -> Value {
         let output = operator(space, arguments, "NO_CONCORD_AGENT", "none");
         assert!(output.status.success());
         serde_json::from_slice(&output.stdout).expect("Concord JSON")
     }
 
-    fn operator(space: &Path, arguments: &[&str], variable: &str, session: &str) -> Output {
+    pub(super) fn operator(
+        space: &Path,
+        arguments: &[&str],
+        variable: &str,
+        session: &str,
+    ) -> Output {
         spawn::concord(space)
             .args(["--root", space.to_str().expect("root path"), "--json"])
             .args(arguments)
