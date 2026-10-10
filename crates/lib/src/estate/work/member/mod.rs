@@ -1,6 +1,11 @@
 use super::super::{BoundaryState, CheckoutState, Estate, IntegrationState, UpstreamState};
+mod cleanup;
+mod recovery;
+
 use super::{IssueWorktree, issue_stale};
 use crate::{Error, Reference, Result, git};
+use cleanup::Cleanup;
+pub use recovery::Recovery;
 use serde::Serialize;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -64,27 +69,31 @@ impl Estate {
             .map_err(super::super::fault)?;
         let revision = anchor.revision + 1;
         let next = revision.to_string();
-        git::at(&source).remove(&path)?;
-        self.core
-            .batch(async |tx| {
-                for row in claims
-                    .iter()
-                    .filter(|row| row.int("member") == Some(member.key))
-                {
-                    tx.end("IssueClaim", row.key()).await?;
-                }
-                tx.end("IssueMember", member.key).await?;
-                tx.set("Anchor", anchor.key, &[("revision", next.as_str())])
-                    .await?;
-                Ok(())
+        let cleanup = Cleanup {
+            source: &source,
+            path: &path,
+            branch: &member.branch,
+            head: &head,
+        };
+        cleanup
+            .settle(async {
+                self.core
+                    .batch(async |tx| {
+                        for row in claims
+                            .iter()
+                            .filter(|row| row.int("member") == Some(member.key))
+                        {
+                            tx.end("IssueClaim", row.key()).await?;
+                        }
+                        tx.end("IssueMember", member.key).await?;
+                        tx.set("Anchor", anchor.key, &[("revision", next.as_str())])
+                            .await?;
+                        Ok(())
+                    })
+                    .await
+                    .map_err(super::super::fault)
             })
-            .await
-            .map_err(|error| {
-                Error::typed(
-                    "concord.member.disagreement",
-                    format!("{error}; worktree is removed but estate still declares it"),
-                )
-            })?;
+            .await?;
         prune(&path);
         Ok(revision)
     }
@@ -112,7 +121,8 @@ impl Estate {
         let member = self.issue_member(issue).await?;
         let path = self.issue_path(&anchor)?;
         let source = self.issue_source(&member)?;
-        current(&member, &git::at(&path).head()?)?;
+        let head = git::at(&path).head()?;
+        current(&member, &head)?;
         if !git::at(&path).clean()? {
             return Err(Error::typed(
                 "concord.member.dirty",
@@ -151,35 +161,38 @@ impl Estate {
         let proof = member.proof.as_ref().expect("current checked proof");
         let revision = anchor.revision + 1;
         let next = revision.to_string();
-        git::at(&source).remove(&path)?;
-        let changed = self
-            .core
-            .batch(async |tx| {
-                tx.end("IssueBoundary", proof.key).await?;
-                for row in claims
-                    .iter()
-                    .filter(|row| row.int("member") == Some(member.key))
-                {
-                    tx.end("IssueClaim", row.key()).await?;
-                }
-                for row in changes
-                    .iter()
-                    .filter(|row| row.int("member") == Some(member.key))
-                {
-                    tx.end("IssueChange", row.key()).await?;
-                }
-                tx.end("IssueMember", member.key).await?;
-                tx.set("Anchor", anchor.key, &[("revision", next.as_str())])
-                    .await?;
-                Ok(())
+        let cleanup = Cleanup {
+            source: &source,
+            path: &path,
+            branch: &member.branch,
+            head: &head,
+        };
+        cleanup
+            .settle(async {
+                self.core
+                    .batch(async |tx| {
+                        tx.end("IssueBoundary", proof.key).await?;
+                        for row in claims
+                            .iter()
+                            .filter(|row| row.int("member") == Some(member.key))
+                        {
+                            tx.end("IssueClaim", row.key()).await?;
+                        }
+                        for row in changes
+                            .iter()
+                            .filter(|row| row.int("member") == Some(member.key))
+                        {
+                            tx.end("IssueChange", row.key()).await?;
+                        }
+                        tx.end("IssueMember", member.key).await?;
+                        tx.set("Anchor", anchor.key, &[("revision", next.as_str())])
+                            .await?;
+                        Ok(())
+                    })
+                    .await
+                    .map_err(super::super::fault)
             })
-            .await;
-        if let Err(error) = changed {
-            return Err(Error::typed(
-                "concord.member.disagreement",
-                format!("{error}; worktree is removed but estate still declares it"),
-            ));
-        }
+            .await?;
         prune(&path);
         Ok(revision)
     }

@@ -210,6 +210,14 @@ impl Checkout<'_> {
         Ok(())
     }
 
+    pub fn restore(&self, path: &Path, branch: &str) -> Result<()> {
+        let path = native(path);
+        let path = path
+            .to_str()
+            .ok_or_else(|| Error::new("member path is not utf8"))?;
+        self.run(&["worktree", "add", path, branch])
+    }
+
     pub fn remove(&self, path: &Path) -> Result<()> {
         let path = native(path);
         let path = path

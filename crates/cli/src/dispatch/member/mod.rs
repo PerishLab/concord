@@ -2,7 +2,7 @@ use super::{emit, explicit};
 use crate::args::member::Command;
 use concord_core::{
     Coordinate, Estate, Finish, IssueClaiming, IssueMemberChange, IssueNarrowing, IssueProving,
-    IssueRelease, IssueRetirement, Result, Start,
+    IssueRelease, IssueRetirement, Recovery, Result, Start,
 };
 use serde_json::json;
 
@@ -89,6 +89,22 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 .release_issue(&IssueRelease {
                     issue: Coordinate::parse(&issue)?,
                     revision,
+                })
+                .await?;
+            emit(json!({"revision": revision}), output)
+        }
+        Command::Recover {
+            issue,
+            revision,
+            head,
+            apply,
+        } => {
+            explicit(apply, "member recover")?;
+            let revision = estate
+                .recover(&Recovery {
+                    issue: Coordinate::parse(&issue)?,
+                    revision,
+                    head,
                 })
                 .await?;
             emit(json!({"revision": revision}), output)

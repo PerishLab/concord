@@ -13,7 +13,7 @@ pub use issue::landing as issue_landing;
 pub use issue::{
     Finish, IssueArtifact, IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange,
     IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval, IssueRetirement,
-    IssueWithdrawal, IssueWorktree, Start,
+    IssueWithdrawal, IssueWorktree, Recovery, Start,
 };
 pub use overlap::{ClaimOverlap, CommittedEvidence, CommittedOverlap};
 use serde::{Deserialize, Serialize};
