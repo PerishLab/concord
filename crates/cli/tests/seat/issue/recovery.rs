@@ -26,7 +26,9 @@ pub(super) fn run(space: &Path, source: &Path, pending: &Path) {
     ];
     let refused = operator(space, &recover, "CODEX_THREAD_ID", "codex-one");
     assert!(!refused.status.success());
-    let error: Value = serde_json::from_slice(&refused.stderr).expect("explicit apply refusal");
+    let refusal = String::from_utf8_lossy(&refused.stderr);
+    let line = refusal.lines().next_back().expect("refusal line");
+    let error: Value = serde_json::from_str(line).expect("explicit apply refusal");
     assert_eq!(error["error"]["code"], "concord.apply.required");
     let arguments = recover.into_iter().chain(["--apply"]).collect::<Vec<_>>();
     assert_eq!(success(space, &arguments)["revision"], 2);
