@@ -65,7 +65,7 @@ impl Command {
             Self::Member(args) => args.command.name(),
             Self::Artifact(args) => args.command.name(),
             Self::Audit(_) => "audit",
-            Self::Skill(args) => args.command.name(),
+            Self::Skill(args) => crate::skill::name(&args.command),
         }
     }
 

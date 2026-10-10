@@ -1,79 +1,31 @@
 use crate::config::Config;
 use crate::output;
-use clap::Subcommand;
 use concord_core::{Error, Result};
+use plumb::skill::command::Deed;
 use plumb::skill::{Action, Ask, Kit};
-use std::path::PathBuf;
 
 #[derive(clap::Args)]
 pub struct Args {
     #[command(subcommand)]
-    pub command: Command,
+    pub command: Deed,
 }
 
-#[derive(Subcommand)]
-pub enum Command {
-    #[command(about = "Install the Concord skill into detected agent directories")]
-    Install {
-        #[arg(long, default_value = "stable")]
-        channel: String,
-        #[arg(long)]
-        version: Option<String>,
-        #[arg(long)]
-        path: Option<PathBuf>,
-        #[arg(long)]
-        force: bool,
-    },
-    #[command(about = "Upgrade all managed Concord skill installations")]
-    Upgrade {
-        #[arg(long, default_value = "stable")]
-        channel: String,
-        #[arg(long)]
-        version: Option<String>,
-        #[arg(long)]
-        #[arg(long = "dry-run")]
-        dry: bool,
-    },
-    #[command(about = "Compare managed skills with this binary's marker-bound Depot generation")]
-    Status {
-        #[arg(long, default_value = "stable")]
-        channel: String,
-        #[arg(long)]
-        version: Option<String>,
-    },
-    #[command(about = "Stage one exact non-stable Concord skill outside managed state")]
-    Stage {
-        #[arg(long)]
-        channel: String,
-        #[arg(long)]
-        version: String,
-        #[arg(long)]
-        path: PathBuf,
-    },
-    #[command(about = "List managed Concord skill installations")]
-    List,
-    #[command(about = "Remove only managed Concord skill installations")]
-    Uninstall,
-}
-
-impl Command {
-    pub(crate) fn name(&self) -> &'static str {
-        match self {
-            Self::Install { .. } => "skill.install",
-            Self::Upgrade { .. } => "skill.upgrade",
-            Self::Status { .. } => "skill.status",
-            Self::Stage { .. } => "skill.stage",
-            Self::List => "skill.list",
-            Self::Uninstall => "skill.uninstall",
-        }
+pub(crate) fn name(deed: &Deed) -> &'static str {
+    match deed {
+        Deed::Install { .. } => "skill.install",
+        Deed::Upgrade { .. } => "skill.upgrade",
+        Deed::Status { .. } => "skill.status",
+        Deed::Stage { .. } => "skill.stage",
+        Deed::List => "skill.list",
+        Deed::Uninstall => "skill.uninstall",
     }
 }
 
-pub fn run(config: &Config, command: Command, output: bool) -> Result<()> {
+pub fn run(config: &Config, command: Deed, output: bool) -> Result<()> {
     let kit = kit(config)?;
     let kit = kit.depot(&config.depot, "concord", plumb::version!("CONCORD"));
     match command {
-        Command::Install {
+        Deed::Install {
             channel,
             version,
             path,
@@ -90,17 +42,19 @@ pub fn run(config: &Config, command: Command, output: bool) -> Result<()> {
             output::done("installed", &done, output)?;
             changed(&done)
         }
-        Command::Upgrade {
+        Deed::Upgrade {
             channel,
             version,
-            dry,
+            dry_run,
+            json,
         } => {
+            let output = output || json;
             let ask = Ask {
                 channel,
                 version,
                 ..Ask::default()
             };
-            if dry {
+            if dry_run {
                 let report = kit.status(&ask).map_err(failure)?;
                 output::report("upgrade_dry_run", &report, output)?;
                 actionable(&report)
@@ -110,7 +64,11 @@ pub fn run(config: &Config, command: Command, output: bool) -> Result<()> {
                 movable(&done)
             }
         }
-        Command::Status { channel, version } => {
+        Deed::Status {
+            channel,
+            version,
+            json,
+        } => {
             let report = kit
                 .status(&Ask {
                     channel,
@@ -118,9 +76,9 @@ pub fn run(config: &Config, command: Command, output: bool) -> Result<()> {
                     ..Ask::default()
                 })
                 .map_err(failure)?;
-            output::report("status", &report, output)
+            output::report("status", &report, output || json)
         }
-        Command::Stage {
+        Deed::Stage {
             channel,
             version,
             path,
@@ -136,11 +94,11 @@ pub fn run(config: &Config, command: Command, output: bool) -> Result<()> {
             output::done("staged", &done, output)?;
             changed(&done)
         }
-        Command::List => {
+        Deed::List => {
             let records = kit.list().map_err(failure)?;
             output::records(&records, output)
         }
-        Command::Uninstall => {
+        Deed::Uninstall => {
             let done = kit.uninstall().map_err(failure)?;
             output::done("removed", &done, output)?;
             changed(&done)
