@@ -1,11 +1,12 @@
 use super::super::execution::unix::{self as execution, Facts, git, repository};
 use super::super::spawn;
+use super::provider::{consume, start};
 use super::provider::{observer, projection, tool};
-use super::unix::{guard, prepare, success};
+use super::unix::{guard, prepare, refused, success};
 use serde_json::Value;
 use std::path::Path;
 use std::process::{Child, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[test]
 fn settled() {
@@ -50,6 +51,103 @@ fn settled() {
     );
     let report: Value = serde_json::from_slice(&audited.stdout).expect("audit JSON");
     assert_eq!(report["agreement"]["faults"], serde_json::json!([]));
+}
+
+#[test]
+fn waits() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    let probe = Probe::open(fixture.path());
+    probe.write("checks-pending", "3");
+    let mut land = start(probe.space, &probe.provider, &probe.plan());
+    let waiting = Instant::now();
+    while probe.read("checks-pending") != "0" {
+        assert!(
+            waiting.elapsed() < Duration::from_secs(60),
+            "land never waited"
+        );
+        assert!(
+            land.try_wait().expect("land state").is_none(),
+            "land ended early"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let lock = probe.integration();
+    lock.try_lock()
+        .expect("land holds no Integration lock while checks are pending");
+    lock.unlock().expect("unlock");
+    let landed = land.wait_with_output().expect("land output");
+    assert!(
+        landed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&landed.stderr)
+    );
+    assert_eq!(probe.read("pull-state"), "MERGED");
+}
+
+#[test]
+fn failed() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    let probe = Probe::open(fixture.path());
+    probe.write(
+        "checks-rollup",
+        r#"{"statusCheckRollup":[{"__typename":"CheckRun","name":"Guard","status":"COMPLETED","conclusion":"FAILURE"}]}"#,
+    );
+    let landed = consume(probe.space, &probe.provider, &probe.plan());
+    refused(&landed, "concord.delivery.provider");
+    let stderr = String::from_utf8_lossy(&landed.stderr);
+    assert!(stderr.contains("failed checks: Guard"), "{stderr}");
+    assert_eq!(probe.read("pull-state"), "OPEN");
+}
+
+struct Probe<'a> {
+    space: &'a Path,
+    provider: String,
+}
+
+impl<'a> Probe<'a> {
+    fn open(space: &'a Path) -> Self {
+        Self {
+            provider: open(space),
+            space,
+        }
+    }
+
+    fn plan(&self) -> Vec<u8> {
+        let prepared = prepare(self.space, &self.provider, &revision(self.space), true)
+            .output()
+            .expect("prepare");
+        assert!(
+            prepared.status.success(),
+            "{}",
+            String::from_utf8_lossy(&prepared.stderr)
+        );
+        prepared.stdout
+    }
+
+    fn write(&self, name: &str, content: &str) {
+        std::fs::write(self.space.join(name), content).expect("provider state");
+    }
+
+    fn read(&self, name: &str) -> String {
+        std::fs::read_to_string(self.space.join(name)).unwrap_or_default()
+    }
+
+    fn integration(&self) -> std::fs::File {
+        let path = std::fs::read_dir(self.space.join(".concord"))
+            .expect("estate directory")
+            .map(|entry| entry.expect("entry").path())
+            .find(|path| {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with("integration-"))
+            })
+            .expect("Integration lock");
+        std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path)
+            .expect("Integration lock file")
+    }
 }
 
 fn inspect(space: &Path) -> Child {

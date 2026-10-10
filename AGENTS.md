@@ -42,6 +42,12 @@ of copying its answer here.
   construction to Plumb's released delivery kernel, and invokes an explicit
   external provider command for PR mutation. Concord never carries provider
   credentials or replaces repository policy.
+- Land waits for the pull's checks without holding the Integration lock.
+  While any check is pending, before marking or after a merge GitHub refuses
+  as pending, it returns from the locked flow, polls the checks with backoff
+  for at most 30 minutes, then re-enters and revalidates the whole land.
+  Checks still pending at the budget refuse as `concord.delivery.pending`
+  naming them; a merge refused with nothing pending names the failed checks.
 - A Guard proof is accepted only from the Plumb Concord was compiled against
   or the current Plumb stable named by its release seal; Plumb's exact
   producer and depot judgment is unchanged. A plan records the authority it
@@ -58,7 +64,8 @@ of copying its answer here.
   constructed tool PATH, and binds implementation, source/tree, base and
   Python/Git identity before each provider mutation. Native evidence names
   inputs rather than attesting a result, so a land executes the gate once,
-  immediately before marking the pull, and confirms that identity without
+  immediately before marking the pull (again only if it re-enters after a
+  merge GitHub refused as pending), and confirms that identity without
   executing before every other mutation; no merge happens without that
   execution in the same land. This environment boundary
   is not a filesystem sandbox. Native evidence and status names never claim

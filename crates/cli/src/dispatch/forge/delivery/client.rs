@@ -1,4 +1,5 @@
 use super::model::Pull;
+use super::model::{Checks, Rollup};
 use super::pull::provider;
 use concord_core::Result;
 use std::path::Path;
@@ -123,21 +124,47 @@ impl Client<'_> {
         .map(|_| ())
     }
 
-    pub async fn settle(&mut self, number: i64, squash: &plumb::delivery::Squash) -> Result<()> {
-        let number = u64::try_from(number)
-            .map_err(|_| provider(format!("pull number {number} is negative")))?;
+    pub async fn settle(&mut self, pull: i64, squash: &plumb::delivery::Squash) -> Result<Merge> {
+        let number =
+            u64::try_from(pull).map_err(|_| provider(format!("pull number {pull} is negative")))?;
         let arguments = squash.arguments(self.repository, number);
         let arguments = arguments.iter().map(String::as_str).collect::<Vec<_>>();
         let mut last = None;
         for turn in 1..=6 {
-            match self.gh(&arguments).await {
-                Ok(_) => return Ok(()),
-                Err(error) if pending(error.message()) => last = Some(error),
+            let error = match self.gh(&arguments).await {
+                Ok(_) => return Ok(Merge::Merged),
+                Err(error) if pending(error.message()) => error,
                 Err(error) => return Err(error),
+            };
+            let checks = self.checks(pull).await?;
+            if !checks.pending.is_empty() {
+                return Ok(Merge::Pending);
             }
+            if !checks.failed.is_empty() {
+                return Err(failed(&error, &checks.failed));
+            }
+            last = Some(error);
             tokio::time::sleep(Duration::from_secs(turn)).await;
         }
         Err(last.unwrap_or_else(|| provider("pull did not become mergeable")))
+    }
+
+    pub async fn checks(&mut self, pull: i64) -> Result<Checks> {
+        let pull = pull.to_string();
+        let body = self
+            .gh(&[
+                "pr",
+                "view",
+                &pull,
+                "-R",
+                self.repository,
+                "--json",
+                "statusCheckRollup",
+            ])
+            .await?;
+        serde_json::from_str::<Rollup>(&body)
+            .map(Checks::from)
+            .map_err(|error| provider(format!("gh pr view did not answer check JSON: {error}")))
     }
 
     async fn gh(&mut self, args: &[&str]) -> Result<String> {
@@ -151,6 +178,19 @@ impl Client<'_> {
     }
 }
 
+fn failed(error: &concord_core::Error, checks: &[String]) -> concord_core::Error {
+    provider(format!(
+        "{} (failed checks: {})",
+        error.message(),
+        checks.join(", ")
+    ))
+}
+
+pub enum Merge {
+    Merged,
+    Pending,
+}
+
 fn pending(message: &str) -> bool {
     ["not mergeable", "is expected", "mergeability"]
         .iter()
@@ -162,6 +202,9 @@ mod tests {
     #[test]
     fn pending() {
         assert!(super::pending("pull is not mergeable"));
+        assert!(super::pending(
+            "X Pull request PerishLab/plumb#188 is not mergeable: the base branch policy prohibits the merge."
+        ));
         assert!(!super::pending("authentication failed"));
     }
 }
