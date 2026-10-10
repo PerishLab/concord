@@ -14,7 +14,7 @@ fn native() {
         "{}",
         String::from_utf8_lossy(&prepared.stderr)
     );
-    let mut envelope: Value = serde_json::from_slice(&prepared.stdout).expect("plan");
+    let envelope: Value = serde_json::from_slice(&prepared.stdout).expect("plan");
     assert_eq!(envelope["plan"]["authority"]["kind"], "wharf-native");
     let candidate = envelope["plan"]["delivery"]["candidate"]
         .as_str()
@@ -22,22 +22,17 @@ fn native() {
     let message = text(&seat.member, &["log", "-1", "--format=%B", candidate]);
     assert!(message.contains("Native-Gate-Proof:"));
     assert!(!message.contains(plumb::guard::TRAILER));
+    assert_eq!(runs(&seat), 1);
     refused(
         &seat.land("plumb", &prepared.stdout),
         "concord.delivery.authority",
     );
-    std::fs::write(seat.space.join("fail-gate"), "fail").expect("failure");
-    refused(
-        &seat.land("wharf-native", &prepared.stdout),
-        "concord.delivery.native",
-    );
-    assert!(!seat.space.join("pull-state").exists());
-    std::fs::remove_file(seat.space.join("fail-gate")).expect("recover gate");
-    envelope["plan"]["authority"]["evidence"]["digest"] = json!("0".repeat(64));
+    let mut tampered = envelope.clone();
+    tampered["plan"]["authority"]["evidence"]["digest"] = json!("0".repeat(64));
     refused(
         &seat.land(
             "wharf-native",
-            &serde_json::to_vec(&envelope).expect("tamper"),
+            &serde_json::to_vec(&tampered).expect("tamper"),
         ),
         "concord.delivery.stale",
     );
@@ -49,12 +44,23 @@ fn native() {
         "concord.issue.needs",
     );
     std::fs::remove_file(seat.space.join("labels")).expect("clear needs");
+    assert_eq!(runs(&seat), 1);
+    std::fs::write(seat.space.join("fail-gate"), "fail").expect("failure");
+    refused(
+        &seat.land("wharf-native", &prepared.stdout),
+        "concord.delivery.native",
+    );
+    assert!(seat.space.join("pull-state").exists());
+    assert!(!seat.space.join("status-call").exists());
+    std::fs::remove_file(seat.space.join("fail-gate")).expect("recover gate");
+    assert_eq!(runs(&seat), 1);
     let landed = seat.land("wharf-native", &prepared.stdout);
     assert!(
         landed.status.success(),
         "{}",
         String::from_utf8_lossy(&landed.stderr)
     );
+    assert_eq!(runs(&seat), 2);
     let report: Value = serde_json::from_slice(&landed.stdout).expect("report");
     assert_eq!(report["merged"], true);
     assert_eq!(report["released"], true);
@@ -71,6 +77,11 @@ fn native() {
         "{}",
         String::from_utf8_lossy(&replay.stderr)
     );
+    assert_eq!(runs(&seat), 2);
+}
+
+fn runs(seat: &Native) -> usize {
+    std::fs::read_to_string(seat.space.join("gate-runs")).map_or(0, |held| held.lines().count())
 }
 
 #[test]

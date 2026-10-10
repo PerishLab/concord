@@ -14,7 +14,7 @@ mod model;
 #[path = "../delivery/process.rs"]
 mod process;
 
-pub use model::{Authority, Candidate, Mode, Preparation};
+pub use model::{Authority, Candidate, Check, Mode, Preparation};
 
 pub use super::authority::delivery::{Resume, resume};
 pub use super::proof::delivery::{Completion, Settlement};
@@ -98,8 +98,8 @@ pub async fn prepare<A: Authorities>(estate: &Estate, request: &Request) -> Resu
 pub async fn revalidate<A: Authorities>(
     estate: &Estate,
     plan: &Plan,
-    snapshot: &plumb::delivery::Snapshot,
-    observed: u64,
+    (snapshot, observed): (&plumb::delivery::Snapshot, u64),
+    check: Check,
 ) -> Result<Ready> {
     let resumed = resume::<A>(estate, plan, snapshot).await?;
     if resumed.released {
@@ -109,7 +109,7 @@ pub async fn revalidate<A: Authorities>(
         ));
     }
     let context = context(estate, &plan.issue, resumed.revision).await?;
-    engine::revalidate::<A>(&context, plan, snapshot, observed)?;
+    engine::revalidate::<A>(&context, plan, (snapshot, observed), check)?;
     Ok(Ready {
         schema: READY.to_string(),
         plan: plan.clone(),

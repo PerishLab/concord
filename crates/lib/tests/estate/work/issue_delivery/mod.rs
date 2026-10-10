@@ -196,21 +196,22 @@ async fn exact() {
         plan.boundary
             .current(&plan.boundary.head, &plan.boundary.claim)
     );
-    let ready = issue_delivery::revalidate::<Plumb>(&estate, &plan, &snapshot, 2)
+    let execute = issue_delivery::Check::Execute;
+    let ready = issue_delivery::revalidate::<Plumb>(&estate, &plan, (&snapshot, 2), execute)
         .await
         .expect("revalidate delivery");
     assert_eq!(ready.preparation.candidate, plan.delivery.candidate);
 
     let mut drifted = snapshot.clone();
     drifted.updated.push_str("-drift");
-    let error = issue_delivery::revalidate::<Plumb>(&estate, &plan, &drifted, 3)
+    let error = issue_delivery::revalidate::<Plumb>(&estate, &plan, (&drifted, 3), execute)
         .await
         .expect_err("Issue drift");
     assert_eq!(error.code(), "concord.delivery.stale");
 
     let member = _temp.path().join(".issues/I_delivery/worktree");
     std::fs::rename(&member, _temp.path().join("displaced")).expect("displace Member");
-    let error = issue_delivery::revalidate::<Plumb>(&estate, &plan, &snapshot, 3)
+    let error = issue_delivery::revalidate::<Plumb>(&estate, &plan, (&snapshot, 3), execute)
         .await
         .expect_err("estate disagreement");
     assert_eq!(error.code(), "concord.audit.refused");

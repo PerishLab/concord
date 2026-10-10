@@ -1,5 +1,5 @@
 use super::process;
-use plumb::delivery::native::{Context, Evidence, Gate};
+use plumb::delivery::native::{Context, Evidence, Gate, Identity};
 use plumb::landing::Refusal;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -49,6 +49,18 @@ impl Gate for Wharf {
                 "native gate tool world changed during verification",
             ));
         }
+        world.evidence(context)
+    }
+}
+
+impl Identity for Wharf {
+    fn identify(&self, context: &Context<'_>) -> Result<Evidence, Refusal> {
+        World::read(context.root)?.evidence(context)
+    }
+}
+
+impl World {
+    fn evidence(self, context: &Context<'_>) -> Result<Evidence, Refusal> {
         let input = Receipt {
             authority: AUTHORITY,
             source: context.source,
@@ -56,7 +68,7 @@ impl Gate for Wharf {
             tree: context.tree,
             check: CHECK,
             test: TEST,
-            world,
+            world: self,
         };
         let bytes =
             serde_json::to_vec(&input).map_err(|error| process::refuse(error.to_string()))?;
@@ -67,9 +79,7 @@ impl Gate for Wharf {
             digest: format!("{:x}", Sha256::digest(bytes)),
         })
     }
-}
 
-impl World {
     fn read(root: &Path) -> Result<Self, Refusal> {
         let python = Tool::read("python3")?;
         let git = Tool::read("git")?;

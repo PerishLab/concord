@@ -56,7 +56,11 @@ of copying its answer here.
   kernel refuses a Plumb-governed source or base. Concord runs only the fixed
   selfcheck and unittest commands, with cleared inherited environment and a
   constructed tool PATH, and binds implementation, source/tree, base and
-  Python/Git identity before each provider mutation. This environment boundary
+  Python/Git identity before each provider mutation. Native evidence names
+  inputs rather than attesting a result, so a land executes the gate once,
+  immediately before marking the pull, and confirms that identity without
+  executing before every other mutation; no merge happens without that
+  execution in the same land. This environment boundary
   is not a filesystem sandbox. Native evidence and status names never claim
   Guard authority; exact provider readback and Member release remain required.
 - Optional Locus facts and the private activity ledger are observations only.
