@@ -1,8 +1,16 @@
+use super::client::Client;
 use super::git::Git;
+use super::model::Checks;
 use super::pull::{Pull, State, stale};
 use concord_core::issue_delivery::Preparation;
 use concord_core::{Error, Result};
 use plumb::delivery::Squash;
+use std::time::Duration;
+
+pub const BUDGET: Duration = Duration::from_secs(30 * 60);
+const FIRST: Duration = Duration::from_secs(2);
+const CEILING: Duration = Duration::from_secs(30);
+const CYCLES: u32 = 20;
 
 pub async fn exact(preparation: &Preparation) -> Result<()> {
     Git::fetch(&preparation.root).await?;
@@ -48,10 +56,69 @@ pub fn merged(pull: &Pull) -> Result<String> {
     }
 }
 
+pub enum Step {
+    Retry,
+    Wait(Duration),
+}
+
+pub struct Wait {
+    elapsed: Duration,
+    delay: Duration,
+    cycles: u32,
+}
+
+impl Wait {
+    pub fn new() -> Self {
+        Self {
+            elapsed: Duration::ZERO,
+            delay: FIRST,
+            cycles: 0,
+        }
+    }
+
+    pub fn step(&mut self, checks: &Checks) -> Result<Step> {
+        if checks.pending.is_empty() {
+            self.cycles += 1;
+            if self.cycles > CYCLES {
+                return Err(exhausted(format!(
+                    "merge stayed pending through {CYCLES} settled check cycles"
+                )));
+            }
+            self.delay = FIRST;
+            return Ok(Step::Retry);
+        }
+        if self.elapsed >= BUDGET {
+            return Err(exhausted(format!(
+                "pull checks still pending after {} minutes: {}",
+                BUDGET.as_secs() / 60,
+                checks.pending.join(", ")
+            )));
+        }
+        let delay = self.delay;
+        self.elapsed += delay;
+        self.delay = (delay * 2).min(CEILING);
+        Ok(Step::Wait(delay))
+    }
+}
+
+pub async fn wait(client: &mut Client<'_>, pull: i64, wait: &mut Wait) -> Result<()> {
+    loop {
+        match wait.step(&client.checks(pull).await?)? {
+            Step::Retry => return Ok(()),
+            Step::Wait(delay) => tokio::time::sleep(delay).await,
+        }
+    }
+}
+
+fn exhausted(message: String) -> Error {
+    Error::typed("concord.delivery.pending", message)
+}
+
 #[cfg(test)]
 mod tests {
+    use super::super::model::Checks;
     use super::super::pull::{Commit, Pull, State};
-    use super::merged;
+    use super::{BUDGET, CEILING, FIRST, Step, Wait, merged};
 
     #[test]
     fn readback() {
@@ -94,5 +161,45 @@ mod tests {
             title: "Deliver topic".into(),
             body: "Refs PerishLab/probe#1".into(),
         }
+    }
+
+    #[test]
+    fn budget() {
+        let pending = Checks {
+            pending: vec!["Guard".into()],
+            failed: Vec::new(),
+        };
+        let mut wait = Wait::new();
+        let mut waited = std::time::Duration::ZERO;
+        let mut delays = Vec::new();
+        let refusal = loop {
+            match wait.step(&pending) {
+                Ok(Step::Wait(delay)) => {
+                    waited += delay;
+                    delays.push(delay);
+                }
+                Ok(Step::Retry) => panic!("pending checks must not retry"),
+                Err(refusal) => break refusal,
+            }
+        };
+        assert_eq!(delays[0], FIRST);
+        assert!(delays.iter().all(|delay| *delay <= CEILING));
+        assert!(waited >= BUDGET && waited < BUDGET + CEILING);
+        assert_eq!(refusal.code(), "concord.delivery.pending");
+        assert!(refusal.message().contains("Guard"));
+        assert!(matches!(wait.step(&Checks::default()), Ok(Step::Retry)));
+    }
+
+    #[test]
+    fn cycles() {
+        let mut wait = Wait::new();
+        for _ in 0..super::CYCLES {
+            assert!(matches!(wait.step(&Checks::default()), Ok(Step::Retry)));
+        }
+        let refusal = wait
+            .step(&Checks::default())
+            .err()
+            .expect("settled cycles are bounded");
+        assert_eq!(refusal.code(), "concord.delivery.pending");
     }
 }

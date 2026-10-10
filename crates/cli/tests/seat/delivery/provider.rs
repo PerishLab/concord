@@ -153,6 +153,14 @@ if [ "$1 $2" = "pr edit" ]; then
   done
   exit 0
 fi
+if [ "$1 $2" = "pr view" ] && [ "$7" = statusCheckRollup ]; then
+  if [ -f '{rollup}' ]; then cat '{rollup}'; exit 0; fi
+  left=$(cat '{waiting}' 2>/dev/null || echo 0)
+  status=COMPLETED
+  if [ "$left" -gt 0 ]; then printf '%s' $((left - 1)) > '{waiting}'; status=IN_PROGRESS; fi
+  printf '{{"statusCheckRollup":[{{"__typename":"CheckRun","name":"Guard","status":"%s","conclusion":null}}]}}\n' "$status"
+  exit 0
+fi
 if [ "$1 $2" = "pr view" ]; then
   if [ -f '{hidden}' ] && [ "$(cat '{state}')" = MERGED ]; then rm '{hidden}'; printf '%s\n' hidden-readback >&2; exit 1; fi
   [ -f '{slow}' ] && sleep 1
@@ -161,6 +169,10 @@ if [ "$1 $2" = "pr view" ]; then
 fi
 if [ "$1 $2" = "pr merge" ]; then
   [ -f '{incomplete}' ] && exit 0
+  if [ "$(cat '{waiting}' 2>/dev/null || echo 0)" -gt 0 ] || [ -f '{rollup}' ]; then
+    printf '%s\n' 'X Pull request PerishLab/probe#7 is not mergeable: the base branch policy prohibits the merge.' >&2
+    exit 1
+  fi
   shift 3
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -198,6 +210,8 @@ exit 1"#,
         relations = relations.display(),
         labels = labels.display(),
         declaration = root.join("declaration").display(),
+        waiting = root.join("checks-pending").display(),
+        rollup = root.join("checks-rollup").display(),
         branches = root.join("branch-issues").display(),
     )
 }

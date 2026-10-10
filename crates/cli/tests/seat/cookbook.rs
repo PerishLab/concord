@@ -38,6 +38,7 @@ fn inventory() {
             "concord.delivery.branches",
             "concord.delivery.landed",
             "concord.delivery.native",
+            "concord.delivery.pending",
             "concord.delivery.provider",
             "concord.estate.upgrade_required",
             "concord.issue.automation",

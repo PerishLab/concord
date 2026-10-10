@@ -1,4 +1,4 @@
-use super::{SHAPE, branches, handoff::Refusal, projection, pull, settle, version};
+use super::{SHAPE, branches, client, handoff::Refusal, projection, pull, settle, version};
 use crate::args::issue::Delivery;
 use crate::dispatch::{emit, input};
 use concord_core::authority::Plumb;
@@ -68,18 +68,26 @@ pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()
             "land authority does not match the explicitly prepared plan",
         ));
     }
-    Flow {
+    let flow = Flow {
         estate,
         plan,
         command,
         timeout,
+    };
+    let mut wait = settle::Wait::new();
+    while let Some(pull) = flow.apply(output).await? {
+        let mut client = client::Client {
+            command: &flow.command,
+            repository: &flow.plan.delivery.repository,
+            timeout: flow.timeout,
+        };
+        settle::wait(&mut client, pull, &mut wait).await?;
     }
-    .apply(output)
-    .await
+    Ok(())
 }
 
 impl Flow<'_> {
-    async fn apply(&self, output: bool) -> Result<()> {
+    async fn apply(&self, output: bool) -> Result<Option<i64>> {
         let integration = self.plan.member.integration.guard(self.estate)?;
         let observed = self.observe().await?;
         let mut resumed =
@@ -137,16 +145,20 @@ impl Flow<'_> {
         }
         if held.state == pull::State::Open {
             active(&resumed)?;
+            if provider.pending(held.number).await? {
+                return Ok(Some(held.number));
+            }
             self.mutation(Check::Execute).await?;
             provider.mark(self.plan.authority.mode()).await?;
             let ready = self.mutation(Check::Confirm).await?;
             let squash = settle::squash(&ready.preparation)?;
             let attempted = provider.settle(held.number, &squash).await;
             held = provider.view(held.number).await?;
-            if let Err(error) = attempted
-                && held.state != pull::State::Merged
-            {
-                return Err(error);
+            match attempted {
+                _ if held.state == pull::State::Merged => {}
+                Ok(pull::Merge::Pending) => return Ok(Some(held.number)),
+                Ok(pull::Merge::Merged) => {}
+                Err(error) => return Err(error),
             }
         }
         let merge = settle::merged(&held)?;
@@ -195,6 +207,7 @@ impl Flow<'_> {
             }),
             output,
         )
+        .map(|_| None)
     }
 
     async fn mutation(&self, check: Check) -> Result<issue_delivery::Ready> {

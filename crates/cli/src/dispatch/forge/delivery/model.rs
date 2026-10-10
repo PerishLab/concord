@@ -71,9 +71,68 @@ fn refusal() -> Result<()> {
     ))
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Rollup {
+    #[serde(rename = "statusCheckRollup")]
+    rollup: Vec<Check>,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "__typename")]
+enum Check {
+    #[serde(rename = "CheckRun")]
+    Run {
+        name: String,
+        status: String,
+        conclusion: Option<String>,
+    },
+    #[serde(rename = "StatusContext")]
+    Status { context: String, state: String },
+}
+
+#[derive(Debug, Default, Eq, PartialEq)]
+pub struct Checks {
+    pub pending: Vec<String>,
+    pub failed: Vec<String>,
+}
+
+impl From<Rollup> for Checks {
+    fn from(rollup: Rollup) -> Self {
+        let mut checks = Self::default();
+        for check in rollup.rollup {
+            match check {
+                Check::Run { name, status, .. } if status != "COMPLETED" => {
+                    checks.pending.push(name)
+                }
+                Check::Run {
+                    name,
+                    conclusion: Some(conclusion),
+                    ..
+                } if failed(&conclusion) => checks.failed.push(name),
+                Check::Status { context, state } if pending(&state) => checks.pending.push(context),
+                Check::Status { context, state } if failed(&state) => checks.failed.push(context),
+                _ => {}
+            }
+        }
+        checks
+    }
+}
+
+fn pending(state: &str) -> bool {
+    matches!(state, "PENDING" | "EXPECTED")
+}
+
+fn failed(state: &str) -> bool {
+    matches!(
+        state,
+        "FAILURE" | "ERROR" | "TIMED_OUT" | "CANCELLED" | "ACTION_REQUIRED" | "STARTUP_FAILURE"
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Commit, Pull, State, contract};
+    use super::{Checks, Commit, Pull, Rollup, State, contract};
     use concord_core::issue_delivery::Preparation;
     use std::path::PathBuf;
 
@@ -154,5 +213,27 @@ mod tests {
             title: "Deliver".into(),
             body: "Refs PerishLab/concord#28".into(),
         }
+    }
+
+    fn checks(rollup: &str) -> Checks {
+        serde_json::from_str::<Rollup>(rollup)
+            .expect("rollup")
+            .into()
+    }
+
+    #[test]
+    fn classify() {
+        let observed = checks(
+            r#"{"statusCheckRollup":[
+                {"__typename":"CheckRun","name":"Guard","status":"IN_PROGRESS","conclusion":null},
+                {"__typename":"CheckRun","name":"lint","status":"COMPLETED","conclusion":"FAILURE"},
+                {"__typename":"CheckRun","name":"test","status":"COMPLETED","conclusion":"SUCCESS"},
+                {"__typename":"StatusContext","context":"guard / guard (pull_request)","state":"SUCCESS"},
+                {"__typename":"StatusContext","context":"native","state":"PENDING"},
+                {"__typename":"StatusContext","context":"probe","state":"ERROR"}
+            ]}"#,
+        );
+        assert_eq!(observed.pending, ["Guard", "native"]);
+        assert_eq!(observed.failed, ["lint", "probe"]);
     }
 }

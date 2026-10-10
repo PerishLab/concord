@@ -79,6 +79,15 @@ fn book() -> Cookbook {
             ),
         ),
         entry(
+            "concord.delivery.pending",
+            "The pull's checks stayed pending through land's 30-minute wait, or GitHub kept refusing the merge as pending after its checks settled.",
+            "Read the named checks on the pull. If they are still queued or running, re-run the same prepared land; it resumes the existing pull and waits again without holding the Integration lock. If a check is stuck, fix or re-run it on GitHub first. Never merge with `--admin` or `--auto` around the policy.",
+            (
+                "Retain the refusal, which names the pending checks, and inspect `gh pr checks <pull>`.",
+                "The pull's checks have settled and a re-run land merges and reads the merge back.",
+            ),
+        ),
+        entry(
             "concord.delivery.provider",
             "The explicit external provider command could not complete or confirm a pull-request mutation.",
             "Observe the exact repository, head branch, and pull request on GitHub before retrying. If the mutation already happened, resume from that provider state; otherwise fix the provider command or authentication and re-run the prepared delivery.",

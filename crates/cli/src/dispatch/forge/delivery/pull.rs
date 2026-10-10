@@ -1,4 +1,5 @@
 use super::client::Client;
+pub use super::client::Merge;
 use super::git::Git;
 use concord_core::issue_delivery::{Mode, Preparation};
 use concord_core::{Error, Reference, ReferenceKind, Result};
@@ -123,10 +124,13 @@ impl<'a> Service<'a> {
             .await
     }
 
-    pub async fn settle(&mut self, number: i64, squash: &plumb::delivery::Squash) -> Result<()> {
+    pub async fn settle(&mut self, number: i64, squash: &plumb::delivery::Squash) -> Result<Merge> {
         self.client.settle(number, squash).await
     }
 
+    pub async fn pending(&mut self, number: i64) -> Result<bool> {
+        Ok(!self.client.checks(number).await?.pending.is_empty())
+    }
     pub fn report(&self, pull: Pull) -> Report {
         Report {
             pull,
