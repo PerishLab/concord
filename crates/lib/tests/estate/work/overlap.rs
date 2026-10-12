@@ -54,6 +54,39 @@ async fn evidence() {
     assert!(foreign.observations.is_empty());
 }
 
+#[tokio::test(flavor = "current_thread")]
+async fn agreement() {
+    let world = World::new().await;
+    let source = repository(world.temp.path(), "plumb", "PerishLab/plumb");
+    world
+        .estate
+        .register(&Register {
+            node: "R_plumb".to_string(),
+            repository: Repository::parse("PerishLab/plumb").expect("repository"),
+            path: source,
+        })
+        .await
+        .expect("register second Integration");
+    let mut expected = Vec::new();
+    for name in ["concord", "plumb"] {
+        let path = world.temp.path().join(format!("{name}-foreign"));
+        let target = path.to_str().expect("foreign path");
+        git(
+            &world.temp.path().join(name),
+            &["worktree", "add", "-b", "foreign", target],
+        );
+        expected.push(path.canonicalize().expect("foreign").display().to_string());
+    }
+    let audit = world.estate.inspect().await.expect("audit estate");
+    let found = audit
+        .faults
+        .iter()
+        .filter(|fault| fault.code == "integration.worktree.unknown")
+        .map(|fault| fault.subject.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(found, expected);
+}
+
 impl World {
     async fn new() -> Self {
         let temp = tempfile::tempdir().expect("temporary Space");
