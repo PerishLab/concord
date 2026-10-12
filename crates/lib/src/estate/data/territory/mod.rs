@@ -3,6 +3,7 @@ use crate::Result;
 use crate::path::at;
 
 mod anchor;
+mod integration;
 
 pub(super) async fn inspect(estate: &Estate, report: &mut Agreement) -> Result<()> {
     custody(estate, report)?;

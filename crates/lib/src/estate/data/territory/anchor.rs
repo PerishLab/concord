@@ -1,7 +1,6 @@
 use super::super::{Agreement, Anchor, Estate, IssueWorktree, Proof, fault};
 use crate::{Result, git};
-use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub(super) async fn inspect(plane: &Estate, report: &mut Agreement) -> Result<()> {
     let survey = Survey { estate: plane };
@@ -120,10 +119,8 @@ impl Survey<'_> {
     }
 
     async fn integrations(&self, members: &[IssueWorktree], report: &mut Agreement) -> Result<()> {
-        for integration in self.estate.integrations().await? {
-            assess(self.estate, members, report, &integration)?;
-        }
-        Ok(())
+        let integrations = self.estate.integrations().await?;
+        super::integration::survey(&self.estate.space, members, &integrations, report)
     }
 }
 
@@ -198,86 +195,6 @@ fn overlaps(plane: &Estate, members: &[IssueWorktree], report: &mut Agreement) -
                 );
             }
         }
-    }
-    Ok(())
-}
-
-fn assess(
-    state: &Estate,
-    members: &[IssueWorktree],
-    report: &mut Agreement,
-    integration: &super::super::work::Integration,
-) -> Result<()> {
-    let subject = integration.repository.identity();
-    let path = PathBuf::from(&integration.path);
-    let observed = match super::super::work::integration::registration::observe(&path) {
-        Ok(observed) => observed,
-        Err(error) => {
-            let message = if !path.exists() {
-                format!(
-                    "{error}; if the operator intentionally removed this idle repository, preflight concord integration retire {subject} --node {} --key {}; apply only after reviewing that exact registration",
-                    integration.node, integration.key,
-                )
-            } else {
-                error.to_string()
-            };
-            report.fault("integration.agreement", subject, message);
-            return Ok(());
-        }
-    };
-    if observed.checkout.common.display().to_string() != integration.common
-        || integration.remote != "origin"
-        || integration.branch != "main"
-    {
-        report.fault(
-            "integration.agreement",
-            integration.repository.identity(),
-            "Integration path, Git identity, remote, or branch disagrees",
-        );
-    }
-    let mut expected = BTreeSet::from([observed.checkout.path.clone()]);
-    for member in members
-        .iter()
-        .filter(|member| member.integration.key == integration.key)
-    {
-        expected.insert(
-            state
-                .space
-                .join(".issues")
-                .join(&member.node)
-                .join("worktree"),
-        );
-    }
-    let mut found = BTreeSet::new();
-    for worktree in observed.worktrees.iter().filter(|worktree| {
-        !worktree.staging
-            && worktree
-                .branch
-                .as_deref()
-                .and_then(crate::automation::branch)
-                .is_none()
-    }) {
-        let Some(path) = worktree.path.canonicalize().ok() else {
-            continue;
-        };
-        found.insert(path.clone());
-        if !expected.contains(&path) {
-            report.fault(
-                "integration.worktree.unknown",
-                path.display().to_string(),
-                format!(
-                    "unmanaged worktree belongs to {subject} at head {}",
-                    worktree.head.as_deref().unwrap_or("unknown")
-                ),
-            );
-        }
-    }
-    for path in expected.difference(&found) {
-        report.fault(
-            "integration.worktree.missing",
-            path.display().to_string(),
-            format!("declared worktree is not registered for {subject}"),
-        );
     }
     Ok(())
 }

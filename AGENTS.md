@@ -106,6 +106,10 @@ of copying its answer here.
   batch for every mutation.
 - Keep protocol agreement separate from coordination and health observations.
   An observation may guide an operator but cannot authorize or block work.
+- Every agreement-guarded step inspects current facts under its own lock; an
+  inspection is never reused across a lock boundary. One inspection assesses
+  registered Integrations concurrently, and its sorted findings do not depend
+  on that order.
 - Tests spawn Concord only through the shared test seat, which clears inherited
   `CONCORD_` configuration and `LOCUS_API` and points the home at the fixture,
   so no test reads the operator's `concord.toml` or writes its Locus buffer.
