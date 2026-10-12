@@ -105,7 +105,7 @@ pub async fn wait(client: &mut Client<'_>, pull: i64, wait: &mut Wait) -> Result
     loop {
         match wait.step(&client.checks(pull).await?)? {
             Step::Retry => return Ok(()),
-            Step::Wait(delay) => tokio::time::sleep(delay).await,
+            Step::Wait(delay) => crate::observation::wait("checks", delay).await,
         }
     }
 }

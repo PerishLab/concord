@@ -1,8 +1,9 @@
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
+use std::panic::Location;
 use std::path::Path;
 use std::process::{ExitStatus, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 
@@ -37,9 +38,11 @@ pub struct Request<'a> {
     input: Option<&'a [u8]>,
     timeout: Duration,
     limit: usize,
+    site: &'static Location<'static>,
 }
 
 impl<'a> Request<'a> {
+    #[track_caller]
     pub fn new(command: &'a Path, timeout: u64, limit: usize) -> Self {
         Self {
             command,
@@ -47,6 +50,7 @@ impl<'a> Request<'a> {
             input: None,
             timeout: Duration::from_secs(timeout),
             limit,
+            site: Location::caller(),
         }
     }
 
@@ -70,6 +74,23 @@ impl<'a> Request<'a> {
     }
 
     pub async fn run(self) -> Result<Reply, Failure> {
+        let operation = operation(&self.arguments);
+        let site = format!("{}:{}", self.site.file(), self.site.line());
+        let start = Instant::now();
+        let reply = self.exchange().await;
+        let outcome = match &reply {
+            Ok(_) => "ok",
+            Err(Failure::Spawn(_)) => "spawn",
+            Err(Failure::Exchange(_)) => "exchange",
+            Err(Failure::Timeout) => "timeout",
+            Err(Failure::Oversized(_)) => "oversized",
+            Err(Failure::Refused { .. }) => "refused",
+        };
+        crate::observation::call(&operation, &site, start.elapsed(), outcome);
+        reply
+    }
+
+    async fn exchange(self) -> Result<Reply, Failure> {
         let mut process = Command::new(self.command);
         process
             .args(self.arguments)
@@ -121,6 +142,24 @@ impl<'a> Request<'a> {
         Ok(Reply {
             stdout: completion.stdout,
         })
+    }
+}
+
+fn operation(arguments: &[OsString]) -> String {
+    let words = arguments
+        .iter()
+        .map(|argument| argument.to_string_lossy())
+        .collect::<Vec<_>>();
+    match words.first().map(AsRef::as_ref) {
+        Some("api") if words.iter().any(|word| word == "graphql") => "api graphql".into(),
+        Some("api") => "api rest".into(),
+        _ => words
+            .iter()
+            .take(2)
+            .take_while(|word| !word.starts_with('-'))
+            .map(AsRef::as_ref)
+            .collect::<Vec<&str>>()
+            .join(" "),
     }
 }
 

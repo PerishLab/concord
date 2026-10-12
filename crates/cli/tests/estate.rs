@@ -10,7 +10,7 @@ mod existing;
 mod issue;
 #[path = "seat/preflight.rs"]
 mod preflight;
-#[path = "seat/projection.rs"]
+#[path = "seat/projection/mod.rs"]
 mod projection;
 #[path = "seat/spawn.rs"]
 mod spawn;

@@ -43,6 +43,7 @@ impl Git {
         Ok(format!("{owner}/{repository}"))
     }
 
+    #[locus::trace(with = concord_core::observation::view())]
     pub async fn run(root: &Path, args: &[&str]) -> Result<String> {
         let output = Command::new("git")
             .args(args)
