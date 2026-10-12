@@ -1,3 +1,5 @@
+mod observed;
+
 #[cfg(unix)]
 mod unix {
     use super::super::spawn;
@@ -6,7 +8,7 @@ mod unix {
     use std::path::{Path, PathBuf};
     use std::process::Output;
 
-    const PLUMB: &str = "[release]\nauthority = \"https://releases.plumb.perish.uk\"\n";
+    pub(super) const PLUMB: &str = "[release]\nauthority = \"https://releases.plumb.perish.uk\"\n";
 
     #[test]
     fn projections() {
@@ -35,7 +37,6 @@ mod unix {
             "exact-cursor"
         );
         assert_eq!(brief["brief"]["pulls"]["nodes"][0]["number"], 32);
-        locus(fixture.path(), command);
 
         let graph = success(
             fixture.path(),
@@ -108,7 +109,7 @@ mod unix {
         assert!(String::from_utf8_lossy(&ready.stderr).contains(code));
     }
 
-    fn answer(declaration: &str) -> String {
+    pub(super) fn answer(declaration: &str) -> String {
         let concord = json!({"object": {"text": "[package]\nname = \"concord\"\n"}});
         let plumb = json!({"object": {"text": declaration}});
         let manifest = json!({"data": {"r0": concord, "r1": plumb}});
@@ -152,57 +153,7 @@ mod unix {
         );
     }
 
-    fn locus(space: &Path, provider: &str) {
-        let config = space.join("home").join(".concord");
-        std::fs::create_dir_all(&config).expect("config home");
-        let closed = std::net::TcpListener::bind("127.0.0.1:0").expect("listen");
-        let endpoint = format!("http://{}", closed.local_addr().expect("address"));
-        drop(closed);
-        std::fs::write(
-            config.join("concord.toml"),
-            format!("[locus]\nenabled = true\nendpoint = \"{endpoint}\"\n"),
-        )
-        .expect("config");
-        let output = spawn::concord(space)
-            .args(["--root", space.to_str().expect("root path"), "--json"])
-            .args([
-                "issue",
-                "brief",
-                "PerishLab/concord#27",
-                "--github-command",
-                provider,
-            ])
-            .env("CODEX_THREAD_ID", "projection-thread")
-            .output()
-            .expect("observe projection");
-        assert!(output.status.success());
-        success(space, &["audit"]);
-        let atoms =
-            std::fs::read_to_string(config.join("state").join("locus").join("active.jsonl"))
-                .expect("Locus buffer")
-                .lines()
-                .map(|line| serde_json::from_str::<Value>(line).expect("Locus atom"))
-                .collect::<Vec<_>>();
-        let find = |name: &str| atoms.iter().rfind(|atom| atom["payload"]["event"] == name);
-        let span = &find("cli.start").expect("audit start")["context"]["locus.span"];
-        let traced = atoms.iter().filter(|atom| atom.get("source").is_some());
-        assert!(traced.clone().count() > 0);
-        for atom in traced {
-            assert_eq!(atom["context"]["concord.command"], "audit");
-            assert_ne!(&atom["context"]["locus.span"], span);
-        }
-        let event = find("provider.projection").expect("projection observation");
-        assert_eq!(event["payload"]["shape"], "issue.brief");
-        assert_eq!(event["payload"]["outcome"], "fresh");
-        assert_eq!(event["context"]["concord.command"], "issue.brief");
-        assert_eq!(event["producer"], "concord");
-        assert!(event["id"].is_string());
-        for absent in ["title", "body", "url", "reply", "credential"] {
-            assert!(event["payload"].get(absent).is_none());
-        }
-    }
-
-    fn reply(manifest: &str) -> String {
+    pub(super) fn reply(manifest: &str) -> String {
         let issue = json!({
             "id": "I_issue",
             "number": 27,
@@ -265,7 +216,7 @@ mod unix {
         })
     }
 
-    fn tool(root: &Path, name: &str, body: String) -> PathBuf {
+    pub(super) fn tool(root: &Path, name: &str, body: String) -> PathBuf {
         let path = root.join(name);
         std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).expect("provider command");
         let mut permissions = std::fs::metadata(&path)
@@ -276,7 +227,7 @@ mod unix {
         path
     }
 
-    fn success(space: &Path, arguments: &[&str]) -> Value {
+    pub(super) fn success(space: &Path, arguments: &[&str]) -> Value {
         let output = raw(space, arguments);
         assert!(
             output.status.success(),
@@ -286,7 +237,7 @@ mod unix {
         serde_json::from_slice(&output.stdout).expect("Concord JSON")
     }
 
-    fn raw(space: &Path, arguments: &[&str]) -> Output {
+    pub(super) fn raw(space: &Path, arguments: &[&str]) -> Output {
         spawn::concord(space)
             .args(["--root", space.to_str().expect("root path"), "--json"])
             .args(arguments)

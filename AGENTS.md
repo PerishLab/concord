@@ -82,6 +82,11 @@ of copying its answer here.
   the single agent session it recognises. Every record of one invocation,
   traced function frames included, carries its `concord.command`; each frame
   keeps its own `locus.span`.
+  Every GitHub command exchange through the shared transport records one
+  `provider.call` (operation, calling site, duration and outcome, never its
+  arguments or reply), and every wait the provider imposes on delivery records
+  one `provider.wait`; these two are the measure of provider time, while
+  `provider.projection` summarises one projection read over its calls.
 - Issue briefs, relationship graphs and closure readiness are bounded live
   GitHub projections. They retain exact provider cursors and observation time,
   distinguish structural parentage from blocking, never cache lifecycle state,

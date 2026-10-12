@@ -1,9 +1,10 @@
 use locus::reporter;
 use locus::{Candidate, Config, Context, Engine, Key, Policy, Role};
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 
 const ENDPOINT: &str = "http://127.0.0.1:43308";
 
@@ -59,22 +60,52 @@ impl Run {
 }
 
 pub(crate) fn projection(shape: &str, provider: (&str, &str), duration: u64, outcome: &str) {
-    let Some(context) = COMMAND.get() else {
-        return;
-    };
-    let Some((engine, _)) = concord_core::observation::view() else {
-        return;
-    };
-    let candidate = Candidate::event(json!({
+    emit(json!({
         "event": "provider.projection",
         "shape": shape,
         "provider": provider.0,
         "kind": provider.1,
         "duration_ms": duration,
         "outcome": outcome,
-    }))
-    .ensure(Role::trace())
-    .ensure(Role::span());
+    }));
+}
+
+pub(crate) fn call(operation: &str, site: &str, elapsed: Duration, outcome: &str) {
+    emit(json!({
+        "event": "provider.call",
+        "provider": "github",
+        "operation": operation,
+        "site": site,
+        "duration_ms": millis(elapsed),
+        "outcome": outcome,
+    }));
+}
+
+pub(crate) async fn wait(reason: &str, delay: Duration) {
+    let start = Instant::now();
+    tokio::time::sleep(delay).await;
+    emit(json!({
+        "event": "provider.wait",
+        "provider": "github",
+        "reason": reason,
+        "duration_ms": millis(start.elapsed()),
+    }));
+}
+
+fn millis(elapsed: Duration) -> u64 {
+    u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX)
+}
+
+fn emit(payload: Value) {
+    let Some(context) = COMMAND.get() else {
+        return;
+    };
+    let Some((engine, _)) = concord_core::observation::view() else {
+        return;
+    };
+    let candidate = Candidate::event(payload)
+        .ensure(Role::trace())
+        .ensure(Role::span());
     let _ = engine.append(context, candidate);
 }
 

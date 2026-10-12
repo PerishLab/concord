@@ -144,7 +144,7 @@ impl Client<'_> {
                 return Err(failed(&error, &checks.failed));
             }
             last = Some(error);
-            tokio::time::sleep(Duration::from_secs(turn)).await;
+            crate::observation::wait("mergeability", Duration::from_secs(turn)).await;
         }
         Err(last.unwrap_or_else(|| provider("pull did not become mergeable")))
     }
