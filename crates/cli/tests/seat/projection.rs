@@ -176,14 +176,22 @@ mod unix {
             .output()
             .expect("observe projection");
         assert!(output.status.success());
+        success(space, &["audit"]);
         let atoms =
             std::fs::read_to_string(config.join("state").join("locus").join("active.jsonl"))
-                .expect("Locus buffer");
-        let event = atoms
-            .lines()
-            .map(|line| serde_json::from_str::<Value>(line).expect("Locus atom"))
-            .find(|atom| atom["payload"]["event"] == "provider.projection")
-            .expect("projection observation");
+                .expect("Locus buffer")
+                .lines()
+                .map(|line| serde_json::from_str::<Value>(line).expect("Locus atom"))
+                .collect::<Vec<_>>();
+        let find = |name: &str| atoms.iter().rfind(|atom| atom["payload"]["event"] == name);
+        let span = &find("cli.start").expect("audit start")["context"]["locus.span"];
+        let traced = atoms.iter().filter(|atom| atom.get("source").is_some());
+        assert!(traced.clone().count() > 0);
+        for atom in traced {
+            assert_eq!(atom["context"]["concord.command"], "audit");
+            assert_ne!(&atom["context"]["locus.span"], span);
+        }
+        let event = find("provider.projection").expect("projection observation");
         assert_eq!(event["payload"]["shape"], "issue.brief");
         assert_eq!(event["payload"]["outcome"], "fresh");
         assert_eq!(event["context"]["concord.command"], "issue.brief");

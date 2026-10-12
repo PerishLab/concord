@@ -28,7 +28,7 @@ static COMMAND: OnceLock<Context> = OnceLock::new();
 
 impl Run {
     pub(crate) fn start(command: &'static str, config: Option<&Path>) -> Option<Self> {
-        let (engine, context) = load(config)?;
+        let (engine, context) = load(config, command)?;
         let candidate = Candidate::event(json!({"event": "cli.start"}))
             .ensure(Role::trace())
             .ensure(Role::span())
@@ -78,7 +78,7 @@ pub(crate) fn projection(shape: &str, provider: (&str, &str), duration: u64, out
     let _ = engine.append(context, candidate);
 }
 
-fn load(config: Option<&Path>) -> Option<(Engine, Context)> {
+fn load(config: Option<&Path>, command: &str) -> Option<(Engine, Context)> {
     let path = crate::config::Config::path(config).ok()?;
     if !path.is_file() {
         return None;
@@ -99,7 +99,7 @@ fn load(config: Option<&Path>) -> Option<(Engine, Context)> {
         .or_else(|| plumb::config::value("LOCUS_API"))
         .unwrap_or_else(|| ENDPOINT.to_string());
     let buffer = plumb::config::data("concord")?.join("state").join("locus");
-    match build(endpoint, buffer) {
+    match build(endpoint, buffer, command) {
         Ok(run) => Some(run),
         Err(error) => {
             eprintln!("concord locus: {error}");
@@ -108,12 +108,18 @@ fn load(config: Option<&Path>) -> Option<(Engine, Context)> {
     }
 }
 
-fn build(endpoint: String, buffer: PathBuf) -> Result<(Engine, Context), locus::Error> {
+fn build(
+    endpoint: String,
+    buffer: PathBuf,
+    command: &str,
+) -> Result<(Engine, Context), locus::Error> {
     let policy = Policy::default()
         .producer("concord")
         .reporter(reporter::Spec::api(endpoint, buffer));
     let engine = Engine::bootstrap(Config::new(policy))?;
-    let mut candidate = Candidate::context().ensure(Role::trace());
+    let mut candidate = Candidate::context()
+        .ensure(Role::trace())
+        .explicit(Role::new("concord.command")?, Key::new(command)?);
     if let Some(session) = concord_core::session() {
         candidate = candidate.explicit(Role::trace(), Key::new(session)?);
     }

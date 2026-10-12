@@ -79,7 +79,9 @@ of copying its answer here.
   `http://127.0.0.1:43308`). No other Locus setting is read from the
   environment. Concord reports as producer `concord` through the Locus `api`
   reporter into a buffer under its data home (`state/locus`), and its trace is
-  the single agent session it recognises.
+  the single agent session it recognises. Every record of one invocation,
+  traced function frames included, carries its `concord.command`; each frame
+  keeps its own `locus.span`.
 - Issue briefs, relationship graphs and closure readiness are bounded live
   GitHub projections. They retain exact provider cursors and observation time,
   distinguish structural parentage from blocking, never cache lifecycle state,
