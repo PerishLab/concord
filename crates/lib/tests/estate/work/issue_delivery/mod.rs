@@ -1,5 +1,6 @@
 mod boundary;
 mod completion;
+mod peer;
 mod recovery;
 
 use concord_core::authority::Plumb;
