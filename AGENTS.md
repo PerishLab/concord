@@ -68,7 +68,14 @@ of copying its answer here.
   merge GitHub refused as pending), and confirms that identity without
   executing before every other mutation; no merge happens without that
   execution in the same land. This environment boundary
-  is not a filesystem sandbox. Native evidence and status names never claim
+  is not a filesystem sandbox. Only the complete fixed unittest suite has a
+  30-minute execution ceiling; selfcheck and tool observations retain five
+  minutes. Every command retains the 1 MiB aggregate output ceiling. Timeout,
+  excessive output and failed exit refuse, with attempted children killed and
+  reaped on refusal; this does not promise process-group confinement. Budget
+  policy remains compiled, not a runtime knob, and gate authority hashes the
+  runner and gate implementation so changed policy invalidates old evidence.
+  Native evidence and status names never claim
   Guard authority; exact provider readback and Member release remain required.
 - Optional Locus facts and the private activity ledger are observations only.
   They never establish authorship, ownership, presence, authorization, or

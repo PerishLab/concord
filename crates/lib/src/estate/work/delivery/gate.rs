@@ -43,7 +43,7 @@ impl Gate for Wharf {
     fn verify(&self, context: &Context<'_>) -> Result<Evidence, Refusal> {
         let world = World::read(context.root)?;
         process::run(&mut world.command(context.root, CHECK))?;
-        process::run(&mut world.command(context.root, TEST))?;
+        process::suite(&mut world.command(context.root, TEST))?;
         if world != World::read(context.root)? {
             return Err(process::refuse(
                 "native gate tool world changed during verification",
