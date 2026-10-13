@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 const LIMIT: u64 = 1_048_576;
 const TIMEOUT: Duration = Duration::from_secs(300);
+const SUITE: Duration = Duration::from_secs(1800);
 
 struct Running(Child);
 
@@ -20,6 +21,10 @@ pub(super) fn run(command: &mut Command) -> Result<String, Refusal> {
     bounded(command, TIMEOUT)
 }
 
+pub(super) fn suite(command: &mut Command) -> Result<String, Refusal> {
+    bounded(command, SUITE)
+}
+
 fn bounded(command: &mut Command, timeout: Duration) -> Result<String, Refusal> {
     let mut log = tempfile::tempfile().map_err(fault)?;
     command
@@ -29,8 +34,11 @@ fn bounded(command: &mut Command, timeout: Duration) -> Result<String, Refusal> 
     let mut child = Running(command.spawn().map_err(fault)?);
     let started = Instant::now();
     loop {
-        if log.metadata().map_err(fault)?.len() > LIMIT || started.elapsed() > timeout {
-            return Err(refuse("native gate exceeded its time or output budget"));
+        if log.metadata().map_err(fault)?.len() > LIMIT {
+            return Err(refuse("native gate exceeded its output budget"));
+        }
+        if started.elapsed() > timeout {
+            return Err(refuse("native gate exceeded its time budget"));
         }
         if let Some(status) = child.0.try_wait().map_err(fault)? {
             log.seek(SeekFrom::Start(0)).map_err(fault)?;
@@ -77,7 +85,7 @@ fn fault(error: std::io::Error) -> Refusal {
 
 #[cfg(all(test, unix))]
 mod tests {
-    use super::{Duration, Instant, bounded};
+    use super::{Duration, Instant, LIMIT, SUITE, TIMEOUT, bounded, run, suite};
     use std::process::Command;
 
     #[test]
@@ -89,7 +97,7 @@ mod tests {
             bounded(&mut large, Duration::from_secs(5))
                 .expect_err("large output")
                 .message
-                .contains("budget")
+                .contains("output budget")
         );
         let mut slow = Command::new(&python);
         slow.env_clear()
@@ -99,8 +107,52 @@ mod tests {
             bounded(&mut slow, Duration::from_millis(10))
                 .expect_err("timeout")
                 .message
-                .contains("budget")
+                .contains("time budget")
         );
         assert!(before.elapsed() < Duration::from_secs(1));
+    }
+
+    #[test]
+    fn policy() {
+        assert_eq!(TIMEOUT, Duration::from_secs(300));
+        assert_eq!(SUITE, Duration::from_secs(1800));
+        assert_eq!(LIMIT, 1_048_576);
+        let python = which::which("python3").expect("Python");
+        let mut command = Command::new(&python);
+        command.env_clear().args(["-B", "-c", "print('verified')"]);
+        assert_eq!(suite(&mut command).expect("suite"), "verified\n");
+        let mut command = Command::new(&python);
+        command.env_clear().args(["--version"]);
+        assert!(run(&mut command).expect("observation").contains("Python"));
+    }
+
+    #[test]
+    fn failure() {
+        let python = which::which("python3").expect("Python");
+        let mut command = Command::new(&python);
+        command
+            .env_clear()
+            .args(["-B", "-c", "raise SystemExit(7)"]);
+        assert!(
+            suite(&mut command)
+                .expect_err("exit")
+                .message
+                .contains("failed")
+        );
+    }
+
+    #[test]
+    fn window() {
+        let python = which::which("python3").expect("Python");
+        let mut command = Command::new(&python);
+        command
+            .env_clear()
+            .args(["-B", "-c", "import time; time.sleep(0.1)"]);
+        assert!(bounded(&mut command, Duration::from_secs(2)).is_ok());
+        let mut command = Command::new(&python);
+        command
+            .env_clear()
+            .args(["-B", "-c", "import time; time.sleep(2)"]);
+        assert!(bounded(&mut command, Duration::from_millis(10)).is_err());
     }
 }
