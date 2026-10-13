@@ -71,8 +71,8 @@ fn book() -> Cookbook {
         ),
         entry(
             "concord.delivery.branches",
-            "The delivering repository holds a local or origin branch outside its Issue branch set: `main`, `release/vX.Y.Z`, automation-held `auto/<number>` refs, the branches of live Members in that repository and their `land/` projections, and `<type>/<number>` of an open Issue of that type in that repository.",
-            "Delete each named branch, or give work worth keeping an open Issue and rename the branch to `<type>/<number>`, then re-run the refused command. Concord never deletes these branches itself and inspects no other repository.",
+            "The delivering repository holds a local or origin branch outside its Issue branch set: `main`, `release/vX.Y.Z`, automation-held `auto/<number>` refs, the branches of live Members in that repository and their `land/` projections, and `<type>/<number>` of an open Issue of that type in that repository. An origin `land/<type>/<number>` from another estate is retained only with an exact same-repository open pull and matching open typed Issue.",
+            "Inspect any existing pull before retiring its branch. Restore exact origin head, open same-repository pull and canonical Issue-reference agreement for a live foreign projection; retire only a verified obsolete branch, or give retained work an open typed Issue and canonical branch, then re-run the refused command. Concord never deletes these branches itself and inspects no other repository.",
             (
                 "Read the refusal's branch list, with each branch's place and reason, and inspect `git log main..<branch>` before deleting anything.",
                 "The repository holds only branches in the Issue branch set and delivery proceeds past the branch check.",

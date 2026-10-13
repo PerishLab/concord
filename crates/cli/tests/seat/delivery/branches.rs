@@ -31,8 +31,14 @@ fn branches() {
         "i6": issue("OPEN", "Task"),
         "i7": issue("OPEN", "Feature"),
         "i8": null,
+        "i9": issue("OPEN", "Task"),
     }}, "errors": [{"type": "NOT_FOUND", "path": ["repository", "i8"], "message": "missing"}]});
     std::fs::write(space.join("branch-issues"), issues.to_string()).expect("issues");
+    std::fs::write(
+        space.join("branch-projections"),
+        projections(json!([]), false).to_string(),
+    )
+    .unwrap();
     let output = prepare(space, provider, &seat.revision(), false)
         .output()
         .expect("prepare");
@@ -165,4 +171,128 @@ fn invoke(seat: &Seat<'_>, provider: &std::path::Path, json: bool) -> std::proce
         ])
         .output()
         .expect("prepare")
+}
+
+fn projections(nodes: Value, more: bool) -> Value {
+    let connection = json!({"nodes": nodes, "pageInfo": {"hasNextPage": more}});
+    json!({"data": {"repository": {"p0": connection}}})
+}
+
+#[test]
+fn foreign() {
+    let fixture = tempfile::tempdir().unwrap();
+    let seat = Seat::open(fixture.path());
+    seat.change();
+    let remote = seat.space.join("remote.git");
+    let branch = "land/feature/9";
+    git(&remote, &["branch", branch, "main"]);
+    let retained = head(&remote, branch);
+    let issues = json!({"data":{"repository":{"i9":issue("OPEN", "Feature")}}});
+    std::fs::write(seat.space.join("branch-issues"), issues.to_string()).unwrap();
+    let pull = json!({
+        "state":"OPEN", "headRefName":branch, "headRefOid":retained,
+        "headRepository":{"nameWithOwner":"PerishLab/probe"},
+        "baseRepository":{"nameWithOwner":"PerishLab/probe"},
+        "body":"Refs PerishLab/probe#9\n\nRetained delivery."
+    });
+    let path = seat.space.join("branch-projections");
+    std::fs::write(&path, projections(json!([pull.clone()]), false).to_string()).unwrap();
+    for value in [issue("CLOSED", "Feature"), issue("OPEN", "Bug")] {
+        let snapshot = states(value);
+        std::fs::write(seat.space.join("branch-issues"), snapshot.to_string()).unwrap();
+        refused(
+            &prepare(seat.space, &seat.provider, &seat.revision(), false)
+                .output()
+                .unwrap(),
+            "concord.delivery.branches",
+        );
+    }
+    std::fs::write(seat.space.join("branch-issues"), issues.to_string()).unwrap();
+    git(&seat.source, &["branch", branch, "main"]);
+    refused(
+        &prepare(seat.space, &seat.provider, &seat.revision(), false)
+            .output()
+            .unwrap(),
+        "concord.delivery.branches",
+    );
+    git(&seat.source, &["branch", "-D", branch]);
+    for field in [
+        "state",
+        "headRefName",
+        "headRefOid",
+        "headRepository",
+        "baseRepository",
+        "body",
+    ] {
+        let mut wrong = pull.clone();
+        wrong[field] = if field.ends_with("Repository") {
+            json!({"nameWithOwner":"PerishLab/other"})
+        } else {
+            json!("mismatch")
+        };
+        std::fs::write(&path, projections(json!([wrong]), false).to_string()).unwrap();
+        let output = prepare(seat.space, &seat.provider, &seat.revision(), false)
+            .output()
+            .unwrap();
+        assert!(
+            !output.status.success(),
+            "accepted mismatch {field}: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        refused(&output, "concord.delivery.branches");
+    }
+    for response in [
+        projections(json!([pull.clone()]), true),
+        json!({"data":{"repository":{}}}),
+        json!({"errors":[{"message":"refused"}]}),
+    ] {
+        std::fs::write(&path, response.to_string()).unwrap();
+        let output = prepare(seat.space, &seat.provider, &seat.revision(), false)
+            .output()
+            .unwrap();
+        refused(&output, "concord.delivery.provider");
+    }
+    std::fs::write(
+        &path,
+        projections(json!([pull.clone(), pull.clone()]), false).to_string(),
+    )
+    .unwrap();
+    refused(
+        &prepare(seat.space, &seat.provider, &seat.revision(), false)
+            .output()
+            .unwrap(),
+        "concord.delivery.branches",
+    );
+    std::fs::write(&path, projections(json!([pull]), false).to_string()).unwrap();
+    let prepared = prepare(seat.space, &seat.provider, &seat.revision(), false)
+        .output()
+        .unwrap();
+    assert!(
+        prepared.status.success(),
+        "{}",
+        String::from_utf8_lossy(&prepared.stderr)
+    );
+    let plan = serde_json::from_slice::<Value>(&prepared.stdout).unwrap();
+    assert!(plan.get("plan").is_some());
+    let before = seat.revision();
+    std::fs::write(&path, projections(json!([]), false).to_string()).unwrap();
+    let rejected = consume(seat.space, &seat.provider, &prepared.stdout);
+    refused(&rejected, "concord.delivery.branches");
+    assert_eq!(seat.revision(), before);
+    assert!(!seat.space.join("pull-state").exists());
+    assert_eq!(head(&remote, branch), retained);
+}
+
+fn head(root: &std::path::Path, branch: &str) -> String {
+    let output = std::process::Command::new("git")
+        .current_dir(root)
+        .args(["rev-parse", branch])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    String::from_utf8(output.stdout).unwrap().trim().to_string()
+}
+
+fn states(node: Value) -> Value {
+    json!({"data":{"repository":{"i9":node}}})
 }
