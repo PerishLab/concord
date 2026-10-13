@@ -173,32 +173,32 @@ mod unix {
             first.wait_with_output().expect("first land"),
             second.wait_with_output().expect("second land"),
         ];
-        let mut reports = Vec::new();
-        let mut refusals = Vec::new();
-        for completed in outputs {
-            if completed.status.success() {
-                reports.push(
-                    serde_json::from_slice::<Value>(&completed.stdout).expect("completion report"),
+        let reports = outputs
+            .iter()
+            .map(|completed| {
+                assert!(
+                    completed.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&completed.stderr)
                 );
-            } else {
-                refusals.push(
-                    serde_json::from_slice::<Value>(&completed.stderr).expect("concurrent refusal"),
-                );
-            }
+                serde_json::from_slice::<Value>(&completed.stdout).expect("completion report")
+            })
+            .collect::<Vec<_>>();
+        for report in &reports {
+            assert_eq!(report["schema"], "concord.issue-delivery-land/v3");
+            assert_eq!(report["revision"], 4);
+            assert_eq!(report["pull"]["state"], "MERGED");
+            assert_eq!(report["merge"], reports[0]["merge"]);
         }
-        assert_eq!(reports.len(), 1);
-        assert_eq!(refusals.len(), 1);
-        assert_eq!(refusals[0]["error"]["code"], "concord.audit.refused");
-        assert!(reports.iter().all(|report| {
-            report["schema"] == "concord.issue-delivery-land/v3"
-                && report["revision"] == 4
-                && report["pull"]["state"] == "MERGED"
-        }));
-        assert_eq!(reports[0]["released"], true);
+        let released = reports
+            .iter()
+            .filter(|report| report["released"] == true)
+            .collect::<Vec<_>>();
+        assert_eq!(released.len(), 1);
         assert!(!member.exists());
         assert_eq!(
             text(&source, &["rev-parse", "HEAD"]),
-            reports[0]["integration"]["head"]
+            released[0]["integration"]["head"]
                 .as_str()
                 .expect("main head")
         );
