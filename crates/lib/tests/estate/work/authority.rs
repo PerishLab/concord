@@ -121,6 +121,12 @@ async fn offline() {
     assert_eq!(error.code(), "concord.delivery.authority");
     assert!(error.message().contains(POINTER), "{}", error.message());
     assert!(error.message().contains(compiled.producer()));
+    assert!(
+        error.message().contains("acceptance cannot be decided"),
+        "{}",
+        error.message()
+    );
+    assert!(error.message().contains("retry"));
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -146,4 +152,41 @@ async fn moved() {
     assert!(error.message().contains("re-guard"), "{}", error.message());
     assert!(error.message().contains(authority.producer()));
     assert!(error.message().contains(POINTER));
+    assert!(error.message().contains("acceptance cannot be decided"));
+    assert!(!error.message().contains("no longer an accepted"));
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn stale() {
+    let authority = released();
+    let Fixture {
+        estate,
+        issue,
+        _temp,
+    } = fixture(authority.producer(), authority.depot()).await;
+    let mut plan = issue_delivery::prepare::<Pinned>(&estate, &request(&issue))
+        .await
+        .expect("prepared under the compiled authority");
+    let issue_delivery::Authority::Plumb { warrant, .. } = &mut plan.authority else {
+        panic!("expected Guard authority");
+    };
+    warrant.producer = UNKNOWN.into();
+    let error = issue_delivery::revalidate::<Pinned>(
+        &estate,
+        &plan,
+        (&snapshot(), 2),
+        issue_delivery::Check::Execute,
+    )
+    .await
+    .expect_err("no readable authority names the warrant");
+    assert_eq!(error.code(), "concord.delivery.authority");
+    assert!(
+        error
+            .message()
+            .contains("no longer an accepted Guard authority"),
+        "{}",
+        error.message()
+    );
+    assert!(error.message().contains(UNKNOWN));
+    assert!(!error.message().contains("cannot be decided"));
 }
