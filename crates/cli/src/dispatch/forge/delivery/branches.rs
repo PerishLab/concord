@@ -1,4 +1,5 @@
 use super::super::github::issues::{Observed, states};
+use super::super::github::projections;
 use super::git::Git;
 use super::pull::provider;
 use concord_core::{Error, Estate, Integration, Result};
@@ -30,12 +31,14 @@ struct Pending {
     place: &'static str,
     kind: &'static str,
     number: u64,
+    head: Option<String>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
 enum Verdict {
     Held,
     Issue { kind: &'static str, number: u64 },
+    Projection { kind: &'static str, number: u64 },
     Refused(Reason),
 }
 
@@ -55,7 +58,7 @@ pub(super) async fn clean(
     let held = listed(Path::new(&integration.path), &integration.remote).await?;
     let mut offenses = Vec::new();
     let mut pending = Vec::new();
-    for (branch, place) in held {
+    for (branch, place, head) in held {
         match judge(&branch, &integration.branch, &live) {
             Verdict::Held => {}
             Verdict::Refused(reason) => offenses.push(Offense {
@@ -63,11 +66,24 @@ pub(super) async fn clean(
                 place,
                 reason,
             }),
+            Verdict::Projection { kind, number } if place == "origin" => pending.push(Pending {
+                branch,
+                place,
+                kind,
+                number,
+                head: Some(head),
+            }),
+            Verdict::Projection { .. } => offenses.push(Offense {
+                branch,
+                place,
+                reason: Reason::Delivery,
+            }),
             Verdict::Issue { kind, number } => pending.push(Pending {
                 branch,
                 place,
                 kind,
                 number,
+                head: None,
             }),
         }
     }
@@ -75,19 +91,42 @@ pub(super) async fn clean(
         .iter()
         .map(|held| held.number)
         .collect::<BTreeSet<_>>();
-    if numbers.len() > BOUND {
+    if pending.len() > BOUND {
         return Err(Error::typed(
             "concord.delivery.branches",
             format!(
                 "{} names {} Issue branches, more than the {BOUND} one bounded query reads; delete stale branches before delivering",
                 identity(integration),
-                numbers.len()
+                pending.len()
             ),
         ));
     }
     let observed = states(&integration.repository, &numbers, command, timeout).await?;
+    let branches = pending
+        .iter()
+        .filter(|held| {
+            held.head.is_some() && settle(held.kind, observed.get(&held.number)).is_none()
+        })
+        .map(|held| held.branch.clone())
+        .collect();
+    let projected =
+        projections::observe(&integration.repository, &branches, command, timeout).await?;
     for held in pending {
-        if let Some(reason) = settle(held.kind, observed.get(&held.number)) {
+        let mut reason = settle(held.kind, observed.get(&held.number));
+        if reason.is_none()
+            && let Some(head) = &held.head
+        {
+            let count = projected[&held.branch]
+                .iter()
+                .filter(|pull| {
+                    pull.matches(&integration.repository, &held.branch, head, held.number)
+                })
+                .count();
+            if count != 1 {
+                reason = Some(Reason::Delivery);
+            }
+        }
+        if let Some(reason) = reason {
             offenses.push(Offense {
                 branch: held.branch,
                 place: held.place,
@@ -105,14 +144,16 @@ fn judge(branch: &str, main: &str, live: &BTreeSet<String>) -> Verdict {
     if branch == main || live.contains(branch) || release(branch) {
         return Verdict::Held;
     }
-    if branch.starts_with("land/") {
-        return Verdict::Refused(Reason::Delivery);
-    }
-    let Some((prefix, number)) = branch.split_once('/') else {
+    let projection = branch.strip_prefix("land/");
+    let candidate = projection.unwrap_or(branch);
+    let Some((prefix, number)) = candidate.split_once('/') else {
         return Verdict::Refused(Reason::Name);
     };
     let kind = KINDS.iter().find(|(held, _)| *held == prefix);
     match (kind, canonical(number).filter(|number| *number > 0)) {
+        (Some((_, kind)), Some(number)) if projection.is_some() => {
+            Verdict::Projection { kind, number }
+        }
         (Some((_, kind)), Some(number)) => Verdict::Issue { kind, number },
         _ => Verdict::Refused(Reason::Name),
     }
@@ -142,25 +183,35 @@ fn settle(kind: &str, observed: Option<&Observed>) -> Option<Reason> {
     }
 }
 
-async fn listed(root: &Path, remote: &str) -> Result<Vec<(String, &'static str)>> {
+async fn listed(root: &Path, remote: &str) -> Result<Vec<(String, &'static str, String)>> {
     let local = Git::run(
         root,
-        &["for-each-ref", "--format=%(refname:strip=2)", "refs/heads"],
+        &[
+            "for-each-ref",
+            "--format=%(refname:strip=2) %(objectname)",
+            "refs/heads",
+        ],
     )
     .await?;
     let mut held = local
         .lines()
-        .map(|branch| (branch.to_string(), "local"))
-        .collect::<Vec<_>>();
+        .map(|line| {
+            line.split_once(' ')
+                .map(|(branch, head)| (branch.to_string(), "local", head.to_string()))
+                .ok_or_else(|| provider("malformed local branch record"))
+        })
+        .collect::<Result<Vec<_>>>()?;
     for line in Git::run(root, &["ls-remote", "--heads", remote])
         .await?
         .lines()
     {
-        let branch = line
+        let (head, reference) = line
             .split_once('\t')
-            .and_then(|(_, reference)| reference.strip_prefix("refs/heads/"))
+            .ok_or_else(|| provider("malformed origin branch record"))?;
+        let branch = reference
+            .strip_prefix("refs/heads/")
             .ok_or_else(|| provider(format!("git ls-remote answered a malformed line: {line}")))?;
-        held.push((branch.to_string(), "origin"));
+        held.push((branch.to_string(), "origin", head.to_string()));
     }
     Ok(held)
 }
@@ -212,7 +263,7 @@ fn identity(integration: &Integration) -> String {
 fn describe(reason: Reason) -> [&'static str; 2] {
     match reason {
         Reason::Name => ["name", "name"],
-        Reason::Delivery => ["delivery", "no live delivery"],
+        Reason::Delivery => ["delivery", "no verified live delivery"],
         Reason::Absent => ["absent", "no such Issue"],
         Reason::Closed => ["closed", "closed Issue"],
         Reason::Kind => ["type", "Issue type differs"],
@@ -220,81 +271,5 @@ fn describe(reason: Reason) -> [&'static str; 2] {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{Observed, Reason, Verdict};
-    use std::collections::BTreeSet;
-
-    #[test]
-    fn judge() {
-        let live = BTreeSet::from([
-            "concord/issue-abc".to_string(),
-            "land/concord/issue-abc".to_string(),
-        ]);
-        for branch in [
-            "main",
-            "release/v0.22.0",
-            "concord/issue-abc",
-            "land/concord/issue-abc",
-        ] {
-            assert_eq!(
-                super::judge(branch, "main", &live),
-                Verdict::Held,
-                "{branch}"
-            );
-        }
-        assert_eq!(
-            super::judge("task/12", "main", &live),
-            Verdict::Issue {
-                kind: "Task",
-                number: 12
-            }
-        );
-        for branch in [
-            "topic",
-            "fix/12",
-            "task/012",
-            "task/0",
-            "task/12/more",
-            "release/v1.2",
-            "release/v01.2.3",
-            "concord/issue-def",
-        ] {
-            assert_eq!(
-                super::judge(branch, "main", &live),
-                Verdict::Refused(Reason::Name),
-                "{branch}"
-            );
-        }
-        assert_eq!(
-            super::judge("land/task/12", "main", &live),
-            Verdict::Refused(Reason::Delivery)
-        );
-    }
-
-    #[test]
-    fn settle() {
-        let open = |kind: &str| Observed::Issue {
-            open: true,
-            kind: Some(kind.to_string()),
-        };
-        assert_eq!(super::settle("Task", Some(&open("Task"))), None);
-        assert_eq!(
-            super::settle("Task", Some(&open("Bug"))),
-            Some(Reason::Kind)
-        );
-        assert_eq!(
-            super::settle(
-                "Task",
-                Some(&Observed::Issue {
-                    open: false,
-                    kind: Some("Task".into())
-                })
-            ),
-            Some(Reason::Closed)
-        );
-        assert_eq!(
-            super::settle("Task", Some(&Observed::Absent)),
-            Some(Reason::Absent)
-        );
-    }
-}
+#[path = "../github/branches.rs"]
+mod tests;
