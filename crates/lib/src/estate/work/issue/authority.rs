@@ -52,8 +52,13 @@ pub(super) fn select<A: Authorities>(
     gather(A::compiled(), &mut set, &mut absent);
     let chosen = Authority::among(set.clone(), root, commit).or_else(|_| {
         gather(A::stable(), &mut set, &mut absent);
-        Authority::among(set, root, commit)
-            .map_err(|error| Error::typed(code, format!("{error}{}", unavailable(&absent))))
+        Authority::among(set, root, commit).map_err(|error| {
+            let message = match undecided(&absent) {
+                Some(reason) => format!("{error}; {reason}; retry once it is readable"),
+                None => error,
+            };
+            Error::typed(code, message)
+        })
     })?;
     let warrant = Warrant::of(&chosen);
     Ok((chosen, warrant))
@@ -73,15 +78,19 @@ pub(super) fn keep<A: Authorities>(warrant: &Warrant, code: &str) -> Result<Auth
         .map(Authority::producer)
         .collect::<Vec<_>>()
         .join(", ");
-    Err(Error::typed(
-        code,
-        format!(
-            "plan was prepared under Plumb {} with depot {}, which is no longer an accepted Guard authority [{named}]{}; re-guard under the current Plumb and prepare again",
-            warrant.producer,
-            warrant.depot,
-            unavailable(&absent)
+    let prepared = format!(
+        "plan was prepared under Plumb {} with depot {}",
+        warrant.producer, warrant.depot
+    );
+    let message = match undecided(&absent) {
+        Some(reason) => format!(
+            "{prepared}; no readable Guard authority names it [{named}] and {reason}; retry once it is readable, or re-guard under the current Plumb if it has moved"
         ),
-    ))
+        None => format!(
+            "{prepared}, which is no longer an accepted Guard authority [{named}]; re-guard under the current Plumb and prepare again"
+        ),
+    };
+    Err(Error::typed(code, message))
 }
 
 fn gather(found: Found, set: &mut Vec<Authority>, absent: &mut Vec<String>) {
@@ -91,11 +100,13 @@ fn gather(found: Found, set: &mut Vec<Authority>, absent: &mut Vec<String>) {
     }
 }
 
-fn unavailable(absent: &[String]) -> String {
-    absent
-        .iter()
-        .map(|error| format!("; unavailable authority: {error}"))
-        .collect()
+fn undecided(absent: &[String]) -> Option<String> {
+    (!absent.is_empty()).then(|| {
+        format!(
+            "acceptance cannot be decided because a Guard authority could not be read: {}",
+            absent.join("; ")
+        )
+    })
 }
 
 pub(super) mod delivery {
