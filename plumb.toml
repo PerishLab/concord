@@ -21,8 +21,10 @@ note = "Git attribute policy."
 name = ["Cargo.toml", "Cargo.lock"]
 note = "Rust workspace anchors."
 
+[identity]
+ns = "concord"
+
 [release]
-product = "concord"
 authority = "https://releases.concord.perish.uk"
 binaries = ["concord"]
 skill = true
