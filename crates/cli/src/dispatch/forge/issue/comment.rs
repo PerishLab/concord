@@ -122,16 +122,11 @@ pub(in crate::dispatch) fn render(prose: &str, execution: &Execution) -> Result<
             "Issue comment body must not be empty",
         ));
     }
-    let host = execution
-        .host
-        .as_ref()
-        .map(|host| format!(" · host `{host}`"))
-        .unwrap_or_default();
     let marker = serde_json::to_string(execution)
         .map_err(|error| Error::typed("concord.issue.comment.encode", error.to_string()))?;
     let body = format!(
-        "{prose}\n\n---\nConcord: `{}` session `{}`{host}\n\n<!-- concord.issue-comment/v1\n{marker}\n-->",
-        execution.agent, execution.session
+        "{prose}\n\n{}\n\n<!-- concord.issue-comment/v1\n{marker}\n-->",
+        card(execution)
     );
     if body.len() > BODY {
         return Err(Error::typed(
@@ -140,6 +135,24 @@ pub(in crate::dispatch) fn render(prose: &str, execution: &Execution) -> Result<
         ));
     }
     Ok(body)
+}
+
+fn card(execution: &Execution) -> String {
+    let session = &execution.session;
+    let host = execution
+        .host
+        .as_ref()
+        .map(|host| format!(" · host `{host}`"))
+        .unwrap_or_default();
+    let title = match execution.agent.as_str() {
+        "grok-bot" => format!("**🫧 {session}** · Grok Bot"),
+        "claude" => "**Claude**".to_string(),
+        "codex" => "**Codex**".to_string(),
+        "grok" => "**Grok**".to_string(),
+        "santi" => "**Santi**".to_string(),
+        agent => format!("**`{agent}`**"),
+    };
+    format!("> {title}\n> concord session `{session}`{host}")
 }
 
 fn read(path: &Path) -> Result<String> {

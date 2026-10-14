@@ -29,6 +29,11 @@ mod unix {
                 "codex-session",
             ),
             (
+                "grok-bot",
+                vec![("GROK_BOT_IDENTITY", "Bubble Santi")],
+                "Bubble Santi",
+            ),
+            (
                 "santi",
                 vec![("SANTI_SOUL_ID", "soul-1"), ("SANTI_STRAND_ID", "strand-1")],
                 "soul-1:strand-1",
