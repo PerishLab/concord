@@ -29,6 +29,10 @@ description = "The explicit authority for Wharf's fixed native checks, not a fal
 name = "WharfNative"
 
 [[vocabulary.term]]
+description = "The Grok Bot agent product, observed through GROK_BOT_IDENTITY as one agent kind."
+name = "GrokBot"
+
+[[vocabulary.term]]
 description = "The spelling required by Rust's FromStr trait at the explicit authority grammar boundary."
 name = "from_str"
 

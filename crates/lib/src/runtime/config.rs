@@ -43,6 +43,7 @@ pub(crate) fn operator() -> Option<Operator> {
         (Agent::Claude, "CLAUDE_CODE_SESSION_ID"),
         (Agent::Grok, "GROK_SESSION_ID"),
         (Agent::Codex, "CODEX_THREAD_ID"),
+        (Agent::GrokBot, "GROK_BOT_IDENTITY"),
     ];
     let mut found = Vec::new();
     for (agent, variable) in variables {
@@ -81,6 +82,10 @@ fn coordinate(value: &str) -> bool {
         && value.chars().all(|character| {
             character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.')
         })
+}
+
+pub(crate) fn identity(value: &str) -> bool {
+    value.len() <= 128 && value.split(' ').all(coordinate)
 }
 
 pub fn session() -> Option<String> {

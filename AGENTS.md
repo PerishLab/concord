@@ -134,6 +134,10 @@ of copying its answer here.
   or another valid agent session alongside them, yield no unique association.
   The existing session-shaped comment and estate records remain unchanged;
   these caller-environment observations are never identity or authority.
+- Grok Bot association observes `GROK_BOT_IDENTITY` as agent `grok-bot`. Its
+  session is the identity: 1..=128 bytes of coordinate words joined by single
+  spaces. It joins the same exactly-one-valid-session rule and is equally never
+  identity or authority.
 
 ## Repository
 

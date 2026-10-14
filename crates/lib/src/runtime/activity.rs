@@ -18,6 +18,7 @@ pub enum Agent {
     Grok,
     Codex,
     Santi,
+    GrokBot,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -80,6 +81,7 @@ impl Agent {
             Self::Grok => "grok",
             Self::Codex => "codex",
             Self::Santi => "santi",
+            Self::GrokBot => "grok-bot",
         }
     }
 }
@@ -91,6 +93,9 @@ impl Operator {
 
     pub(crate) fn valid(&self) -> bool {
         let session = self.session.as_str();
+        if self.agent == Agent::GrokBot {
+            return crate::config::identity(session);
+        }
         !session.is_empty()
             && session.len() <= 512
             && session.chars().all(|character| {
