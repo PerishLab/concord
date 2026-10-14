@@ -99,6 +99,34 @@ fn failed() {
     assert_eq!(probe.read("pull-state"), "OPEN");
 }
 
+#[test]
+fn early() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    let probe = Probe::open(fixture.path());
+    probe.write(
+        "checks-rollup",
+        r#"{"statusCheckRollup":[{"__typename":"CheckRun","name":"Guard","status":"IN_PROGRESS","conclusion":null},{"__typename":"CheckRun","name":"lint","status":"COMPLETED","conclusion":"FAILURE","detailsUrl":"https://ci.example/lint"}]}"#,
+    );
+    let mut land = start(probe.space, &probe.provider, &probe.plan());
+    let waiting = Instant::now();
+    while land.try_wait().expect("land state").is_none() {
+        if waiting.elapsed() > Duration::from_secs(60) {
+            land.kill().expect("kill land");
+            panic!("land waited on pending checks after one failed");
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let landed = land.wait_with_output().expect("land output");
+    refused(&landed, "concord.delivery.checks");
+    let stderr = String::from_utf8_lossy(&landed.stderr);
+    assert!(
+        stderr.contains("lint <https://ci.example/lint>"),
+        "{stderr}"
+    );
+    assert_eq!(probe.read("merge-attempts"), "");
+    assert_eq!(probe.read("pull-state"), "OPEN");
+}
+
 struct Probe<'a> {
     space: &'a Path,
     provider: String,

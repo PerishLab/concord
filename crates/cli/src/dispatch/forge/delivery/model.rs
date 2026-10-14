@@ -86,9 +86,16 @@ enum Check {
         name: String,
         status: String,
         conclusion: Option<String>,
+        #[serde(rename = "detailsUrl", default)]
+        url: Option<String>,
     },
     #[serde(rename = "StatusContext")]
-    Status { context: String, state: String },
+    Status {
+        context: String,
+        state: String,
+        #[serde(rename = "targetUrl", default)]
+        url: Option<String>,
+    },
 }
 
 #[derive(Debug, Default, Eq, PartialEq)]
@@ -108,14 +115,28 @@ impl From<Rollup> for Checks {
                 Check::Run {
                     name,
                     conclusion: Some(conclusion),
+                    url,
                     ..
-                } if failed(&conclusion) => checks.failed.push(name),
-                Check::Status { context, state } if pending(&state) => checks.pending.push(context),
-                Check::Status { context, state } if failed(&state) => checks.failed.push(context),
+                } if failed(&conclusion) => checks.failed.push(named(name, url)),
+                Check::Status { context, state, .. } if pending(&state) => {
+                    checks.pending.push(context)
+                }
+                Check::Status {
+                    context,
+                    state,
+                    url,
+                } if failed(&state) => checks.failed.push(named(context, url)),
                 _ => {}
             }
         }
         checks
+    }
+}
+
+fn named(name: String, url: Option<String>) -> String {
+    match url.filter(|url| !url.is_empty()) {
+        Some(url) => format!("{name} <{url}>"),
+        None => name,
     }
 }
 
@@ -230,10 +251,13 @@ mod tests {
                 {"__typename":"CheckRun","name":"test","status":"COMPLETED","conclusion":"SUCCESS"},
                 {"__typename":"StatusContext","context":"guard / guard (pull_request)","state":"SUCCESS"},
                 {"__typename":"StatusContext","context":"native","state":"PENDING"},
-                {"__typename":"StatusContext","context":"probe","state":"ERROR"}
+                {"__typename":"StatusContext","context":"probe","state":"ERROR","targetUrl":"https://ci.example/probe"}
             ]}"#,
         );
         assert_eq!(observed.pending, ["Guard", "native"]);
-        assert_eq!(observed.failed, ["lint", "probe"]);
+        assert_eq!(
+            observed.failed,
+            ["lint", "probe <https://ci.example/probe>"]
+        );
     }
 }

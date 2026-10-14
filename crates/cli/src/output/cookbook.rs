@@ -79,6 +79,15 @@ fn book() -> Cookbook {
             ),
         ),
         entry(
+            "concord.delivery.checks",
+            "While land waited on the pull's checks, at least one check had already finished as failed, so land refused without marking or merging the pull.",
+            "Read the named failed checks on the pull. Fix the source through its Issue, prove the updated Boundary and prepare again, or re-run a check that failed for reasons outside the source on GitHub, then re-run the same prepared land. Never merge with `--admin` or `--auto` around the policy.",
+            (
+                "Retain the refusal, which names each failed check and its link, and inspect `gh pr checks <pull>`.",
+                "No check on the pull has failed and a re-run land merges and reads the merge back.",
+            ),
+        ),
+        entry(
             "concord.delivery.landed",
             "After a squash merge, the fetched base head differs from the verified candidate in parent, tree or authority evidence. Native delivery also refuses lost or contradictory native proof.",
             "Do not blindly retry a completed merge. Compare the exact head and candidate under the selected authority, reverify what main actually holds, and land any repair as a new Issue-led change. Never fabricate a Guard proof for native delivery or force Member release past failed readback. Synchronize the integration checkout through the verified lifecycle.",

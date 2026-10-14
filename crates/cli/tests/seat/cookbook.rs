@@ -37,6 +37,7 @@ fn inventory() {
             "concord.audit.refused",
             "concord.boundary.refused",
             "concord.delivery.branches",
+            "concord.delivery.checks",
             "concord.delivery.landed",
             "concord.delivery.native",
             "concord.delivery.pending",
