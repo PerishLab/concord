@@ -2,6 +2,8 @@ use super::world;
 use concord_core::acceptance::{Marker, Plan, Step, Target, digest};
 use serde_json::json;
 
+mod advice;
+
 #[test]
 fn declaration() {
     let scratch = tempfile::tempdir().unwrap();

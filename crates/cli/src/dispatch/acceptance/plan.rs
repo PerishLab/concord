@@ -21,12 +21,73 @@ pub(super) struct Prepared {
     pub intent: Plan,
     pub execution: Execution,
     pub semantics: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authority: Option<Advice>,
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub(super) enum Status {
+    Declared,
+    Missing,
+    Invalid,
+    Unknown,
+}
+
+impl Status {
+    pub fn message(self) -> &'static str {
+        match self {
+            Self::Declared => {
+                "This repository declares a release authority; closure still requires one exact containing stable distribution and any promised consumer evidence."
+            }
+            Self::Missing => {
+                "No release authority is currently declared in HEAD:plumb.toml. Retain future authority as an obligation, or explicitly amend a research or coordination promise to source while preserving each leaf's release obligations."
+            }
+            Self::Invalid => {
+                "HEAD:plumb.toml does not declare a valid release authority; repair the declaration before release closure."
+            }
+            Self::Unknown => {
+                "Release authority could not be read consistently for this repository; unreadable provider facts do not establish absence. Read current authority before release closure."
+            }
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct Advice {
+    pub repository: String,
+    pub manifest: Option<String>,
+    pub status: Status,
+    pub message: String,
 }
 
 impl Envelope {
     pub fn validate(&self, coordinate: &Coordinate) -> Result<()> {
-        if self.version != 1 || self.plan.schema != "concord.acceptance-plan/v1" {
+        let versioned = match self.plan.schema.as_str() {
+            "concord.acceptance-plan/v1" => self.plan.authority.is_none(),
+            "concord.acceptance-plan/v2" => self.plan.authority.is_some(),
+            _ => false,
+        };
+        if self.version != 1 || !versioned {
             return Err(super::fault("plan", "unsupported acceptance plan version"));
+        }
+        if let Some(advice) = &self.plan.authority {
+            let identity = advice.manifest.as_ref().is_none_or(|value| {
+                value.len() == 40
+                    && value
+                        .bytes()
+                        .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+            });
+            if advice.repository != self.plan.issue.repository
+                || !identity
+                || advice.message != advice.status.message()
+            {
+                return Err(super::fault(
+                    "plan",
+                    "authority advice differs from its repository or public shape",
+                ));
+            }
         }
         if &self.plan.issue.coordinate != coordinate {
             return Err(super::fault("plan", "plan belongs to another Issue"));

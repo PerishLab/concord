@@ -7,6 +7,8 @@ use super::super::forge;
 use super::plan::Prepared;
 use crate::args::acceptance::Prepare;
 
+mod advice;
+
 const SHAPE: &str = r#"{"prose":"Concrete acceptance promise","marker":{"purpose":"declaration","target":"source","promise":"Merge the bounded verified source change."}}"#;
 
 pub(super) enum Purpose {
@@ -25,6 +27,8 @@ struct Intent {
 pub(super) async fn run(args: Prepare, purpose: Purpose) -> Result<Value> {
     let intent: Intent = crate::dispatch::input::read(&args.input, SHAPE)?;
     let execution = forge::execution()?;
+    let advisory = matches!(&purpose, Purpose::Declaration | Purpose::Amendment)
+        && intent.marker.target() == concord_core::acceptance::Target::Release;
     validate(&intent, purpose)?;
     let prose = format!("{}\n\n{}", intent.prose.trim_end(), intent.marker.render()?);
     let body = forge::render(&prose, &execution)?;
@@ -36,12 +40,22 @@ pub(super) async fn run(args: Prepare, purpose: Purpose) -> Result<Value> {
         ));
     }
     let plan = Plan::prepare(intent.marker, body, &snapshot.labels, &snapshot.comments())?;
+    let authority = if advisory {
+        Some(advice::read(&args.observe, &snapshot.header).await)
+    } else {
+        None
+    };
     let prepared = Prepared {
-        schema: "concord.acceptance-plan/v1".into(),
+        schema: if authority.is_some() {
+            "concord.acceptance-plan/v2"
+        } else {
+            "concord.acceptance-plan/v1"
+        }.into(),
         review: snapshot.review()?,
         issue: snapshot.header,
         intent: plan,
         execution,
+        authority,
         semantics: "prepared attestation only; no provider write, readiness proof or authenticated identity".into(),
     };
     Ok(json!({"plan": prepared}))
