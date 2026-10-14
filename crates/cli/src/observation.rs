@@ -116,6 +116,13 @@ fn load(config: Option<&Path>, command: &str) -> Option<(Engine, Context)> {
     }
     let file: File = match plumb::config::load(&path) {
         Ok(file) => file,
+        Err(plumb::config::Error::Parse { path, .. }) => {
+            eprintln!(
+                "concord locus config: invalid observation configuration in {}; check [locus] settings",
+                path.display()
+            );
+            return None;
+        }
         Err(error) => {
             eprintln!("concord locus config: {error}");
             return None;

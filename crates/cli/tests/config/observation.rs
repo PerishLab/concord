@@ -56,6 +56,86 @@ fn disabled() {
 }
 
 #[test]
+fn private() {
+    let home = Observed::new("");
+    let path = expected(home.0.path());
+    for (arguments, code) in [
+        (vec!["--json", "config", "show"], 0),
+        (vec!["--json", "issue", "show", "invalid"], 1),
+    ] {
+        fs::write(&path, "").expect("baseline config");
+        let baseline = process(home.0.path(), &arguments)
+            .output()
+            .expect("baseline");
+        assert_eq!(baseline.status.code(), Some(code));
+        for config in [
+            "[locus]\nenabled = 'private-sentinel'\n",
+            "[locus]\nenabled = true\nendpoint = { private = 'private-sentinel' }\n",
+        ] {
+            fs::write(&path, config).expect("invalid observation config");
+            let output = process(home.0.path(), &arguments)
+                .output()
+                .expect("command");
+            assert_eq!(output.status.code(), baseline.status.code());
+            assert_eq!(output.stdout, baseline.stdout);
+            let diagnostic = String::from_utf8_lossy(&output.stderr);
+            assert!(!diagnostic.contains("private-sentinel"), "{diagnostic}");
+            assert!(
+                diagnostic.contains(&path.display().to_string()),
+                "{diagnostic}"
+            );
+            assert!(
+                diagnostic.contains("check [locus] settings"),
+                "{diagnostic}"
+            );
+            assert!(output.stderr.ends_with(&baseline.stderr));
+        }
+    }
+    assert!(!home.buffer().exists());
+}
+
+#[test]
+fn syntax() {
+    let home = Observed::new("[locus]\nenabled = 'private-sentinel\n");
+    let output = home.run(&[]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(output.stdout)
+            .expect("config path")
+            .trim(),
+        expected(home.0.path()).display().to_string()
+    );
+    let diagnostic = String::from_utf8_lossy(&output.stderr);
+    assert!(!diagnostic.contains("private-sentinel"), "{diagnostic}");
+    assert!(
+        diagnostic.contains("check [locus] settings"),
+        "{diagnostic}"
+    );
+}
+
+#[test]
+fn unreadable() {
+    let home = Observed::new("");
+    let baseline = home.run(&[]);
+    let path = expected(home.0.path());
+    fs::write(&path, [0xff]).expect("invalid UTF-8 config");
+    let output = home.run(&[]);
+    assert_eq!(output.status.code(), baseline.status.code());
+    assert_eq!(output.stdout, baseline.stdout);
+    let diagnostic = String::from_utf8_lossy(&output.stderr);
+    assert!(diagnostic.contains("cannot read"), "{diagnostic}");
+    assert!(
+        diagnostic.contains(&path.display().to_string()),
+        "{diagnostic}"
+    );
+    assert!(diagnostic.contains("UTF-8"), "{diagnostic}");
+    assert!(
+        !diagnostic.contains("check [locus] settings"),
+        "{diagnostic}"
+    );
+}
+
+#[test]
 fn configured() {
     let closed = TcpListener::bind("127.0.0.1:0").expect("listen");
     let endpoint = format!("http://{}", closed.local_addr().expect("address"));
