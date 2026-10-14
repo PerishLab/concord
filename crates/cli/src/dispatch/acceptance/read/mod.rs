@@ -1,3 +1,4 @@
+pub(super) mod authority;
 mod relations;
 
 use concord_core::{Coordinate, Result};

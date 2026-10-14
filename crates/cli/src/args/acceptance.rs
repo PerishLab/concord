@@ -17,9 +17,15 @@ pub enum Command {
         about = "Check current PR closing references against an explicit head without writes"
     )]
     Closing(Closing),
-    #[command(about = "Prepare an Issue-bound declaration plan without provider writes")]
+    #[command(
+        about = "Prepare an Issue-bound declaration plan without provider writes",
+        long_about = "Prepare an Issue-bound declaration plan without provider writes. Release declarations include read-only repository authority advice in an explicitly versioned v2 plan. Missing or unknown authority does not change the target or prevent preparation; closure still requires its promised evidence. Source plans remain v1, and apply accepts existing v1 plans."
+    )]
     Declare(Prepare),
-    #[command(about = "Prepare an explicit predecessor amendment without provider writes")]
+    #[command(
+        about = "Prepare an explicit predecessor amendment without provider writes",
+        long_about = "Prepare an explicit predecessor amendment without provider writes. Release amendments include read-only repository authority advice in a v2 plan; advice neither changes the promise nor authorizes closure. Source plans and closure judgments remain v1."
+    )]
     Amend(Prepare),
     #[command(about = "Prepare a closure attestation without provider writes or Issue closing")]
     Judge(Prepare),

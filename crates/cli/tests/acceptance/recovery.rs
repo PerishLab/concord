@@ -235,7 +235,7 @@ fn partial() {
     let output = world::invoke(scratch.path(), &provider, "apply", Some(&plan));
     world::refused(&output, "concord.acceptance.partial");
     let message = String::from_utf8_lossy(&output.stderr);
-    assert!(message.contains("concord.acceptance-plan/v1"));
+    assert!(message.contains("concord.acceptance-plan/v2"));
     assert!(message.contains("last confirmed observation only"));
 }
 
