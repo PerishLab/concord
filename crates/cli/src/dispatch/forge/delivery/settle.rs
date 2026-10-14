@@ -77,6 +77,12 @@ impl Wait {
     }
 
     pub fn step(&mut self, checks: &Checks) -> Result<Step> {
+        if !checks.failed.is_empty() {
+            return Err(Error::typed(
+                "concord.delivery.checks",
+                format!("pull checks failed: {}", checks.failed.join(", ")),
+            ));
+        }
         if checks.pending.is_empty() {
             self.cycles += 1;
             if self.cycles > CYCLES {
@@ -187,6 +193,41 @@ mod tests {
         assert!(waited >= BUDGET && waited < BUDGET + CEILING);
         assert_eq!(refusal.code(), "concord.delivery.pending");
         assert!(refusal.message().contains("Guard"));
+        assert!(matches!(wait.step(&Checks::default()), Ok(Step::Retry)));
+    }
+
+    #[test]
+    fn failure() {
+        let mut wait = Wait::new();
+        let refusal = wait
+            .step(&Checks {
+                pending: vec!["Guard".into()],
+                failed: vec!["lint <https://ci.example/lint>".into()],
+            })
+            .err()
+            .expect("a failed check refuses while others are pending");
+        assert_eq!(refusal.code(), "concord.delivery.checks");
+        assert!(refusal.message().contains("lint <https://ci.example/lint>"));
+
+        let settled = Checks {
+            pending: Vec::new(),
+            failed: vec!["lint".into()],
+        };
+        let refusal = Wait::new()
+            .step(&settled)
+            .err()
+            .expect("a failed check refuses instead of retrying the merge");
+        assert_eq!(refusal.code(), "concord.delivery.checks");
+    }
+
+    #[test]
+    fn rerun() {
+        let mut wait = Wait::new();
+        let rerun = Checks {
+            pending: vec!["lint".into()],
+            failed: Vec::new(),
+        };
+        assert!(matches!(wait.step(&rerun), Ok(Step::Wait(FIRST))));
         assert!(matches!(wait.step(&Checks::default()), Ok(Step::Retry)));
     }
 

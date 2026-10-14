@@ -47,7 +47,10 @@ of copying its answer here.
   as pending, it returns from the locked flow, polls the checks with backoff
   for at most 30 minutes, then re-enters and revalidates the whole land.
   Checks still pending at the budget refuse as `concord.delivery.pending`
-  naming them; a merge refused with nothing pending names the failed checks.
+  naming them. Once any check has failed the wait refuses at once as
+  `concord.delivery.checks`, naming each failed check and its link, without
+  marking or merging; a rerun check is pending again, not failed. A merge
+  refused with nothing pending names the failed checks.
 - A Guard proof is accepted only from the Plumb Concord was compiled against
   or the current Plumb stable named by its release seal; Plumb's exact
   producer and depot judgment is unchanged. A plan records the authority it

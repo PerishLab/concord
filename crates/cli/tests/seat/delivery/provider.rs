@@ -169,6 +169,7 @@ if [ "$1 $2" = "pr view" ]; then
   exit 0
 fi
 if [ "$1 $2" = "pr merge" ]; then
+  printf '%s\n' merge >> '{attempts}'
   [ -f '{incomplete}' ] && exit 0
   if [ "$(cat '{waiting}' 2>/dev/null || echo 0)" -gt 0 ] || [ -f '{rollup}' ]; then
     printf '%s\n' 'X Pull request PerishLab/probe#7 is not mergeable: the base branch policy prohibits the merge.' >&2
@@ -213,6 +214,7 @@ exit 1"#,
         declaration = root.join("declaration").display(),
         waiting = root.join("checks-pending").display(),
         rollup = root.join("checks-rollup").display(),
+        attempts = root.join("merge-attempts").display(),
         branches = root.join("branch-issues").display(),
         projections = root.join("branch-projections").display(),
     )
