@@ -6,7 +6,6 @@ mod recovery;
 pub(super) mod unix {
     use super::super::spawn;
     use serde_json::{Value, json};
-    use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
     use std::process::{Command, Output};
 
@@ -24,13 +23,7 @@ pub(super) mod unix {
             "kind": "Feature",
             "updated_at": "one",
         });
-        std::fs::write(&provider, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"))
-            .expect("provider command");
-        let mut permissions = std::fs::metadata(&provider)
-            .expect("provider metadata")
-            .permissions();
-        permissions.set_mode(0o700);
-        std::fs::set_permissions(&provider, permissions).expect("provider mode");
+        plumb::testing::executable(&provider, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
         success(
             fixture.path(),
             &[
@@ -244,12 +237,7 @@ pub(super) mod unix {
     }
 
     fn executable(path: &Path, body: &str) {
-        std::fs::write(path, body).expect("provider command");
-        let mut permissions = std::fs::metadata(path)
-            .expect("provider metadata")
-            .permissions();
-        permissions.set_mode(0o700);
-        std::fs::set_permissions(path, permissions).expect("provider mode");
+        plumb::testing::executable(path, body);
     }
 
     pub(super) fn success(space: &Path, arguments: &[&str]) -> Value {

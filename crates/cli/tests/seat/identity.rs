@@ -27,17 +27,15 @@ fn identity() {
         other.marker = "v0.13.1".into();
         assert!(plumb::identity::bind(&bound, &other).is_err());
         #[cfg(target_os = "linux")]
-        probe(scratch.path(), source, marker, &bound);
+        probe(scratch.path(), marker, &bound);
     }
     assert_eq!(std::fs::read(source).unwrap(), bytes);
 }
 
 #[cfg(target_os = "linux")]
-fn probe(scratch: &std::path::Path, source: &std::path::Path, marker: &str, bytes: &[u8]) {
+fn probe(scratch: &std::path::Path, marker: &str, bytes: &[u8]) {
     let path = scratch.join(marker);
-    std::fs::write(&path, bytes).expect("bound copy");
-    std::fs::set_permissions(&path, std::fs::metadata(source).unwrap().permissions())
-        .expect("executable permissions");
+    plumb::testing::executable(&path, bytes);
     let output = spawn::image(scratch, &path)
         .arg("--version")
         .output()

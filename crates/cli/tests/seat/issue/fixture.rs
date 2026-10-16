@@ -1,7 +1,6 @@
 use super::super::execution::unix::{Facts, git, provider, repository};
 use super::super::spawn;
 use serde_json::{Value, json};
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 pub(super) struct Seat<'a> {
@@ -58,10 +57,7 @@ impl Seat<'_> {
 
     pub(super) fn tool(&self, name: &str, reply: Value) -> PathBuf {
         let path = self.space.join(name);
-        std::fs::write(&path, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n")).expect("provider");
-        let mut permissions = std::fs::metadata(&path).expect("provider").permissions();
-        permissions.set_mode(0o700);
-        std::fs::set_permissions(&path, permissions).expect("provider permissions");
+        plumb::testing::executable(&path, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
         path
     }
 
