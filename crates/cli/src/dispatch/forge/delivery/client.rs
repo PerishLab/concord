@@ -68,20 +68,12 @@ impl Client<'_> {
     }
 
     pub async fn edit(&mut self, pull: i64, title: &str, body: &str) -> Result<()> {
-        let pull = pull.to_string();
-        self.gh(&[
-            "pr",
-            "edit",
-            &pull,
-            "-R",
-            self.repository,
-            "--title",
-            title,
-            "--body",
-            body,
-        ])
-        .await
-        .map(|_| ())
+        let path = format!("repos/{}/pulls/{pull}", self.repository);
+        let title = format!("title={title}");
+        let body = format!("body={body}");
+        self.gh(&["api", "-X", "PATCH", &path, "-f", &title, "-f", &body])
+            .await
+            .map(|_| ())
     }
 
     pub async fn view(&mut self, pull: i64) -> Result<Pull> {
