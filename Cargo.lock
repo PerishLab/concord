@@ -891,6 +891,7 @@ dependencies = [
  "base64",
  "clap",
  "flate2",
+ "locus",
  "object",
  "pin-project-lite",
  "plumb-macro",

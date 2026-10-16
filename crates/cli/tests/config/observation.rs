@@ -24,6 +24,21 @@ impl Observed {
         command.output().expect("observe concord")
     }
 
+    fn atoms(&self) -> Vec<Value> {
+        fs::read_to_string(self.buffer().join("active.jsonl"))
+            .expect("buffer")
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("atom"))
+            .collect()
+    }
+
+    fn finish(&self) -> Value {
+        self.atoms()
+            .into_iter()
+            .find(|atom| atom["payload"]["event"] == "cli.finish")
+            .expect("cli.finish atom")
+    }
+
     fn buffer(&self) -> PathBuf {
         expected(self.0.path())
             .parent()
@@ -143,19 +158,66 @@ fn configured() {
     let home = Observed::new(&format!(
         "[locus]\nenabled = true\nendpoint = \"{endpoint}\"\n"
     ));
-    let output = home.run(&[("CLAUDE_CODE_SESSION_ID", "session-1")]);
+    let output = home.run(&[]);
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(output.status.success());
     assert!(stderr.contains("reporter.registration"), "{stderr}");
-    let active = fs::read_to_string(home.buffer().join("active.jsonl")).expect("buffer");
-    let atoms: Vec<Value> = active
-        .lines()
-        .map(|line| serde_json::from_str(line).expect("atom"))
-        .collect();
+    let atoms = home.atoms();
     assert!(atoms.len() >= 2);
-    for atom in atoms {
+    for atom in &atoms {
         assert_eq!(atom["producer"], "concord");
-        assert_eq!(atom["context"]["locus.trace"], "session-1");
+        assert_eq!(atom["context"]["concord.command"], "config.path");
+    }
+    let finish = home.finish();
+    assert_eq!(finish["payload"]["code"], 0);
+    assert!(finish["context"].get("concord.fault").is_none(), "{finish}");
+}
+
+#[test]
+fn fault() {
+    let home = Observed::new(&format!(
+        "[locus]\nenabled = true\nendpoint = \"{}\"\n",
+        closed()
+    ));
+    let output = process(home.0.path(), &["--json", "issue", "show", "invalid"])
+        .output()
+        .expect("failing command");
+    assert_eq!(output.status.code(), Some(1));
+    let error: Value = serde_json::from_slice(
+        output
+            .stderr
+            .split(|byte| *byte == b'\n')
+            .find(|line| line.starts_with(b"{"))
+            .expect("error line"),
+    )
+    .expect("error JSON");
+    let finish = home.finish();
+    assert_eq!(finish["payload"]["code"], 1);
+    assert_eq!(finish["context"]["concord.fault"], error["error"]["code"]);
+}
+
+#[test]
+fn parity() {
+    let endpoint = closed();
+    for arguments in [
+        vec!["--json", "config", "show"],
+        vec!["--json", "issue", "show", "invalid"],
+    ] {
+        let mut seen = Vec::new();
+        for config in [
+            String::new(),
+            "[locus]\nenabled = false\n".to_string(),
+            format!("[locus]\nenabled = true\nendpoint = \"{endpoint}\"\n"),
+        ] {
+            let home = Observed::new(&config);
+            let output = process(home.0.path(), &arguments)
+                .output()
+                .expect("command");
+            let stdout = String::from_utf8_lossy(&output.stdout)
+                .replace(&home.0.path().display().to_string(), "<home>");
+            seen.push((output.status.code(), stdout));
+        }
+        assert!(seen.windows(2).all(|pair| pair[0] == pair[1]), "{seen:?}");
     }
 }
 
@@ -169,6 +231,11 @@ fn unified() {
         fs::read_to_string(home.buffer().join("registration")).expect("marker"),
         endpoint
     );
+}
+
+fn closed() -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("listen");
+    format!("http://{}", listener.local_addr().expect("address"))
 }
 
 fn serve() -> String {
