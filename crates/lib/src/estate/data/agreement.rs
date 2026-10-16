@@ -50,7 +50,7 @@ impl Agreement {
 }
 
 impl Estate {
-    #[locus::trace(with = crate::observation::view())]
+    #[locus::trace(with = plumb::observation::view())]
     pub async fn inspect(&self) -> Result<Agreement> {
         let mut report = Agreement {
             target: self.space.display().to_string(),
