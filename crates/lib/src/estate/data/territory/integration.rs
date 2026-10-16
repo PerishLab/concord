@@ -4,16 +4,23 @@ use crate::Result;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+#[locus::trace(with = crate::observation::view().as_ref().map(crate::observation::borrow), frame = frame)]
 pub(super) fn survey(
     space: &Path,
     members: &[IssueWorktree],
     integrations: &[Integration],
     report: &mut Agreement,
 ) -> Result<()> {
+    let frame = frame.as_ref();
     let parts = std::thread::scope(|scope| {
         let tasks = integrations
             .iter()
-            .map(|integration| scope.spawn(move || assess(space, members, integration)))
+            .map(|integration| {
+                let context = crate::observation::fork(frame);
+                scope.spawn(move || {
+                    crate::observation::within(context, || assess(space, members, integration))
+                })
+            })
             .collect::<Vec<_>>();
         tasks
             .into_iter()
