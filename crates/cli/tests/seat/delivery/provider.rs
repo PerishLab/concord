@@ -1,6 +1,5 @@
 use serde_json::{Value, json};
 use std::io::Write;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
 
@@ -52,11 +51,7 @@ pub fn observer(root: &Path) -> PathBuf {
         "branch": "main",
     });
     let path = root.join("repository-provider");
-    std::fs::write(&path, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"))
-        .expect("repository provider");
-    let mut permissions = std::fs::metadata(&path).expect("metadata").permissions();
-    permissions.set_mode(0o700);
-    std::fs::set_permissions(&path, permissions).expect("provider mode");
+    plumb::testing::executable(&path, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
     path
 }
 
@@ -230,9 +225,6 @@ fn connection() -> Value {
 
 pub fn tool(root: &Path, name: &str, body: String) -> PathBuf {
     let path = root.join(name);
-    std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).expect("provider");
-    let mut permissions = std::fs::metadata(&path).expect("metadata").permissions();
-    permissions.set_mode(0o700);
-    std::fs::set_permissions(&path, permissions).expect("provider mode");
+    plumb::testing::executable(&path, format!("#!/bin/sh\n{body}\n"));
     path
 }

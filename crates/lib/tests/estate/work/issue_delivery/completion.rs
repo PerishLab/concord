@@ -2,7 +2,6 @@ use super::{Fixture, fixture, released, request, snapshot};
 use concord_core::authority::Plumb;
 use concord_core::{IssueDeclaration, Reference, ReferenceKind, issue_delivery};
 use std::io::Write;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread::JoinHandle;
@@ -25,15 +24,13 @@ async fn completion() {
     let source = _temp.path().join("source");
     let remote = _temp.path().join("remote.git");
     let ssh = _temp.path().join("ssh");
-    std::fs::write(
+    plumb::testing::executable(
         &ssh,
         format!(
             "#!/bin/sh\nfor last; do :; done\nexec sh -c \"$(printf '%s' \"$last\" | sed \"s|'/PerishLab/probe'|'{}'|\")\"\n",
             remote.display()
         ),
-    )
-    .expect("ssh tool");
-    std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o700)).expect("ssh mode");
+    );
     git(
         &source,
         &[

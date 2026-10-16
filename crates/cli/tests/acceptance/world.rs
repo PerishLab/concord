@@ -1,6 +1,5 @@
 use serde_json::{Value, json};
 use std::io::Write;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 
@@ -39,8 +38,7 @@ pub(super) fn provider(scratch: &Path, replies: &[Value]) -> PathBuf {
     }
     script.push_str("*) exit 91;;\nesac\n");
     let path = scratch.join("provider");
-    std::fs::write(&path, script).unwrap();
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+    plumb::testing::executable(&path, script);
     path
 }
 
