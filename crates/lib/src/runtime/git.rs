@@ -14,7 +14,7 @@ pub fn at(root: &Path) -> Checkout<'_> {
 }
 
 impl Checkout<'_> {
-    #[locus::trace(with = crate::observation::view())]
+    #[locus::trace(with = plumb::observation::view())]
     pub fn text(&self, args: &[&str]) -> Result<String> {
         let root = native(self.root);
         let output = command()
@@ -37,13 +37,13 @@ impl Checkout<'_> {
         self.text(args).map(|_| ())
     }
 
-    #[locus::trace(with = crate::observation::view())]
+    #[locus::trace(with = plumb::observation::view())]
     pub fn identity(&self) -> Result<PathBuf> {
         let path = self.text(&["rev-parse", "--path-format=absolute", "--git-common-dir"])?;
         PathBuf::from(path).canonicalize().map_err(Into::into)
     }
 
-    #[locus::trace(with = crate::observation::view())]
+    #[locus::trace(with = plumb::observation::view())]
     pub fn branch(&self) -> Result<String> {
         self.text(&["symbolic-ref", "--short", "HEAD"])
     }
@@ -168,7 +168,7 @@ impl Checkout<'_> {
         Ok(member == source)
     }
 
-    #[locus::trace(with = crate::observation::view())]
+    #[locus::trace(with = plumb::observation::view())]
     pub fn registered(&self, member: &Path) -> Result<bool> {
         let wanted = member.canonicalize()?;
         let list = self.text(&["worktree", "list", "--porcelain"])?;

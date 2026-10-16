@@ -16,16 +16,16 @@ async fn main() {
     }
     let cli = Cli::parse();
     let json = cli.json;
-    let observation = observation::Run::start(cli.command.name(), cli.config.as_deref());
+    let observation = observation::start(cli.command.name(), cli.config.as_deref());
     let result = match plumb::identity::ready() {
         Ok(()) => dispatch::run(cli).await,
         Err(error) => Err(concord_core::Error::new(error)),
     };
+    if let Err(error) = &result {
+        observation::fault(error);
+    }
     if let Some(observation) = observation {
-        observation.finish(
-            i32::from(result.is_err()),
-            result.as_ref().err().map(concord_core::Error::code),
-        );
+        observation.finish(i32::from(result.is_err()));
     }
     if let Err(error) = result {
         if json {
