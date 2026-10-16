@@ -117,6 +117,18 @@ if [ "$1 $2" = "api graphql" ]; then
   printf '%s\n' '{projected}'
   exit 0
 fi
+if [ "$1 $2 $3 $4" = "api -X PATCH repos/PerishLab/probe/pulls/7" ]; then
+  shift 4
+  while [ $# -gt 0 ]; do
+    case "$2" in
+      title=*) printf '%s' "${{2#title=}}" > '{title}' ;;
+      body=*) printf '%s' "${{2#body=}}" > '{body}' ;;
+    esac
+    shift 2
+  done
+  printf '%s\n' '{{}}'
+  exit 0
+fi
 if [ "$1 $2" = "api -X" ]; then printf '%s\n' '{{}}'; exit 0; fi
 if [ "$1 $2" = "pr list" ]; then
   [ -f '{state}' ] && reply | jq -s . || printf '%s\n' '[]'
@@ -139,16 +151,7 @@ if [ "$1 $2" = "pr create" ]; then
   printf '%s\n' https://github.com/PerishLab/probe/pull/7
   exit 0
 fi
-if [ "$1 $2" = "pr edit" ]; then
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      --title) printf '%s' "$2" > '{title}'; shift ;;
-      --body) printf '%s' "$2" > '{body}'; shift ;;
-    esac
-    shift
-  done
-  exit 0
-fi
+if [ "$1 $2" = "pr edit" ]; then printf '%s\n' 'gh pr edit needs read:org' >&2; exit 1; fi
 if [ "$1 $2" = "pr view" ] && [ "$7" = statusCheckRollup ]; then
   if [ -f '{rollup}' ]; then cat '{rollup}'; exit 0; fi
   left=$(cat '{waiting}' 2>/dev/null || echo 0)
