@@ -2,7 +2,6 @@
 mod unix {
     use super::super::spawn;
     use serde_json::{Value, json};
-    use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
 
     #[test]
@@ -160,10 +159,7 @@ mod unix {
 
     fn tool(root: &Path, name: &str, body: String) -> PathBuf {
         let path = root.join(name);
-        std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).expect("provider command");
-        let mut permissions = std::fs::metadata(&path).expect("metadata").permissions();
-        permissions.set_mode(0o700);
-        std::fs::set_permissions(&path, permissions).expect("provider mode");
+        plumb::testing::executable(&path, format!("#!/bin/sh\n{body}\n"));
         path
     }
 

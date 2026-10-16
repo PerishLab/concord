@@ -1,6 +1,5 @@
 use super::spawn;
 use serde_json::{Value, json};
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 pub fn fact() -> Value {
@@ -26,10 +25,7 @@ pub fn tool(root: &Path, name: &str, reply: Value) -> PathBuf {
 }
 
 pub fn executable(path: &Path, body: &str) {
-    std::fs::write(path, body).expect("provider command");
-    let mut permissions = std::fs::metadata(path).expect("metadata").permissions();
-    permissions.set_mode(0o700);
-    std::fs::set_permissions(path, permissions).expect("provider mode");
+    plumb::testing::executable(path, body);
 }
 
 pub fn repository(root: &Path, coordinate: &str) -> PathBuf {
