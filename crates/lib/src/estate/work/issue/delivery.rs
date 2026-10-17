@@ -16,7 +16,7 @@ mod process;
 
 pub use model::{Authority, Candidate, Check, Mode, Preparation};
 
-pub use super::authority::delivery::{Resume, resume};
+pub use super::authority::delivery::{Resume, recall, resume};
 pub use super::proof::delivery::{Completion, Settlement};
 
 pub const SCHEMA: &str = "concord.issue-member-delivery/v6";

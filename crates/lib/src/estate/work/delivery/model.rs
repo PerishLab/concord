@@ -99,6 +99,16 @@ impl Authority {
         }
         Ok(())
     }
+
+    pub(in crate::estate::work::issue) fn settled(
+        &self,
+        integration: &crate::estate::Integration,
+    ) -> Result<()> {
+        match self {
+            Self::Plumb { .. } => Ok(()),
+            Self::WharfNative { .. } => admit(integration),
+        }
+    }
 }
 
 pub(super) fn admit(integration: &crate::estate::Integration) -> Result<()> {

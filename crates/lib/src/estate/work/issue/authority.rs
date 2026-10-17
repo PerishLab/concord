@@ -138,6 +138,26 @@ pub(super) mod delivery {
         plan: &Plan,
         snapshot: &plumb::delivery::Snapshot,
     ) -> Result<Resume> {
+        derive(estate, plan, snapshot, |integration| {
+            plan.authority.validate::<A>(integration)
+        })
+        .await
+    }
+
+    pub async fn recall(
+        estate: &Estate,
+        plan: &Plan,
+        snapshot: &plumb::delivery::Snapshot,
+    ) -> Result<Resume> {
+        derive(estate, plan, snapshot, |_| Ok(())).await
+    }
+
+    async fn derive(
+        estate: &Estate,
+        plan: &Plan,
+        snapshot: &plumb::delivery::Snapshot,
+        authority: impl FnOnce(&Integration) -> Result<()>,
+    ) -> Result<Resume> {
         schema(plan)?;
         estate.agreed().await?;
         let anchor = estate.issue(&plan.issue).await?;
@@ -150,7 +170,7 @@ pub(super) mod delivery {
             estate,
         }
         .validate()?;
-        plan.authority.validate::<A>(&integration)?;
+        authority(&integration)?;
         match estate.issue_member(&plan.issue).await {
             Ok(held) => active(estate, plan, &anchor, held).await,
             Err(error) if error.code() == "concord.member.absent" => released(plan, &anchor),

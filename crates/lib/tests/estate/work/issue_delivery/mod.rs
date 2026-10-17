@@ -1,5 +1,6 @@
 mod boundary;
 mod completion;
+mod moved;
 mod peer;
 mod recovery;
 
