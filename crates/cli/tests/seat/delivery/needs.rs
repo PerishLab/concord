@@ -54,6 +54,22 @@ fn needs() {
     );
 }
 
+#[test]
+fn unadopted() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    let seat = Seat::open(fixture.path());
+    seat.change();
+    seat.label(&[Target::Source.label()], false);
+    let output = prepare(seat.space, &seat.provider, &seat.revision(), false)
+        .output()
+        .expect("prepare");
+    refused(&output, "concord.acceptance.target");
+    let error: Value = serde_json::from_slice(&output.stderr).expect("refusal JSON");
+    assert_eq!(error["error"]["details"]["label"], "acceptance:source");
+    assert_eq!(error["error"]["details"]["declared"], Value::Null);
+    assert_eq!(error["error"]["cookbook"], "concord.acceptance.target");
+}
+
 #[path = "branches.rs"]
 mod branches;
 
@@ -123,7 +139,7 @@ fn acceptance() {
         let landed = consume(seat.space, &seat.provider, &prepared.stdout);
         if matches!(mode, "edited" | "removed" | "orphan") {
             let code = if mode == "orphan" {
-                "concord.acceptance.protocol"
+                "concord.acceptance.target"
             } else {
                 "concord.acceptance.changed"
             };

@@ -3,6 +3,7 @@ use concord_core::acceptance::{Marker, Plan, Step, Target, digest};
 use serde_json::json;
 
 mod advice;
+mod target;
 
 #[test]
 fn declaration() {
