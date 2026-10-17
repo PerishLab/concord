@@ -18,6 +18,7 @@ pub(super) fn image(scratch: &Path, binary: &Path) -> Command {
         .env("USERPROFILE", &home)
         .env("LOCALAPPDATA", home.join("data"))
         .env_remove("LOCUS_API")
+        .env_remove("LOCUS_PARENT")
         .env_remove("CLAUDE_CODE_SESSION_ID")
         .env_remove("GROK_SESSION_ID")
         .env_remove("GROK_BOT_IDENTITY")

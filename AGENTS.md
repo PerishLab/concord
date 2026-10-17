@@ -129,8 +129,9 @@ of copying its answer here.
   registered Integrations concurrently, and its sorted findings do not depend
   on that order.
 - Tests spawn Concord only through the shared test seat, which clears inherited
-  `CONCORD_` configuration and `LOCUS_API` and points the home at the fixture,
-  so no test reads the operator's `concord.toml` or writes its Locus buffer.
+  `CONCORD_` configuration, `LOCUS_API`, the caller's `LOCUS_PARENT` link and
+  agent session variables and points the home at the fixture, so no test reads
+  the operator's `concord.toml`, writes its Locus buffer or nests under its span.
 - Native Santi association observes both `SANTI_SOUL_ID` and `SANTI_STRAND_ID`.
   Each is a nonempty ASCII letter/digit or `-_.` coordinate; their combined
   `soul:strand` session is at most 512 bytes. Missing or malformed components,
