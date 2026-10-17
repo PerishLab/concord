@@ -48,16 +48,18 @@ impl History {
 
     pub fn target(&self, labels: &[String]) -> Result<Option<Target>> {
         let label = Target::select(labels)?;
-        let declared = self
-            .declaration
-            .as_ref()
-            .map(|record| record.marker.target());
-        if label != declared {
-            return Err(super::fault(
-                "managed target label and current declaration disagree",
-            ));
+        let declared = self.declaration.as_ref();
+        if label == declared.map(|record| record.marker.target()) {
+            return Ok(label);
         }
-        Ok(label)
+        Err(super::disagreement::refuse(label, declared))
+    }
+
+    pub(super) fn adopt(&self, labels: &[String], planned: Target) -> Result<Option<Target>> {
+        if self.declaration.is_none() && Target::select(labels)? == Some(planned) {
+            return Ok(None);
+        }
+        self.target(labels)
     }
 
     fn apply(&mut self, record: Record) -> Result<()> {

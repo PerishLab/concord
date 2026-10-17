@@ -5,6 +5,7 @@ mod acceptance {
     mod marker;
     mod plan;
     mod report;
+    mod target;
     mod validation;
 }
 

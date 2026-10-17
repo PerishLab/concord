@@ -17,6 +17,13 @@ impl Target {
         }
     }
 
+    pub(super) fn name(self) -> &'static str {
+        match self {
+            Self::Source => "source",
+            Self::Release => "release",
+        }
+    }
+
     pub fn select(labels: &[String]) -> Result<Option<Self>> {
         let mut selected = None;
         for label in labels
