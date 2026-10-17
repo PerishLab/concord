@@ -54,7 +54,10 @@ of copying its answer here.
 - A Guard proof is accepted only from the Plumb Concord was compiled against
   or the current Plumb stable named by its release seal; Plumb's exact
   producer and depot judgment is unchanged. A plan records the authority it
-  was prepared under and refuses when that authority is no longer accepted.
+  was prepared under and refuses when that authority is no longer accepted,
+  before every provider mutation. Once land reads its exact pull merged, the
+  warrant judged at Confirm stands: settling that merge, in the same land or
+  a rerun, never judges it again against the authorities current then.
   When stable is unreachable only the compiled authority remains, and the
   refusal names the unreachable authority. The stable location is fixed;
   tests inject authorities through the `Authorities` trait, never through

@@ -192,9 +192,7 @@ pub(super) mod delivery {
                     ),
                 ));
             }
-            request
-                .authority
-                .validate::<super::super::authority::Plumb>(&held)?;
+            request.authority.settled(&held)?;
             let landed = match &request.authority {
                 Authority::Plumb { .. } => {
                     plumb::delivery::landed(&source, &request.candidate, &request.merge)

@@ -1,6 +1,6 @@
 use super::{Fixture, fixture, released, request, snapshot};
 use concord_core::authority::Plumb;
-use concord_core::{IssueDeclaration, Reference, ReferenceKind, issue_delivery};
+use concord_core::{Estate, Guard, IssueDeclaration, Reference, ReferenceKind, issue_delivery};
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -21,9 +21,87 @@ async fn completion() {
     let plan = issue_delivery::prepare::<Plumb>(&estate, &request(&issue))
         .await
         .expect("prepare delivery");
+    let (settlement, integration) = merged(&estate, &issue, &plan, _temp.path()).await;
     let source = _temp.path().join("source");
-    let remote = _temp.path().join("remote.git");
-    let ssh = _temp.path().join("ssh");
+    let merge = settlement.merge.clone();
+    let wrong = estate
+        .complete(
+            &integration,
+            &issue_delivery::Settlement {
+                merge: plan.delivery.candidate.clone(),
+                ..settlement.clone()
+            },
+        )
+        .await
+        .expect_err("different merge result");
+    assert_eq!(wrong.code(), "concord.delivery.merge");
+    let writer = hold(_temp.path(), &source);
+    let began = Instant::now();
+    let completed = estate
+        .complete(&integration, &settlement)
+        .await
+        .expect("synchronize and release");
+    assert!(began.elapsed() >= HOLD, "completion read a writer's state");
+    writer.join().expect("writer");
+    assert_eq!(completed.revision, 4);
+    assert_eq!(completed.head, merge);
+    assert!(completed.released);
+    assert_eq!(
+        completed.retired.deleted,
+        [
+            plan.delivery.projection.clone(),
+            plan.delivery.branch.clone()
+        ]
+    );
+    assert!(
+        completed.retired.kept.is_empty(),
+        "{:?}",
+        completed.retired.kept
+    );
+    assert_eq!(
+        text(
+            &source,
+            &["branch", "--list", plan.delivery.branch.as_str()]
+        ),
+        ""
+    );
+    assert_eq!(text(&source, &["rev-parse", "HEAD"]), completed.head);
+    assert_eq!(
+        estate
+            .issue_member(&issue)
+            .await
+            .expect_err("Member released")
+            .code(),
+        "concord.member.absent"
+    );
+    let resumed = issue_delivery::resume::<Plumb>(&estate, &plan, &snapshot)
+        .await
+        .expect("derive released delivery");
+    assert!(resumed.released);
+    assert_eq!(resumed.revision, 4);
+    let replay = estate
+        .complete(
+            &integration,
+            &issue_delivery::Settlement {
+                revision: 4,
+                ..settlement
+            },
+        )
+        .await
+        .expect("released completion replay");
+    assert_eq!(replay.revision, 4);
+    assert!(!replay.released);
+}
+
+pub(super) async fn merged(
+    estate: &Estate,
+    issue: &concord_core::Coordinate,
+    plan: &issue_delivery::Plan,
+    space: &Path,
+) -> (issue_delivery::Settlement, Guard) {
+    let source = space.join("source");
+    let remote = space.join("remote.git");
+    let ssh = space.join("ssh");
     plumb::testing::executable(
         &ssh,
         format!(
@@ -104,78 +182,12 @@ async fn completion() {
         ],
     };
     let integration = estate
-        .integration(&issue)
+        .integration(issue)
         .await
         .expect("Integration")
-        .guard(&estate)
+        .guard(estate)
         .expect("hold Integration");
-    let wrong = estate
-        .complete(
-            &integration,
-            &issue_delivery::Settlement {
-                merge: plan.delivery.candidate.clone(),
-                ..settlement.clone()
-            },
-        )
-        .await
-        .expect_err("different merge result");
-    assert_eq!(wrong.code(), "concord.delivery.merge");
-    let writer = hold(_temp.path(), &source);
-    let began = Instant::now();
-    let completed = estate
-        .complete(&integration, &settlement)
-        .await
-        .expect("synchronize and release");
-    assert!(began.elapsed() >= HOLD, "completion read a writer's state");
-    writer.join().expect("writer");
-    assert_eq!(completed.revision, 4);
-    assert_eq!(completed.head, merge);
-    assert!(completed.released);
-    assert_eq!(
-        completed.retired.deleted,
-        [
-            plan.delivery.projection.clone(),
-            plan.delivery.branch.clone()
-        ]
-    );
-    assert!(
-        completed.retired.kept.is_empty(),
-        "{:?}",
-        completed.retired.kept
-    );
-    assert_eq!(
-        text(
-            &source,
-            &["branch", "--list", plan.delivery.branch.as_str()]
-        ),
-        ""
-    );
-    assert_eq!(text(&source, &["rev-parse", "HEAD"]), completed.head);
-    assert_eq!(
-        estate
-            .issue_member(&issue)
-            .await
-            .expect_err("Member released")
-            .code(),
-        "concord.member.absent"
-    );
-    let resumed = issue_delivery::resume::<Plumb>(&estate, &plan, &snapshot)
-        .await
-        .expect("derive released delivery");
-    assert!(resumed.released);
-    assert_eq!(resumed.revision, 4);
-    let replay = estate
-        .complete(
-            &integration,
-            &issue_delivery::Settlement {
-                revision: 4,
-                ..settlement
-            },
-        )
-        .await
-        .expect("released completion replay");
-    assert_eq!(replay.revision, 4);
-    assert!(!replay.released);
+    (settlement, integration)
 }
 
 fn hold(space: &Path, source: &Path) -> JoinHandle<()> {

@@ -12,7 +12,11 @@ pub fn consume(space: &Path, provider: &str, plan: &[u8]) -> Output {
 }
 
 pub fn start(space: &Path, provider: &str, plan: &[u8]) -> Child {
-    let mut consumer = land(space, provider, "-")
+    feed(land(space, provider, "-"), plan)
+}
+
+pub fn feed(mut command: Command, plan: &[u8]) -> Child {
+    let mut consumer = command
         .stdin(Stdio::piped())
         .spawn()
         .expect("consume stored plan");
@@ -25,7 +29,7 @@ pub fn start(space: &Path, provider: &str, plan: &[u8]) -> Child {
     consumer
 }
 
-fn land(space: &Path, provider: &str, plan: &str) -> Command {
+pub fn land(space: &Path, provider: &str, plan: &str) -> Command {
     let mut command = spawn::concord(space);
     command
         .args(["--root", space.to_str().expect("root"), "--json"])

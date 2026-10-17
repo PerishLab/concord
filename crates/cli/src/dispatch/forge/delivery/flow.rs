@@ -2,8 +2,9 @@ use super::{SHAPE, branches, client, handoff::Refusal, projection, pull, settle,
 use crate::args::issue::Delivery;
 use crate::dispatch::{emit, input};
 use concord_core::authority::Plumb;
-use concord_core::issue_delivery::Check;
+use concord_core::issue_delivery::{Check, Preparation, Resume, recall, resume};
 use concord_core::{Coordinate, Error, Estate, IssueDeclaration, Result, issue_delivery};
+use plumb::delivery::Snapshot;
 use serde::Deserialize;
 use serde_json::json;
 use std::path::{Path, PathBuf};
@@ -90,8 +91,7 @@ impl Flow<'_> {
     async fn apply(&self, output: bool) -> Result<Option<i64>> {
         let integration = self.plan.member.integration.guard(self.estate)?;
         let observed = self.observe().await?;
-        let mut resumed =
-            issue_delivery::resume::<Plumb>(self.estate, &self.plan, &observed.snapshot).await?;
+        let mut resumed = self.reenter(&observed.snapshot).await?;
         if !resumed.released {
             branches::clean(
                 self.estate,
@@ -102,21 +102,7 @@ impl Flow<'_> {
             .await?;
         }
         let preparation = self.plan.delivery.preparation();
-        let identity = if resumed.released {
-            Path::new(&self.plan.member.integration.path)
-        } else {
-            preparation.root.as_path()
-        };
-        let mut provider = pull::Service::open(
-            &preparation,
-            pull::Access {
-                identity,
-                repository: &self.plan.delivery.repository,
-                command: &self.command,
-                timeout: self.timeout,
-            },
-        )
-        .await?;
+        let mut provider = self.provider(&preparation, resumed.released).await?;
         let mut held = provider.locate(resumed.reference.as_ref()).await?;
         if let Some(number) = held
             .as_ref()
@@ -162,7 +148,7 @@ impl Flow<'_> {
             }
         }
         let merge = settle::merged(&held)?;
-        let reference = reference(&self.plan, &held)?;
+        let reference = pull::reference(&self.plan.delivery.repository, held.number)?;
         let completion = self
             .estate
             .complete(
@@ -210,6 +196,42 @@ impl Flow<'_> {
         .map(|_| None)
     }
 
+    async fn reenter(&self, snapshot: &Snapshot) -> Result<Resume> {
+        let refusal = match resume::<Plumb>(self.estate, &self.plan, snapshot).await {
+            Err(error) if error.code() == "concord.delivery.authority" => error,
+            resumed => return resumed,
+        };
+        let Ok(resumed) = recall(self.estate, &self.plan, snapshot).await else {
+            return Err(refusal);
+        };
+        let preparation = self.plan.delivery.preparation();
+        let Ok(mut provider) = self.provider(&preparation, resumed.released).await else {
+            return Err(refusal);
+        };
+        match provider.locate(resumed.reference.as_ref()).await {
+            Ok(Some(pull)) if pull.state == pull::State::Merged => Ok(resumed),
+            _ => Err(refusal),
+        }
+    }
+
+    async fn provider<'p>(
+        &'p self,
+        preparation: &'p Preparation,
+        released: bool,
+    ) -> Result<pull::Service<'p>> {
+        let identity = match released {
+            true => Path::new(&self.plan.member.integration.path),
+            false => preparation.root.as_path(),
+        };
+        let access = pull::Access {
+            identity,
+            repository: &self.plan.delivery.repository,
+            command: &self.command,
+            timeout: self.timeout,
+        };
+        pull::Service::open(preparation, access).await
+    }
+
     async fn mutation(&self, check: Check) -> Result<issue_delivery::Ready> {
         pull::fetch(&self.plan.delivery.root).await?;
         let observed = self.observe().await?;
@@ -240,7 +262,7 @@ impl Flow<'_> {
 
     async fn attach(&self, pull: &pull::Pull, revision: i64) -> Result<i64> {
         let status = self.estate.issue_member_status(&self.plan.issue).await?;
-        let (owner, repository) = coordinate(&self.plan.delivery.repository)?;
+        let (owner, repository) = pull::coordinate(&self.plan.delivery.repository)?;
         if status.references.iter().any(|reference| {
             reference.owner == owner
                 && reference.repository == repository
@@ -267,7 +289,7 @@ impl Flow<'_> {
     }
 }
 
-fn active(resumed: &issue_delivery::Resume) -> Result<()> {
+fn active(resumed: &Resume) -> Result<()> {
     if resumed.released {
         return Err(Error::typed(
             "concord.delivery.stale",
@@ -275,24 +297,4 @@ fn active(resumed: &issue_delivery::Resume) -> Result<()> {
         ));
     }
     Ok(())
-}
-
-fn reference(plan: &issue_delivery::Plan, pull: &pull::Pull) -> Result<concord_core::Reference> {
-    let (owner, repository) = coordinate(&plan.delivery.repository)?;
-    Ok(concord_core::Reference {
-        kind: concord_core::ReferenceKind::Change,
-        provider: "github".to_string(),
-        owner: owner.to_string(),
-        repository: repository.to_string(),
-        number: pull.number,
-    })
-}
-
-fn coordinate(repository: &str) -> Result<(&str, &str)> {
-    repository.split_once('/').ok_or_else(|| {
-        Error::typed(
-            "concord.delivery.repository",
-            "delivery repository coordinate is malformed",
-        )
-    })
 }

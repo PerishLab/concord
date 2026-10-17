@@ -1,5 +1,5 @@
 use super::super::execution::unix::{self as execution, Facts, git, repository, text};
-use super::provider::{consume, observer, projection, tool};
+use super::provider::{consume, feed, land, observer, projection, tool};
 use super::unix::{guard, prepare, refused, success};
 use serde_json::Value;
 use std::path::Path;
@@ -43,6 +43,34 @@ fn refresh() {
     refused(&seat.land(&fourth), "concord.delivery.stale");
     assert_eq!(seat.read("pull-title"), "tampered");
     assert_eq!(seat.read("pull-state"), "MERGED");
+}
+
+#[test]
+fn moved() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    let seat = Fixture::open(fixture.path());
+    let member = fixture.path().join(".issues/I_delivery/worktree");
+    seat.change("moved\n");
+    let plan = seat.plan();
+    let moved = unnamed(&plan);
+    refused(&seat.severed(&moved), "concord.delivery.authority");
+    assert!(!fixture.path().join("pull-state").exists());
+    assert!(!fixture.path().join("merge-attempts").exists());
+    seat.write("hide-readback", "one\n");
+    refused(&seat.land(&plan), "concord.delivery.provider");
+    assert_eq!(seat.read("pull-state"), "MERGED");
+    assert!(member.is_dir());
+    let landed = seat.severed(&moved);
+    assert!(
+        landed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&landed.stderr)
+    );
+    let report: Value = serde_json::from_slice(&landed.stdout).expect("land report");
+    assert_eq!(report["released"], true);
+    assert_eq!(report["merge"], seat.read("pull-merge"));
+    assert!(!member.exists());
+    assert_eq!(seat.read("merge-attempts"), "merge\n");
 }
 
 struct Fixture<'a> {
@@ -155,6 +183,15 @@ impl<'a> Fixture<'a> {
         consume(self.space, &self.provider, plan)
     }
 
+    fn severed(&self, plan: &[u8]) -> Output {
+        let mut command = land(self.space, &self.provider, "-");
+        command
+            .env("ALL_PROXY", "http://127.0.0.1:9")
+            .env("NO_PROXY", "")
+            .env("no_proxy", "");
+        feed(command, plan).wait_with_output().expect("land")
+    }
+
     fn stale(&self) {
         self.write("pull-title", "stale title");
         self.write("pull-body", "stale body");
@@ -209,4 +246,11 @@ impl<'a> Fixture<'a> {
 fn delivery(plan: &[u8]) -> Value {
     let handoff: Value = serde_json::from_slice(plan).expect("handoff JSON");
     handoff["plan"]["delivery"].clone()
+}
+
+fn unnamed(plan: &[u8]) -> Vec<u8> {
+    let mut handoff: Value = serde_json::from_slice(plan).expect("handoff JSON");
+    handoff["plan"]["authority"]["warrant"]["producer"] =
+        "v9.9.9@0000000000000000000000000000000000000009".into();
+    serde_json::to_vec(&handoff).expect("moved handoff")
 }
