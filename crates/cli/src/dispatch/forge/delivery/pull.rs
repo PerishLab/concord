@@ -180,3 +180,23 @@ pub(super) fn provider(message: impl Into<String>) -> Error {
 fn merged(pull: &Pull) -> bool {
     pull.merge.is_some() || pull.merged.is_some()
 }
+
+pub fn reference(repository: &str, number: i64) -> Result<Reference> {
+    let (owner, repository) = coordinate(repository)?;
+    Ok(Reference {
+        kind: ReferenceKind::Change,
+        provider: "github".to_string(),
+        owner: owner.to_string(),
+        repository: repository.to_string(),
+        number,
+    })
+}
+
+pub fn coordinate(repository: &str) -> Result<(&str, &str)> {
+    repository.split_once('/').ok_or_else(|| {
+        Error::typed(
+            "concord.delivery.repository",
+            "delivery repository coordinate is malformed",
+        )
+    })
+}
