@@ -4,8 +4,14 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
-use std::process::Output;
+use std::process::{Command, Output};
 use std::thread;
+
+#[cfg(unix)]
+mod estate;
+
+const PARENT: &str = "0123456789abcdef0123456789abcdef";
+const PROBE: &str = "CONCORD_TEST_INHERITED_PARENT";
 
 struct Observed(tempfile::TempDir);
 
@@ -199,17 +205,18 @@ fn fault() {
 #[test]
 fn parity() {
     let endpoint = closed();
+    let configs = [
+        String::new(),
+        "[locus]\nenabled = false\n".to_string(),
+        format!("[locus]\nenabled = true\nendpoint = \"{endpoint}\"\n"),
+    ];
     for arguments in [
         vec!["--json", "config", "show"],
         vec!["--json", "issue", "show", "invalid"],
     ] {
         let mut seen = Vec::new();
-        for config in [
-            String::new(),
-            "[locus]\nenabled = false\n".to_string(),
-            format!("[locus]\nenabled = true\nendpoint = \"{endpoint}\"\n"),
-        ] {
-            let home = Observed::new(&config);
+        for config in &configs {
+            let home = Observed::new(config);
             let output = process(home.0.path(), &arguments)
                 .output()
                 .expect("command");
@@ -219,6 +226,35 @@ fn parity() {
         }
         assert!(seen.windows(2).all(|pair| pair[0] == pair[1]), "{seen:?}");
     }
+    #[cfg(unix)]
+    estate::parity(&configs);
+}
+
+#[test]
+fn inherited() {
+    if std::env::var_os(PROBE).is_some() {
+        assert_eq!(std::env::var("LOCUS_PARENT").as_deref(), Ok(PARENT));
+        let home = Observed::new(&format!(
+            "[locus]\nenabled = true\nendpoint = \"{}\"\n",
+            closed()
+        ));
+        assert!(home.run(&[]).status.success());
+        let atoms = home.atoms();
+        assert!(!atoms.is_empty());
+        for atom in &atoms {
+            assert!(atom["context"].get("locus.parent").is_none(), "{atom}");
+        }
+        return;
+    }
+    let output = Command::new(std::env::current_exe().expect("test binary"))
+        .args(["--exact", "observation::inherited", "--test-threads", "1"])
+        .env(PROBE, "1")
+        .env("LOCUS_PARENT", PARENT)
+        .output()
+        .expect("rerun with an inherited parent link");
+    let report = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{report}");
+    assert!(report.contains("1 passed"), "{report}");
 }
 
 #[test]
