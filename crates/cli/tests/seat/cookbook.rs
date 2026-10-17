@@ -34,6 +34,7 @@ fn inventory() {
     assert_eq!(
         codes,
         [
+            "concord.acceptance.target",
             "concord.audit.refused",
             "concord.boundary.refused",
             "concord.delivery.branches",

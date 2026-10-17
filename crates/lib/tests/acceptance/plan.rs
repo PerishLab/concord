@@ -231,7 +231,7 @@ fn persistence() {
 fn preparation() {
     let marker = declaration(Target::Source);
     let body = comment("intended", &marker).body;
-    assert!(Plan::prepare(marker.clone(), body.clone(), &labels(Target::Source), &[]).is_err());
+    assert!(Plan::prepare(marker.clone(), body.clone(), &labels(Target::Release), &[]).is_err());
     let other = comment("other", &declaration(Target::Release)).body;
     assert!(Plan::prepare(marker.clone(), other, &[], &[]).is_err());
     let root = comment("root", &marker);

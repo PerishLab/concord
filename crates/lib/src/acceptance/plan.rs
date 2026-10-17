@@ -34,7 +34,11 @@ impl Plan {
         labels: &[String],
         comments: &[Comment],
     ) -> Result<Self> {
-        let prior = History::read(comments)?.target(labels)?;
+        let history = History::read(comments)?;
+        let prior = match &marker {
+            Marker::Declaration { target, .. } => history.adopt(labels, *target)?,
+            _ => history.target(labels)?,
+        };
         let plan = Self {
             marker,
             body,

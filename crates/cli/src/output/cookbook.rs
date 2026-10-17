@@ -34,6 +34,15 @@ pub(crate) fn reference(code: &str) -> Option<String> {
 fn book() -> Cookbook {
     Cookbook::new([
         entry(
+            "concord.acceptance.target",
+            "The Issue's managed `acceptance:` label and its current acceptance declaration disagree: a label is present with no declaration, a declaration is present with no label, or the label names another target. Every acceptance read refuses, and the refusal's details name the label, the declared target and the declaration comment.",
+            "The declaration comment is the authority; the label only projects its target. A label with no declaration: run concord acceptance declare for that same target, which adopts the label (apply publishes the declaration and needs no relabel); to declare another target, first remove the label on GitHub. A declaration with no label: re-run concord acceptance apply with the plan that published it, which restores the label; without that plan, add the declared label on GitHub. A label naming another target: replace it on GitHub with the declared label, then change the target only through concord acceptance amend. Never edit or delete a declaration comment, and never treat a hand-applied label that disagrees with a declaration as the target.",
+            (
+                "Retain the refusal's details (label, declared target, declaration node) and read concord acceptance show after each repair; read the Issue's label events to learn who applied or removed the label.",
+                "concord acceptance show reports one target that the label and the current declaration agree on, and the refused command passes its unchanged gates.",
+            ),
+        ),
+        entry(
             "concord.audit.refused",
             "Estate agreement faults prevent an ordinary mutation; activity and Claim overlap observations are not faults.",
             "Read concord audit and preserve the named payload. Only a declared missing Member can use member recover: read concord cookbook concord.member.cleanup and bind its exact Issue revision and retained head. Recovery refuses unrelated faults and cannot force release or erase files. Other disagreements require diagnosis of their owning source or seat; never reset the estate, fabricate proof or hand-edit control data to pass audit.",
