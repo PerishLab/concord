@@ -14,23 +14,9 @@ pub enum Command {
     #[command(about = "Resolve one direct Issue Artifact")]
     Show { issue: String, name: String },
     #[command(about = "Prove an Issue Artifact import without copying payload")]
-    Preflight {
-        issue: String,
-        name: String,
-        #[arg(long)]
-        source: PathBuf,
-        #[arg(long)]
-        revision: i64,
-    },
+    Preflight(Import),
     #[command(about = "Import a file or tree into one Issue Artifact seat")]
-    Import {
-        issue: String,
-        name: String,
-        #[arg(long)]
-        source: PathBuf,
-        #[arg(long)]
-        revision: i64,
-    },
+    Import(Import),
     #[command(about = "Remove one exact Issue Artifact seat")]
     Remove {
         issue: String,
@@ -42,23 +28,32 @@ pub enum Command {
     },
 }
 
+#[derive(clap::Args)]
+pub struct Import {
+    pub issue: String,
+    pub name: String,
+    #[arg(long)]
+    pub source: PathBuf,
+    #[arg(long)]
+    pub revision: i64,
+}
+
 impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
             Self::List { .. } => "artifact.list",
             Self::Show { .. } => "artifact.show",
-            Self::Preflight { .. } => "artifact.preflight",
-            Self::Import { .. } => "artifact.import",
+            Self::Preflight(_) => "artifact.preflight",
+            Self::Import(_) => "artifact.import",
             Self::Remove { .. } => "artifact.remove",
         }
     }
     pub(crate) fn activity(&self) -> Vec<&str> {
         match self {
-            Self::List { issue }
-            | Self::Show { issue, .. }
-            | Self::Preflight { issue, .. }
-            | Self::Import { issue, .. }
-            | Self::Remove { issue, .. } => vec![issue],
+            Self::List { issue } | Self::Show { issue, .. } | Self::Remove { issue, .. } => {
+                vec![issue]
+            }
+            Self::Preflight(import) | Self::Import(import) => vec![&import.issue],
         }
     }
 }

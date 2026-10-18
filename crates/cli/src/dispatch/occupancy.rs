@@ -145,8 +145,8 @@ fn member(command: &args::member::Command) -> Option<Vec<Seed<'_>>> {
 
 fn artifact(command: &args::artifact::Command) -> Option<Vec<Seed<'_>>> {
     match command {
-        args::artifact::Command::Import { issue, .. }
-        | args::artifact::Command::Remove { issue, .. } => Some(vec![Seed::Issue(issue)]),
+        args::artifact::Command::Import(import) => Some(vec![Seed::Issue(&import.issue)]),
+        args::artifact::Command::Remove { issue, .. } => Some(vec![Seed::Issue(issue)]),
         _ => None,
     }
 }

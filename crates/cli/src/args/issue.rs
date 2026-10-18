@@ -49,17 +49,7 @@ pub enum Command {
         timeout: u64,
     },
     #[command(about = "Evaluate Issue closure readiness from current GitHub facts")]
-    Ready {
-        issue: String,
-        #[arg(long = "github-command")]
-        command: PathBuf,
-        #[arg(long = "page-size", default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=100))]
-        page_size: u16,
-        #[arg(long = "max-pages", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
-        max_pages: u16,
-        #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
-        timeout: u64,
-    },
+    Ready(Relations),
     #[command(about = "Declare one GitHub Issue comment with execution observations")]
     Comment {
         issue: String,
@@ -138,17 +128,20 @@ pub enum Preflight {
         timeout: u64,
     },
     #[command(about = "Explain native relationships and active execution for an existing Issue")]
-    Existing {
-        issue: String,
-        #[arg(long = "github-command")]
-        command: PathBuf,
-        #[arg(long = "page-size", default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=100))]
-        page_size: u16,
-        #[arg(long = "max-pages", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
-        max_pages: u16,
-        #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
-        timeout: u64,
-    },
+    Existing(Relations),
+}
+
+#[derive(clap::Args)]
+pub struct Relations {
+    pub issue: String,
+    #[arg(long = "github-command")]
+    pub command: PathBuf,
+    #[arg(long = "page-size", default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=100))]
+    pub page_size: u16,
+    #[arg(long = "max-pages", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
+    pub max_pages: u16,
+    #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
+    pub timeout: u64,
 }
 
 #[derive(Subcommand)]
@@ -201,7 +194,7 @@ impl Command {
             Self::Brief { .. } => "issue.brief",
             Self::Preflight { command } => command.name(),
             Self::Graph { .. } => "issue.graph",
-            Self::Ready { .. } => "issue.ready",
+            Self::Ready(_) => "issue.ready",
             Self::Comment { .. } => "issue.comment",
             Self::Delivery { command } => command.name(),
             Self::Attach { .. } => "issue.attach",
@@ -217,7 +210,7 @@ impl Preflight {
     fn name(&self) -> &'static str {
         match self {
             Self::Proposed { .. } => "issue.preflight.proposed",
-            Self::Existing { .. } => "issue.preflight.existing",
+            Self::Existing(_) => "issue.preflight.existing",
         }
     }
 }
