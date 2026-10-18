@@ -111,12 +111,12 @@ pub enum Landing {
         title: String,
         #[arg(long, default_value = "")]
         body: String,
-        #[arg(long)]
-        guard_schema: String,
-        #[arg(long)]
-        guard_tree: String,
-        #[arg(long)]
-        guard_digest: String,
+        #[arg(long = "guard-schema", value_name = "GUARD_SCHEMA")]
+        schema: String,
+        #[arg(long = "guard-tree", value_name = "GUARD_TREE")]
+        tree: String,
+        #[arg(long = "guard-digest", value_name = "GUARD_DIGEST")]
+        digest: String,
         #[arg(long)]
         revision: i64,
     },

@@ -19,9 +19,9 @@ pub(super) async fn run(estate: &Estate, command: Landing, output: bool) -> Resu
             base,
             title,
             body,
-            guard_schema,
-            guard_tree,
-            guard_digest,
+            schema,
+            tree,
+            digest,
             revision,
         } => {
             let request = issue_landing::Request {
@@ -31,9 +31,9 @@ pub(super) async fn run(estate: &Estate, command: Landing, output: bool) -> Resu
                 title,
                 body,
                 guard: issue_landing::Guard {
-                    schema: guard_schema,
-                    tree: guard_tree,
-                    digest: guard_digest,
+                    schema,
+                    tree,
+                    digest,
                 },
             };
             emit(
