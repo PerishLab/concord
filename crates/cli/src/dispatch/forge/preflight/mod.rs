@@ -2,7 +2,7 @@ mod automation;
 mod existing;
 mod github;
 
-pub(super) use existing::{Request as ExistingRequest, run as existing};
+pub(super) use existing::run as existing;
 
 use super::projection::{self, Issue};
 use concord_core::occupancy::Subject;

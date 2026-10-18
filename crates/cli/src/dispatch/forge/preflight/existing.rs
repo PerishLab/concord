@@ -1,19 +1,11 @@
 use super::super::projection::{self, Connection, Issue, Pull};
 use super::{Diagnostic, Execution, Member, matches};
+use crate::args::issue::Relations;
 use concord_core::{Anchor, Coordinate, Estate, IssueWorktree, Result};
 use serde::Serialize;
 use std::collections::BTreeSet;
-use std::path::Path;
 
 const SCHEMA: &str = "concord.issue-preflight-existing/v2";
-
-pub struct Request<'a> {
-    pub issue: &'a str,
-    pub command: &'a Path,
-    pub page_size: u16,
-    pub max_pages: u16,
-    pub timeout: u64,
-}
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -65,8 +57,8 @@ pub struct Existing {
     pub observed_at: u64,
 }
 
-pub async fn run(estate: &Estate, request: Request<'_>) -> Result<Existing> {
-    let coordinate = Coordinate::parse(request.issue)?;
+pub async fn run(estate: &Estate, request: &Relations) -> Result<Existing> {
+    let coordinate = Coordinate::parse(&request.issue)?;
     let mut connections = BTreeSet::new();
     connections.extend([
         Connection::SubIssues,
@@ -75,7 +67,7 @@ pub async fn run(estate: &Estate, request: Request<'_>) -> Result<Existing> {
         Connection::Pulls,
     ]);
     let projected = projection::Projection::new(
-        request.command,
+        &request.command,
         request.page_size,
         request.max_pages,
         request.timeout,
@@ -109,7 +101,7 @@ pub async fn run(estate: &Estate, request: Request<'_>) -> Result<Existing> {
         estate,
         &coordinate,
         &super::Bounds {
-            command: request.command,
+            command: &request.command,
             first: request.page_size,
             pages: request.max_pages,
             timeout: request.timeout,

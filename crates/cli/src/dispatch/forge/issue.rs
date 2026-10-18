@@ -63,17 +63,16 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 .await;
             emit(json!({"graph": graph}), output)
         }
-        Command::Ready {
-            issue,
-            command,
-            page_size,
-            max_pages,
-            timeout,
-        } => {
-            let coordinate = Coordinate::parse(&issue)?;
-            let readiness = projection::Projection::new(&command, page_size, max_pages, timeout)
-                .ready(&coordinate)
-                .await?;
+        Command::Ready(relations) => {
+            let coordinate = Coordinate::parse(&relations.issue)?;
+            let readiness = projection::Projection::new(
+                &relations.command,
+                relations.page_size,
+                relations.max_pages,
+                relations.timeout,
+            )
+            .ready(&coordinate)
+            .await?;
             emit(json!({"readiness": readiness}), output)
         }
         Command::Comment {
@@ -210,24 +209,8 @@ async fn preflight(estate: &Estate, command: Preflight, output: bool) -> Result<
             .await?;
             emit(json!({"preflight": report}), output)
         }
-        Preflight::Existing {
-            issue,
-            command,
-            page_size,
-            max_pages,
-            timeout,
-        } => {
-            let report = super::preflight::existing(
-                estate,
-                super::preflight::ExistingRequest {
-                    issue: &issue,
-                    command: &command,
-                    page_size,
-                    max_pages,
-                    timeout,
-                },
-            )
-            .await?;
+        Preflight::Existing(relations) => {
+            let report = super::preflight::existing(estate, &relations).await?;
             emit(json!({"preflight": report}), output)
         }
     }
