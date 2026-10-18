@@ -45,7 +45,7 @@ pub fn run(config: &Config, command: Deed, output: bool) -> Result<()> {
         Deed::Upgrade {
             channel,
             version,
-            dry_run,
+            dry,
             json,
         } => {
             let output = output || json;
@@ -54,7 +54,7 @@ pub fn run(config: &Config, command: Deed, output: bool) -> Result<()> {
                 version,
                 ..Ask::default()
             };
-            if dry_run {
+            if dry {
                 let report = kit.status(&ask).map_err(failure)?;
                 output::report("upgrade_dry_run", &report, output)?;
                 actionable(&report)
