@@ -77,12 +77,7 @@ pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()
     };
     let mut wait = settle::Wait::new();
     while let Some(pull) = flow.apply(output).await? {
-        let mut client = client::Client {
-            command: &flow.command,
-            repository: &flow.plan.delivery.repository,
-            timeout: flow.timeout,
-        };
-        settle::wait(&mut client, pull, &mut wait).await?;
+        settle::wait(&mut flow.client(), pull, &mut wait).await?;
     }
     Ok(())
 }
@@ -223,13 +218,15 @@ impl Flow<'_> {
             true => Path::new(&self.plan.member.integration.path),
             false => preparation.root.as_path(),
         };
-        let access = pull::Access {
-            identity,
-            repository: &self.plan.delivery.repository,
+        pull::Service::open(preparation, identity, self.client()).await
+    }
+
+    fn client(&self) -> client::Client<'_> {
+        client::Client {
             command: &self.command,
+            repository: &self.plan.delivery.repository,
             timeout: self.timeout,
-        };
-        pull::Service::open(preparation, access).await
+        }
     }
 
     async fn mutation(&self, check: Check) -> Result<issue_delivery::Ready> {

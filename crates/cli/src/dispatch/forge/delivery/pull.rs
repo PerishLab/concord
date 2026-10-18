@@ -13,34 +13,27 @@ pub async fn fetch(root: &Path) -> Result<()> {
     Git::fetch(root).await
 }
 
-pub struct Access<'a> {
-    pub identity: &'a Path,
-    pub repository: &'a str,
-    pub command: &'a Path,
-    pub timeout: u64,
-}
-
 pub struct Service<'a> {
     preparation: &'a Preparation,
     client: Client<'a>,
 }
 
 impl<'a> Service<'a> {
-    pub async fn open(preparation: &'a Preparation, access: Access<'a>) -> Result<Self> {
-        let observed = Git::repository(access.identity).await?;
-        if observed != access.repository {
+    pub(super) async fn open(
+        preparation: &'a Preparation,
+        identity: &Path,
+        client: Client<'a>,
+    ) -> Result<Self> {
+        let observed = Git::repository(identity).await?;
+        if observed != client.repository {
             return Err(stale(format!(
                 "delivery repository {} is not worktree origin {observed}",
-                access.repository
+                client.repository
             )));
         }
         Ok(Self {
             preparation,
-            client: Client {
-                command: access.command,
-                repository: access.repository,
-                timeout: access.timeout,
-            },
+            client,
         })
     }
 
