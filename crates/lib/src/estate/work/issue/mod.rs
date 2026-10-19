@@ -45,7 +45,7 @@ impl Estate {
             let anchor = row
                 .int("anchor")
                 .and_then(|key| anchors.iter().find(|anchor| anchor.key() == key))
-                .map(super::super::forge::decode_anchor)
+                .map(super::super::forge::anchor::decode)
                 .transpose()?
                 .ok_or_else(|| malformed(row.key(), "anchor"))?;
             let integration = row
