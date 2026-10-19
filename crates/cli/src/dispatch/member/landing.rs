@@ -1,7 +1,7 @@
 use super::super::{emit, input};
 use crate::args::member::Landing;
 use concord_core::authority::Plumb;
-use concord_core::{Coordinate, Estate, Result, issue_landing};
+use concord_core::{Coordinate, Estate, Result, landing};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -9,7 +9,7 @@ use serde_json::json;
 #[serde(deny_unknown_fields)]
 struct Envelope {
     version: u64,
-    plan: issue_landing::Plan,
+    plan: landing::Plan,
 }
 
 pub(super) async fn run(estate: &Estate, command: Landing, output: bool) -> Result<()> {
@@ -24,20 +24,20 @@ pub(super) async fn run(estate: &Estate, command: Landing, output: bool) -> Resu
             digest,
             revision,
         } => {
-            let request = issue_landing::Request {
+            let request = landing::Request {
                 issue: Coordinate::parse(&issue)?,
                 revision,
                 base,
                 title,
                 body,
-                guard: issue_landing::Guard {
+                guard: landing::Guard {
                     schema,
                     tree,
                     digest,
                 },
             };
             emit(
-                json!({"plan": issue_landing::prepare::<Plumb>(estate, &request).await?}),
+                json!({"plan": landing::prepare::<Plumb>(estate, &request).await?}),
                 output,
             )
         }
@@ -50,7 +50,7 @@ pub(super) async fn run(estate: &Estate, command: Landing, output: bool) -> Resu
                 ));
             }
             emit(
-                json!({"ready": issue_landing::revalidate::<Plumb>(estate, &envelope.plan).await?}),
+                json!({"ready": landing::revalidate::<Plumb>(estate, &envelope.plan).await?}),
                 output,
             )
         }
