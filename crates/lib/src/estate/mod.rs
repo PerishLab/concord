@@ -22,7 +22,7 @@ pub use work::{
     Integration, IntegrationState, IssueArtifact, IssueClaiming, IssueDeclaration, IssueImport,
     IssueMemberChange, IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval,
     IssueRetirement, IssueWithdrawal, IssueWorktree, Proof, Recovery, Register, Rename, Repository,
-    Start, UpstreamState, authority, issue_delivery, issue_landing,
+    Start, UpstreamState, authority, issue_delivery, landing,
 };
 
 pub struct Estate {

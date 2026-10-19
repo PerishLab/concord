@@ -8,7 +8,7 @@ pub(super) async fn inspect(plane: &Estate, report: &mut Agreement) -> Result<()
     let members = plane.issue_worktrees().await?;
     survey.integrations(&members, report).await?;
     for row in &anchors {
-        let anchor = match super::super::forge::decode_anchor(row) {
+        let anchor = match super::super::forge::anchor::decode(row) {
             Ok(anchor) => anchor,
             Err(_) => continue,
         };

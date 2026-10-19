@@ -9,7 +9,7 @@ use super::{Estate, fault};
 pub use integration::{Guard, Integration, Register, Rename, Repository};
 pub use issue::authority;
 pub use issue::delivery as issue_delivery;
-pub use issue::landing as issue_landing;
+pub use issue::landing;
 pub use issue::{
     Finish, IssueArtifact, IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange,
     IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval, IssueRetirement,

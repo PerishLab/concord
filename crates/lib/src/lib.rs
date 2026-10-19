@@ -30,5 +30,5 @@ pub use estate::{
     IssueWithdrawal, IssueWorktree, Proof, Reconcile, Recovery, Reference, ReferenceKind, Register,
     Rename, Repository, Seat, Start, UpstreamState,
 };
-pub use estate::{authority, issue_delivery, issue_landing};
+pub use estate::{authority, issue_delivery, landing};
 pub use protocol::PLUMB;

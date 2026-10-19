@@ -28,7 +28,7 @@ async fn resources(estate: &Estate, report: &mut Agreement) -> Result<()> {
         }
     }
     for row in estate.core.live("Anchor").await.map_err(super::fault)? {
-        if let Err(error) = super::forge::decode_anchor(&row) {
+        if let Err(error) = super::forge::anchor::decode(&row) {
             report.fault(
                 "issue.shape",
                 format!("Anchor/{}", row.key()),

@@ -1,5 +1,5 @@
 use super::emit;
-use crate::args::integration::Command as IntegrationCommand;
+use crate::args::integration;
 use concord_core::{Error, Estate, Integration, Register, Rename, Repository, Result};
 use serde::Deserialize;
 use serde_json::json;
@@ -17,13 +17,13 @@ struct Observed {
     branch: String,
 }
 
-pub async fn run(estate: &Estate, command: IntegrationCommand, output: bool) -> Result<()> {
+pub async fn run(estate: &Estate, command: integration::Command, output: bool) -> Result<()> {
     match command {
-        IntegrationCommand::List => emit(
+        integration::Command::List => emit(
             json!({"integrations": estate.integrations().await?}),
             output,
         ),
-        IntegrationCommand::Retire {
+        integration::Command::Retire {
             repository,
             node,
             key,
@@ -33,7 +33,7 @@ pub async fn run(estate: &Estate, command: IntegrationCommand, output: bool) -> 
             let retired = estate.retire(&held, apply).await?;
             emit(retirement(retired, apply), output)
         }
-        IntegrationCommand::Register {
+        integration::Command::Register {
             repository,
             path,
             command,
@@ -50,7 +50,7 @@ pub async fn run(estate: &Estate, command: IntegrationCommand, output: bool) -> 
                 .await?;
             emit(json!({"integration": integration}), output)
         }
-        IntegrationCommand::Reconcile {
+        integration::Command::Reconcile {
             repository,
             command,
             timeout,
