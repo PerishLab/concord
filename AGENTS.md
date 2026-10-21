@@ -36,6 +36,11 @@ of copying its answer here.
   and sort updates and Type visibility lack a supported observable write loop;
   refuse those requests and preserve existing view identity. Generic field
   removal requires complete empty-value evidence and protects cycle history.
+- Project planning writes qualified Project-owned priority and iteration fields.
+  Empty priority means unreviewed; empty iteration means unassigned. Native
+  iteration IDs and completed history survive configuration updates. Calendar
+  dates never prove elapsed work. Ordering requires both anchors in the selected
+  cycle; these choices never alter Issue dependencies or acceptance authority.
 
 - Ordinary open replays exactly the current Issue-execution model. It never
   evolves, repairs, migrates, or falls back to an older managed shape.

@@ -10,6 +10,9 @@ struct Facts<'a> {
 impl<'a> Facts<'a> {
     fn result(&self, intent: &Intent) -> Option<Value> {
         match &intent.action {
+            Action::Planning { change } => super::super::planning::result(self.state, change)
+                .ok()
+                .flatten(),
             Action::Create { title } => {
                 let values = self.list("projects");
                 let found = values

@@ -3,6 +3,7 @@ mod inspect;
 mod issue;
 mod manage;
 mod observe;
+mod planning;
 mod query;
 mod target;
 mod wire;

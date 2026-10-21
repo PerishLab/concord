@@ -28,8 +28,12 @@ impl Journal<'_, '_> {
             .as_str()
             .expect("action tag")
             .to_owned();
+        let detail = match &plan.intent.action {
+            Action::Planning { change } => super::super::planning::summary(state, change),
+            _ => String::new(),
+        };
         let body = format!(
-            "{}\n\nAction: {kind}\nStatus: {status}\nProject: {}\n\n{} {status} -->",
+            "{}\n\nAction: {kind}\n{detail}\nStatus: {status}\nProject: {}\n\n{} {status} -->",
             plan.intent.reason,
             state["project"]["url"]
                 .as_str()

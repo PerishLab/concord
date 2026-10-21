@@ -11,8 +11,10 @@ mod rest;
 use super::{fault, wire::Client};
 use crate::args::project::{Command, Remote};
 use crate::runtime::input;
+pub(super) use build::Step;
 use concord_core::Result;
-use model::{Intent, Plan};
+use model::Plan;
+pub(super) use model::{Action, Intent};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
