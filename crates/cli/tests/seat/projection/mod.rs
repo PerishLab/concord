@@ -1,6 +1,8 @@
 #[cfg(unix)]
 mod arrange;
 #[cfg(unix)]
+mod confirmation;
+#[cfg(unix)]
 mod managed;
 #[cfg(unix)]
 mod management;

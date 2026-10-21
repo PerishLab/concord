@@ -113,6 +113,24 @@ def page(nodes): return {'nodes':nodes,'totalCount':len(nodes),'pageInfo':{'hasN
 def stamp():
     s['clock']+=1
     s['project']['updatedAt']='stamp-'+str(s['clock'])
+def projected():
+    value=copy.deepcopy(s['project'])
+    if s.get('projection'):
+        for key in ['title','shortDescription','readme','public']:value[key]=s['previous'][key]
+    return value
+def observed(name):
+    nodes=copy.deepcopy(s[name])
+    if name!='items' or not s.get('hidden') or s['mode']=='ordinary':return nodes
+    s['observations']=s.get('observations',0)+1
+    if s['mode']=='reader-failure':save();fail()
+    if s.get('delay',0)>0:
+        if s['mode']=='delayed-value':
+            for item in nodes:
+                if item['id']==s['hidden']:item['fieldValues']=s['previous']
+        else:nodes=[item for item in nodes if item['content']['id']!=s['hidden']]
+        s['delay']-=1
+        if s['mode']=='pending-context':s['statusUpdates'].append({'id':'U_foreign','body':'Human changes the investment boundary.','createdAt':'new','updatedAt':'new'})
+    save();return nodes
 def fields():
     url='https://api.github.com/orgs/PerishLab/projectsV2/'+str(s['project']['number'])
     nodes=[{'id':{'F_local':100,'F_issue':101,'F_new':102}.get(f['id'],200+i),'node_id':f['id'],'name':f['name'],'data_type':f['dataType'].lower(),'project_url':url} for i,f in enumerate(s['fields'])]
@@ -143,11 +161,13 @@ if q.startswith('mutation'):
         if s['mode']=='partial' and p['contentId']=='I_two':save();fail()
         content=next(i for i in s['issues'] if i['id']==p['contentId'])
         s['items'].append({'id':'ITEM_'+content['id'],'type':'ISSUE','isArchived':False,'updatedAt':'item-original','project':{'id':s['project']['id']},'content':copy.deepcopy(content)})
+        if s['mode'] in ['delayed','invisible','pending-context','reader-failure']:s.update(hidden=content['id'],delay=999 if s['mode']=='invisible' else 1)
         if s['mode']=='changed-type':s['issues'][1]['issueType']['name']='Auto'
         if s['mode']=='context':s['statusUpdates'].append({'id':'U_foreign','body':'Human changes the investment boundary.','createdAt':'new','updatedAt':'new'})
         if s['mode']=='lost':stamp();save();fail()
     elif name=='deleteProjectV2Item':s['items']=[i for i in s['items'] if i['id']!=p['itemId']]
     elif name=='updateProjectV2':
+        if s['mode']=='delayed-project':s.update(previous=copy.deepcopy(s['project']),delay=1)
         for k,value in p.items():
             if k!='projectId':s['project'][k]=value
     elif name in ['createProjectV2Field','updateProjectV2Field']:
@@ -167,6 +187,7 @@ if q.startswith('mutation'):
             value['configuration']={'duration':p['iterationConfiguration']['duration'],'startDay':3,'iterations':[x for x in periods if x['startDate']>='2026-10-21'],'completedIterations':[x for x in periods if x['startDate']<'2026-10-21']}
     elif name in ['updateProjectV2ItemFieldValue','clearProjectV2ItemFieldValue']:
         item=next(i for i in s['items'] if i['id']==p['itemId']);nodes=[v for v in item['fieldValues']['nodes'] if v['field']['id']!=p['fieldId']]
+        if s['mode']=='delayed-value':s.update(hidden=item['id'],delay=1,previous=copy.deepcopy(item['fieldValues']))
         if 'value' in p:
             data=p['value'];value={'field':{'id':p['fieldId']}}
             if 'singleSelectOptionId' in data:value.update(__typename='ProjectV2ItemFieldSingleSelectValue',optionId=data['singleSelectOptionId'])
@@ -197,10 +218,13 @@ if q.startswith('mutation'):
 if 'projectsV2(first:' in q:
     projects=[s['project'] if x['id']==s['project']['id'] else x for x in s['projects']]
     emit({'data':{'organization':{'id':'O_lab','login':'PerishLab','url':'https://github.com/PerishLab','projectsV2':page(projects)}}})
-if 'organization(login:' in q:emit({'data':{'organization':{'projectV2':s['project']}}})
+if 'organization(login:' in q:
+    s['projection']=s['mode']=='delayed-project' and s.get('delay',0)>0
+    if s['projection']:s['delay']-=1
+    save();emit({'data':{'organization':{'projectV2':projected()}}})
 for name in ['fields','items','views','workflows','repositories','statusUpdates']:
     if name+'(first:' in q:
-        project=copy.deepcopy(s['project']);project[name]=page(s[name]);emit({'data':{'node':project}})
+        project=projected();project[name]=page(observed(name));emit({'data':{'node':project}})
 if 'nodes(ids:' in q:emit({'data':{'nodes':[next((i for i in s['issues'] if i['id']==identity),None) for identity in v['ids']]}})
 if v.get('id')=='IF_priority':emit({'data':{'node':{'id':'IF_priority','__typename':'IssueFieldSingleSelect'}}})
 if v.get('id')=='R_repo':emit({'data':{'node':{'__typename':'Repository','id':'R_repo','nameWithOwner':'PerishLab/concord','owner':{'id':'O_lab'}}}})
