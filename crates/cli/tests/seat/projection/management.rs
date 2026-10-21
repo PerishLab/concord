@@ -161,6 +161,7 @@ if q.startswith('mutation'):
         if s['mode']=='partial' and p['contentId']=='I_two':save();fail()
         content=next(i for i in s['issues'] if i['id']==p['contentId'])
         s['items'].append({'id':'ITEM_'+content['id'],'type':'ISSUE','isArchived':False,'updatedAt':'item-original','project':{'id':s['project']['id']},'content':copy.deepcopy(content)})
+        if s['mode'].startswith('snapshot'):s['snapshot']=999 if s['mode']=='snapshot-persistent' else 1
         if s['mode'] in ['delayed','invisible','pending-context','reader-failure']:s.update(hidden=content['id'],delay=999 if s['mode']=='invisible' else 1)
         if s['mode']=='changed-type':s['issues'][1]['issueType']['name']='Auto'
         if s['mode']=='context':s['statusUpdates'].append({'id':'U_foreign','body':'Human changes the investment boundary.','createdAt':'new','updatedAt':'new'})
@@ -224,6 +225,17 @@ if 'organization(login:' in q:
     save();emit({'data':{'organization':{'projectV2':projected()}}})
 for name in ['fields','items','views','workflows','repositories','statusUpdates']:
     if name+'(first:' in q:
+        if name=='items' and s['mode'].startswith('snapshot') and s.get('snapshot',0)>0:
+            project=projected()
+            if v.get('after') is None:
+                phantom={'id':'ITEM_phantom','type':'ISSUE','isArchived':False,'updatedAt':'old','project':{'id':s['project']['id']},'content':s['issues'][-1]}
+                project[name]={'nodes':[phantom],'totalCount':2,'pageInfo':{'hasNextPage':True,'endCursor':'snapshot'}}
+            else:
+                if v['after']!='snapshot':fail()
+                s['snapshot']-=1;s['conflicts']=s.get('conflicts',0)+1
+                if s['mode']=='snapshot-context':s['statusUpdates'].append({'id':'U_foreign','body':'A human changes the planning boundary.','createdAt':'new','updatedAt':'new'})
+                project[name]=page(s[name])
+            save();emit({'data':{'node':project}})
         project=projected();project[name]=page(observed(name));emit({'data':{'node':project}})
 if 'nodes(ids:' in q:emit({'data':{'nodes':[next((i for i in s['issues'] if i['id']==identity),None) for identity in v['ids']]}})
 if v.get('id')=='IF_priority':emit({'data':{'node':{'id':'IF_priority','__typename':'IssueFieldSingleSelect'}}})

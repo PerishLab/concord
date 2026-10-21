@@ -39,6 +39,9 @@ of copying its answer here.
   An acknowledged action mutation may receive three fresh confirmation observations,
   separated by 250 ms, without mutation replay. Provider errors remain immediate
   unknown outcomes; changed planning context refuses further writes.
+  Prepared Project state acquisition discards partial observations and restarts
+  from the root at most three times on recognized paging/metadata conflicts,
+  separated by 250 ms. Other errors retain refusal; no mutation is replayed.
 - Project planning writes qualified Project-owned priority and iteration fields.
   Empty priority means unreviewed; empty iteration means unassigned. Native
   iteration IDs and completed history survive configuration updates. Calendar
