@@ -1,6 +1,6 @@
 use super::fault;
 use super::wire::Client;
-use crate::dispatch::forge::Request;
+use crate::runtime::transport::Request;
 use concord_core::{Coordinate, Result};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;

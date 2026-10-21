@@ -27,6 +27,15 @@ of copying its answer here.
   values from attached Issue fields; display names establish neither. Bounded
   projections preserve cursors, unknown content and read-only Auto classification.
   A successful read grants no planning, Issue or local execution authority.
+- Project preparation binds current native facts without writes; applying a
+  prepared intent requires fresh agreement, narrow mutations and independent
+  readback. Native requested/confirmed planning updates retain rationale.
+  Recovery observes current facts without replaying uncertain writes or
+  claiming their authorship. Auto and unknown Issue types stay read-only;
+  enabled native workflows refuse candidate maintenance. Existing view group
+  and sort updates and Type visibility lack a supported observable write loop;
+  refuse those requests and preserve existing view identity. Generic field
+  removal requires complete empty-value evidence and protects cycle history.
 
 - Ordinary open replays exactly the current Issue-execution model. It never
   evolves, repairs, migrates, or falls back to an older managed shape.

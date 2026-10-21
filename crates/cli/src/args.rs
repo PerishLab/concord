@@ -61,7 +61,7 @@ impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
             Self::Acceptance(args) => args.command.name(),
-            Self::Project(_) => "project.show",
+            Self::Project(args) => args.command.name(),
             Self::Config(args) => args.command.name(),
             Self::Cookbook(_) => "cookbook",
             Self::Issue(args) => args.command.name(),
