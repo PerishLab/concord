@@ -1,5 +1,5 @@
 use super::{fault, query};
-use crate::dispatch::forge::Request;
+use crate::runtime::transport::Request;
 use concord_core::Result;
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
@@ -137,19 +137,44 @@ pub(super) fn metadata(value: &Value) -> Value {
     value
 }
 
+pub(super) struct Spec<'a> {
+    pub name: &'a str,
+    pub query: String,
+    pub size: u16,
+    pub pages: u16,
+}
+
 pub(super) async fn gather(
     client: &Client<'_>,
     project: &Value,
     name: &str,
     budget: (u16, u16),
 ) -> Result<Collection> {
+    collect(
+        client,
+        project,
+        Spec {
+            name,
+            query: query::connection(name),
+            size: budget.0,
+            pages: budget.1,
+        },
+    )
+    .await
+}
+
+pub(super) async fn collect(
+    client: &Client<'_>,
+    project: &Value,
+    spec: Spec<'_>,
+) -> Result<Collection> {
     let mut collection = Collection::new();
-    let query = query::connection(name);
-    for _ in 0..budget.1 {
+    let query = spec.query;
+    for _ in 0..spec.pages {
         let data = client
             .read(
                 &query,
-                json!({"id": project["id"], "size": budget.0, "after": collection.after()}),
+                json!({"id": project["id"], "size": spec.size, "after": collection.after()}),
             )
             .await?;
         let node = &data["node"];
@@ -159,7 +184,7 @@ pub(super) async fn gather(
                 "Project metadata changed or became inaccessible while observing",
             ));
         }
-        collection.push(&node[name])?;
+        collection.push(&node[spec.name])?;
         if collection.complete {
             break;
         }

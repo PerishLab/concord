@@ -1,3 +1,7 @@
+#[cfg(unix)]
+mod managed;
+#[cfg(unix)]
+mod management;
 mod observed;
 #[cfg(unix)]
 mod planning;

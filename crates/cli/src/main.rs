@@ -1,9 +1,11 @@
 mod args;
-mod config;
 mod dispatch;
-mod observation;
 mod output;
+mod project;
+mod runtime;
 mod skill;
+
+pub(crate) use runtime::{config, observation};
 
 use args::Cli;
 use clap::Parser;

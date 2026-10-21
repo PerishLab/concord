@@ -1,30 +1,26 @@
-mod inspect;
-mod issue;
-mod query;
-mod target;
-mod wire;
-
-use crate::args::project::Command;
-use concord_core::{Error, Result};
+use super::{
+    fault, inspect, issue, query,
+    target::Target,
+    wire::{self, Client},
+};
+use crate::args::project::Observe;
+use concord_core::Result;
 use serde_json::{Value, json};
-use std::time::{SystemTime, UNIX_EPOCH};
-use target::Target;
-use wire::Client;
 
-pub(super) async fn run(command: Command, output: bool) -> Result<()> {
-    let Command::Show {
+pub(super) async fn run(args: Observe, output: bool) -> Result<()> {
+    let Observe {
         project,
         command,
         size,
         pages,
         timeout,
-    } = command;
+    } = args;
     let target = Target::parse(&project)?;
     let client = Client {
         command: &command,
         timeout,
     };
-    let started = now();
+    let started = super::now();
     let query = "query($owner:String!,$number:Int!){organization(login:$owner){projectV2(number:$number){$META}}}".replace("$META", query::META);
     let data = client
         .read(
@@ -87,7 +83,7 @@ pub(super) async fn run(command: Command, output: bool) -> Result<()> {
             .expect("collected items"),
         &mut diagnostics,
     );
-    super::emit(
+    crate::dispatch::emit(
         json!({"project": {
             "schema": "concord.project-observation/v1",
             "identity": project,
@@ -95,7 +91,7 @@ pub(super) async fn run(command: Command, output: bool) -> Result<()> {
             "complete": diagnostics.is_empty(),
             "diagnostics": diagnostics,
             "started_at": started,
-            "observed_at": now(),
+            "observed_at": super::now(),
             "consistency": "live interval; Project metadata checked on every page and at completion; Issue facts can change independently; no atomic snapshot",
             "order": "items connection order is native Project item order; view sort is separately reported",
             "unknown": [
@@ -108,15 +104,4 @@ pub(super) async fn run(command: Command, output: bool) -> Result<()> {
         }}),
         output,
     )
-}
-
-fn now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
-}
-
-fn fault(code: &str, message: impl Into<String>) -> Error {
-    Error::typed(format!("concord.project.{code}"), message)
 }
