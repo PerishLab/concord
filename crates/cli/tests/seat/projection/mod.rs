@@ -1,4 +1,7 @@
 mod observed;
+#[cfg(unix)]
+mod planning;
+mod project;
 mod survey;
 
 #[cfg(unix)]

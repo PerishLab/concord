@@ -98,7 +98,8 @@ fn seeds(command: &args::Command) -> Option<Vec<Seed<'_>>> {
         args::Command::Issue(args) => issue(&args.command),
         args::Command::Artifact(args) => artifact(&args.command),
         args::Command::Integration(_) | args::Command::Acceptance(_) => None,
-        args::Command::Config(_)
+        args::Command::Project(_)
+        | args::Command::Config(_)
         | args::Command::Cookbook(_)
         | args::Command::Audit(_)
         | args::Command::Skill(_) => None,

@@ -5,11 +5,13 @@ at work start and again before delivery or Issue closure. That document owns
 organization-wide Issue, pull-request and acceptance policy; this file keeps
 repository-specific constraints without copying that policy.
 
-Concord is the executable control plane for one managed Space. GitHub Issues
-are the durable work ledger. One exact Keel estate is the sole authority for
+Concord controls Issue execution and independently scoped native Project planning.
+GitHub Issues own bounded work, dependencies and acceptance; GitHub Projects own
+priority, cycle assignment and item order. One exact Keel estate is the authority for
 Issue-anchored local execution state; Git worktrees and Artifact directories
 remain external payload and must agree with that estate. GitHub Issues and PRs
-are the only work narrative and delivery ledger.
+own work narrative and delivery; Project descriptions and status updates own
+planning decisions. Project operations never create a local planning ledger.
 
 Five surfaces answer different questions. The source says what Concord does,
 `--help` says how to invoke it, the Concord skill says how to operate its
@@ -18,6 +20,13 @@ repository constraints those surfaces cannot. Ask the owning surface instead
 of copying its answer here.
 
 ## Authority
+
+- Project observation selects an explicit organization Project by coordinate or
+  canonical URL and runs before local estate opening. The external provider
+  owns credentials. Field identity and native ownership distinguish Project
+  values from attached Issue fields; display names establish neither. Bounded
+  projections preserve cursors, unknown content and read-only Auto classification.
+  A successful read grants no planning, Issue or local execution authority.
 
 - Ordinary open replays exactly the current Issue-execution model. It never
   evolves, repairs, migrates, or falls back to an older managed shape.

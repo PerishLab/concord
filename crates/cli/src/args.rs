@@ -4,6 +4,7 @@ pub(crate) mod audit;
 pub(crate) mod integration;
 pub(crate) mod issue;
 pub(crate) mod member;
+pub(crate) mod project;
 
 use crate::skill::Args as Skill;
 use clap::{Args, Parser, Subcommand};
@@ -36,6 +37,8 @@ pub struct Cli {
 pub enum Command {
     #[command(about = "Observe acceptance and prepare explicit Issue-bound write plans")]
     Acceptance(acceptance::Args),
+    #[command(about = "Observe native GitHub Project planning independently of local execution")]
+    Project(project::Args),
     #[command(about = "Inspect Concord configuration")]
     Config(Config),
     #[command(about = "Read code-addressed recovery guidance")]
@@ -58,6 +61,7 @@ impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
             Self::Acceptance(args) => args.command.name(),
+            Self::Project(_) => "project.show",
             Self::Config(args) => args.command.name(),
             Self::Cookbook(_) => "cookbook",
             Self::Issue(args) => args.command.name(),
@@ -71,7 +75,7 @@ impl Command {
 
     pub(crate) fn activity(&self) -> Option<Vec<&str>> {
         match self {
-            Self::Acceptance(_) => None,
+            Self::Acceptance(_) | Self::Project(_) => None,
             Self::Issue(_) => None,
             Self::Integration(_) => None,
             Self::Member(args) => args.command.activity(),
