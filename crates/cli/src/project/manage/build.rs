@@ -6,7 +6,7 @@ use super::{
 use concord_core::Result;
 use serde_json::{Value, json};
 
-pub(super) struct Step {
+pub(in crate::project) struct Step {
     pub mutation: &'static str,
     pub input: Value,
     pub check: Intent,
@@ -25,6 +25,7 @@ impl Builder<'_> {
         qualify::intent(self.state, intent)?;
         let project = &self.state["project"]["id"];
         let (mutation, input) = match &intent.action {
+            Action::Planning { .. } => return super::super::planning::build(self.state, intent),
             Action::Create { title } => (
                 "createProjectV2",
                 json!({"ownerId":self.state["owner"]["id"],"title":title}),

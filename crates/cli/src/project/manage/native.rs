@@ -17,6 +17,9 @@ pub(super) async fn perform(client: &Client<'_>, state: &Value, step: &Step) -> 
     let input = step.input.clone();
     let name = step.mutation;
     let kind = match name {
+        "updateProjectV2ItemFieldValue" => "UpdateProjectV2ItemFieldValueInput",
+        "clearProjectV2ItemFieldValue" => "ClearProjectV2ItemFieldValueInput",
+        "updateProjectV2ItemPosition" => "UpdateProjectV2ItemPositionInput",
         "createProjectV2" => "CreateProjectV2Input",
         "updateProjectV2" => "UpdateProjectV2Input",
         "linkProjectV2ToRepository" => "LinkProjectV2ToRepositoryInput",

@@ -28,6 +28,7 @@ impl<'a> Context<'a> {
             ));
         }
         match &intent.action {
+            Action::Planning { change } => super::super::planning::qualify(self.state, change)?,
             Action::Create { title } => {
                 text(title, 255)?;
                 self.unique("projects", title, None)?;

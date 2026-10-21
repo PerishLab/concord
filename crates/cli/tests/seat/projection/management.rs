@@ -150,14 +150,33 @@ if q.startswith('mutation'):
     elif name=='updateProjectV2':
         for k,value in p.items():
             if k!='projectId':s['project'][k]=value
-    elif name=='createProjectV2Field':
-        value={'__typename':'ProjectV2SingleSelectField','id':'F_new','name':p['name'],'dataType':p['dataType'],'isIssueField':False,'updatedAt':'field-original','project':{'id':s['project']['id']},'options':[]}
-        for index,option in enumerate(p.get('singleSelectOptions',[])):
-            option['id']='choice-'+str(index);value['options'].append(option)
-        s['fields'].append(value)
-    elif name=='updateProjectV2Field':
-        value=next(f for f in s['fields'] if f['id']==p['fieldId']);value['name']=p['name']
-        if 'singleSelectOptions' in p:value['options']=p['singleSelectOptions']
+    elif name in ['createProjectV2Field','updateProjectV2Field']:
+        if name=='createProjectV2Field':
+            value={'__typename':'ProjectV2SingleSelectField','id':'F_new','name':p['name'],'dataType':p['dataType'],'isIssueField':False,'updatedAt':'field-original','project':{'id':s['project']['id']},'options':[]}
+            s['fields'].append(value)
+        else:
+            value=next(f for f in s['fields'] if f['id']==p['fieldId']);value['name']=p['name']
+        if 'singleSelectOptions' in p:
+            value['options']=p['singleSelectOptions']
+            for index,option in enumerate(value['options']):
+                if option.get('id') is None:option['id']='choice-'+str(index)
+        if 'iterationConfiguration' in p:
+            value.update(__typename='ProjectV2IterationField',dataType='ITERATION');periods=copy.deepcopy(p['iterationConfiguration']['iterations'])
+            for index,period in enumerate(periods):
+                if period.get('id') is None:period['id']='period-new-'+str(index)
+            value['configuration']={'duration':p['iterationConfiguration']['duration'],'startDay':3,'iterations':[x for x in periods if x['startDate']>='2026-10-21'],'completedIterations':[x for x in periods if x['startDate']<'2026-10-21']}
+    elif name in ['updateProjectV2ItemFieldValue','clearProjectV2ItemFieldValue']:
+        item=next(i for i in s['items'] if i['id']==p['itemId']);nodes=[v for v in item['fieldValues']['nodes'] if v['field']['id']!=p['fieldId']]
+        if 'value' in p:
+            data=p['value'];value={'field':{'id':p['fieldId']}}
+            if 'singleSelectOptionId' in data:value.update(__typename='ProjectV2ItemFieldSingleSelectValue',optionId=data['singleSelectOptionId'])
+            else:value.update(__typename='ProjectV2ItemFieldIterationValue',iterationId=data['iterationId'])
+            nodes.append(value)
+        item['fieldValues']=page(nodes)
+    elif name=='updateProjectV2ItemPosition':
+        item=next(i for i in s['items'] if i['id']==p['itemId']);s['items'].remove(item)
+        index=next((i+1 for i,x in enumerate(s['items']) if x['id']==p['afterId']),0)
+        s['items'].insert(index,item)
     elif name=='deleteProjectV2Field':s['fields']=[f for f in s['fields'] if f['id']!=p['fieldId']]
     elif name=='deleteProjectV2Workflow':s['workflows']=[w for w in s['workflows'] if w['id']!=p['workflowId']]
     elif name=='deleteProjectV2View':s['views']=[w for w in s['views'] if w['id']!=p['viewId']]

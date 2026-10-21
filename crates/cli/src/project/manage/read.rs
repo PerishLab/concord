@@ -192,7 +192,7 @@ fn connection(name: &str, intent: &Intent) -> String {
     let selection = match name {
         "fields" => query::FIELD,
         "items" => {
-            "id type isArchived updatedAt project{id} content{__typename ... on Issue{id state updatedAt issueType{id name} repository{id owner{id}}}}"
+            "id type isArchived updatedAt project{id} content{__typename ... on Issue{id number url title state updatedAt issueType{id name} repository{id nameWithOwner owner{id}}}}"
         }
         "views" => {
             "id fullDatabaseId number name layout filter updatedAt project{id} configuration{visibleFields(first:100){pageInfo{hasNextPage endCursor} nodes{... on ProjectV2FieldCommon{id}}}} groupByFields(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{... on ProjectV2FieldCommon{id}}} verticalGroupByFields(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{... on ProjectV2FieldCommon{id}}} sortByFields(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{direction field{... on ProjectV2FieldCommon{id}}}}"
@@ -202,7 +202,9 @@ fn connection(name: &str, intent: &Intent) -> String {
         "statusUpdates" => "id body createdAt updatedAt",
         _ => unreachable!("fixed native planning surface"),
     };
-    let selection = if name == "items" && matches!(intent.action, Action::Remove { .. }) {
+    let selection = if name == "items" && matches!(intent.action, Action::Planning { .. }) {
+        super::super::planning::selection(selection)
+    } else if name == "items" && matches!(intent.action, Action::Remove { .. }) {
         values(selection)
     } else {
         selection.to_string()

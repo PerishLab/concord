@@ -103,6 +103,14 @@ revise: view (node ID), name?, layout?, filter?, visible?
 retire: view (node ID)
 workflow: workflow (explicit native workflow node ID to remove)
 record: body (a new distinct native Project planning update)
+planning: change (one of the native planning choices below)
+
+Planning change kinds:
+priority: field, item, level (Urgent/High/Medium/Low, or null for unreviewed)
+cycle: field (null to create), name, start (YYYY-MM-DD), duration (days), periods
+assign: field, item, period (native iteration ID, or null for unassigned)
+order: field, period, item, after (same-cycle item ID, or null for cycle beginning)
+Each period contains {id:null,title,start,duration}. Updates retain every existing period ID, including completed history; new periods use null. Dates are explicit local calendar dates, never timestamps or elapsed-work evidence. Planning requires Project-owned fields; priority requires exactly four distinct Urgent/High/Medium/Low options. Attached Issue fields, Auto and unknown Issue types remain read-only. Ordering acts only within the selected native cycle and never closes work or changes dependencies.
 
 All actions contain kind, e.g. {"kind":"configure","changes":{"title":"Domain planning"}}.
 Select options contain {"id":null,"name":"High","color":"RED","description":""}; updates preserve every existing option ID and cannot import foreign IDs. Colors: GRAY, BLUE, GREEN, YELLOW, ORANGE, RED, PINK, PURPLE. Scalar fields use options: [].

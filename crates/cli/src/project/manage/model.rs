@@ -4,14 +4,17 @@ use serde_json::Value;
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct Intent {
+pub(in crate::project) struct Intent {
     pub reason: String,
     pub action: Action,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
-pub(super) enum Action {
+pub(in crate::project) enum Action {
+    Planning {
+        change: super::super::planning::Change,
+    },
     Create {
         title: String,
     },
@@ -72,7 +75,7 @@ pub(super) enum Action {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct Changes {
+pub(in crate::project) struct Changes {
     pub title: Option<String>,
     pub description: Option<String>,
     pub readme: Option<String>,
@@ -81,7 +84,7 @@ pub(super) struct Changes {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub(super) enum Layout {
+pub(in crate::project) enum Layout {
     Table,
     Board,
     Roadmap,
@@ -89,21 +92,21 @@ pub(super) enum Layout {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct Sort {
+pub(in crate::project) struct Sort {
     pub field: String,
     pub direction: Direction,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub(super) enum Direction {
+pub(in crate::project) enum Direction {
     Asc,
     Desc,
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct Plan {
+pub(in crate::project) struct Plan {
     pub schema: String,
     pub target: String,
     pub before: Value,
