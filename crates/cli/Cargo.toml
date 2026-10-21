@@ -1,6 +1,6 @@
 [package]
 name = "concord"
-description = "Issue execution control plane for perish.code."
+description = "Issue execution and native Project planning control plane for perish.code."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
