@@ -36,6 +36,9 @@ of copying its answer here.
   and sort updates and Type visibility lack a supported observable write loop;
   refuse those requests and preserve existing view identity. Generic field
   removal requires complete empty-value evidence and protects cycle history.
+  An acknowledged action mutation may receive three fresh confirmation observations,
+  separated by 250 ms, without mutation replay. Provider errors remain immediate
+  unknown outcomes; changed planning context refuses further writes.
 - Project planning writes qualified Project-owned priority and iteration fields.
   Empty priority means unreviewed; empty iteration means unassigned. Native
   iteration IDs and completed history survive configuration updates. Calendar

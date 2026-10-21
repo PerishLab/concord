@@ -1,6 +1,7 @@
 use super::super::{fault, wire::Client};
 use super::{
-    build, desired,
+    build::{self, Step},
+    desired,
     journal::{self, Journal, Phase},
     model::{Action, Intent, Plan},
     native, qualify, read,
@@ -69,7 +70,8 @@ impl Runner<'_, '_> {
             let receipt = native::perform(self.client, &state, step)
                 .await
                 .map_err(|error| uncertain(error, &completed, index))?;
-            state = read::state(self.client, &plan.target, &plan.intent, self.pages)
+            state = self
+                .confirm(plan, step, &context)
                 .await
                 .map_err(|error| uncertain(error, &completed, index))?;
             let result = desired::result(&state, &step.check).ok_or_else(|| {
@@ -83,7 +85,7 @@ impl Runner<'_, '_> {
                 )
             })?;
             completed.push(json!({"step":index,"native_result":result,"provider_receipt":receipt}));
-            if ordinary && contextchanged(&context, &state, &step.check) {
+            if ordinary && contextchanged(&context, &state, &step.check, false) {
                 return Err(Error::detailed(
                     "concord.project.context.changed",
                     "native planning context changed while the change was in flight; confirmed results are retained and further writes were not attempted",
@@ -113,6 +115,32 @@ impl Runner<'_, '_> {
         Ok(
             json!({"schema":"concord.project-result/v1","outcome":if steps.is_empty(){"unchanged"}else{"confirmed-native-state"},"project":identity,"automatic_behavior":{"native":state["workflows"],"external":"unknown"},"completed":completed,"result":result,"record":record,"coverage":"requested properties; native view Type visibility and external automation remain provider projection gaps","semantics":"independent native readback; no provider transaction, execution delegation, or Issue lifecycle mutation request"}),
         )
+    }
+
+    async fn confirm(&self, plan: &Plan, step: &Step, context: &Value) -> Result<Value> {
+        let ordinary = !matches!(
+            plan.intent.action,
+            Action::Create { .. } | Action::Record { .. }
+        );
+        for attempt in 0..3 {
+            let state = read::state(self.client, &plan.target, &plan.intent, self.pages).await?;
+            if desired::result(&state, &step.check).is_some() {
+                return Ok(state);
+            }
+            if ordinary && contextchanged(context, &state, &step.check, true) {
+                return Err(fault(
+                    "context.changed",
+                    "planning context changed while native confirmation was pending; no further write was attempted",
+                ));
+            }
+            if attempt < 2 {
+                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            }
+        }
+        Err(fault(
+            "readback",
+            "three fresh native observations did not confirm the requested result",
+        ))
     }
 
     async fn recover(&self, plan: &Plan) -> Result<Value> {
@@ -204,7 +232,7 @@ fn uncertain(error: Error, completed: &[Value], step: usize) -> Error {
     )
 }
 
-fn contextchanged(before: &Value, current: &Value, intent: &Intent) -> bool {
+fn contextchanged(before: &Value, current: &Value, intent: &Intent, pending: bool) -> bool {
     let mut expected = before["project"].clone();
     let mut actual = current["project"].clone();
     expected
@@ -222,9 +250,13 @@ fn contextchanged(before: &Value, current: &Value, intent: &Intent) -> bool {
             ("readme", json!(changes.readme)),
             ("public", json!(changes.public)),
         ] {
-            if !value.is_null() {
-                expected[key] = value;
+            if value.is_null() {
+                continue;
             }
+            if pending && actual[key] == expected[key] {
+                actual[key] = value.clone();
+            }
+            expected[key] = value;
         }
     }
     expected != actual || before["statusUpdates"] != current["statusUpdates"]
