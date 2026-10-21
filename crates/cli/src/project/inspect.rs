@@ -270,3 +270,15 @@ fn view(node: &Value) -> Result<()> {
     }
     Ok(())
 }
+
+pub(super) fn membership(items: &[Value], project: &Value) -> Result<()> {
+    for item in items {
+        if item["project"]["id"] != project["id"] {
+            return Err(fault("identity", "Project item belongs to another Project"));
+        }
+        if !item["isArchived"].is_boolean() {
+            return Err(fault("schema", "Project item archival state is unreadable"));
+        }
+    }
+    Ok(())
+}

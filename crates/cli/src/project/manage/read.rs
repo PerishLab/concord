@@ -14,7 +14,16 @@ pub(super) async fn state(
     intent: &Intent,
     pages: u16,
 ) -> Result<Value> {
-    Reader { client, pages }.state(target, intent).await
+    let reader = Reader { client, pages };
+    for attempt in 0..3 {
+        match reader.state(target, intent).await {
+            Err(error) if error.code() == "concord.project.changed" && attempt < 2 => {
+                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            }
+            result => return result,
+        }
+    }
+    unreachable!("finite projection acquisition")
 }
 pub(super) async fn inventory(client: &Client<'_>, owner: &str, pages: u16) -> Result<Value> {
     Reader { client, pages }.owner(owner).await
@@ -61,7 +70,7 @@ impl Reader<'_, '_> {
             match name {
                 "fields" => inspect::fields(&mut values.nodes, project)?,
                 "views" | "workflows" => inspect::configuration(&values.nodes, project, name)?,
-                "items" => ownership(&values.nodes, project)?,
+                "items" => inspect::membership(&values.nodes, project)?,
                 _ => {}
             }
             state[name] = json!(values.nodes);
@@ -274,16 +283,4 @@ fn values(item: &str) -> String {
     format!(
         "{item} fieldValues(first:100){{totalCount pageInfo{{hasNextPage endCursor}} nodes{{__typename {fragments} ... on ProjectV2ItemIssueFieldValue{{field{{... on ProjectV2FieldCommon{{id}}}}}}}}}}"
     )
-}
-
-fn ownership(items: &[Value], project: &Value) -> Result<()> {
-    for item in items {
-        if item["project"]["id"] != project["id"] {
-            return Err(fault("identity", "Project item belongs to another Project"));
-        }
-        if !item["isArchived"].is_boolean() {
-            return Err(fault("schema", "Project item archival state is unreadable"));
-        }
-    }
-    Ok(())
 }

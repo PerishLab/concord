@@ -10,6 +10,8 @@ mod observed;
 #[cfg(unix)]
 mod planning;
 mod project;
+#[cfg(unix)]
+mod snapshot;
 mod survey;
 
 #[cfg(unix)]
