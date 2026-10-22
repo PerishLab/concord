@@ -1,6 +1,70 @@
 use super::*;
 
 #[test]
+fn documents() {
+    for body in [
+        "{}",
+        " \n[{}]\n",
+        "\"Decision\"",
+        "42",
+        "1e999",
+        "true",
+        "null",
+    ] {
+        let fixture = tempfile::tempdir().expect("fixture");
+        bootstrap(fixture.path());
+        let command = tool(
+            fixture.path(),
+            &format!(
+                "touch '{}'; exit 99",
+                fixture.path().join("called").display()
+            ),
+        );
+        let output = invoke(
+            fixture.path(),
+            Run {
+                command: &command,
+                body,
+                environment: &[("CODEX_THREAD_ID", "thread")],
+                timeout: 10,
+            },
+        );
+        assert!(!output.status.success(), "{body}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains("concord.issue.comment.json"),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!fixture.path().join("called").exists());
+    }
+}
+
+#[test]
+fn prose() {
+    for body in [
+        "Decision: accepted.",
+        "```json\n{}\n```",
+        "Example: {\"ok\": true}",
+        "{} followed by prose",
+    ] {
+        let fixture = tempfile::tempdir().expect("fixture");
+        bootstrap(fixture.path());
+        let expected = render::body(body, "codex", "thread", None);
+        let command = provider(fixture.path(), "OPEN", &expected, Reply::Exact);
+        success(invoke(
+            fixture.path(),
+            Run {
+                command: &command,
+                body,
+                environment: &[("CODEX_THREAD_ID", "thread")],
+                timeout: 10,
+            },
+        ));
+        request(fixture.path(), &expected, "thread");
+    }
+}
+
+#[test]
 fn validation() {
     let long = "a".repeat(129);
     for (name, environment, code) in [
