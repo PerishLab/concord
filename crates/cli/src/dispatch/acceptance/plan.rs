@@ -1,4 +1,4 @@
-use concord_core::acceptance::{Plan, Recovery};
+use concord_core::acceptance::{Marker, Plan, Recovery, digest};
 use concord_core::{Coordinate, Result};
 use serde::{Deserialize, Serialize};
 
@@ -120,8 +120,26 @@ impl Envelope {
                 "Issue identity, conditions or state changed",
             ));
         }
+        let marker = Marker::parse(self.plan.intent.body()?)?
+            .ok_or_else(|| super::fault("plan", "planned acceptance marker is missing"))?;
+        review(&marker, &snapshot.header.body)?;
         self.plan
             .intent
             .recover(&snapshot.labels, &snapshot.comments())
     }
+}
+
+pub(super) fn review(marker: &Marker, body: &str) -> Result<()> {
+    if let Marker::Closure { review, .. } = marker {
+        let expected = digest(body);
+        if *review != expected {
+            return Err(super::fault(
+                "review",
+                format!(
+                    "closure marker.review must be the SHA-256 of the exact current Issue body: {expected}; plan.review instead binds the plan Issue header; review the current conditions before preparing a new judgment"
+                ),
+            ));
+        }
+    }
+    Ok(())
 }
