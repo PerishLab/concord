@@ -50,10 +50,15 @@ pub enum Command {
     },
     #[command(about = "Evaluate Issue closure readiness from current GitHub facts")]
     Ready(Relations),
-    #[command(about = "Declare one GitHub Issue comment with execution observations")]
+    #[command(about = "Post a Markdown Issue comment with appended execution card and marker")]
     Comment {
         issue: String,
-        #[arg(long, value_name = "PATH|-", default_value = "-")]
+        #[arg(
+            long,
+            value_name = "PATH|-",
+            default_value = "-",
+            help = "Markdown comment body (stdin by default); execution card and marker are appended. Bare JSON documents are refused; fenced JSON in prose is allowed"
+        )]
         input: PathBuf,
         #[arg(long = "github-command")]
         command: PathBuf,

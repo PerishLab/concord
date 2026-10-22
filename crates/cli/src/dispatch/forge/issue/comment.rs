@@ -161,12 +161,19 @@ fn read(path: &Path) -> Result<String> {
     } else {
         regular(path)?
     };
-    String::from_utf8(bytes).map_err(|error| {
+    let body = String::from_utf8(bytes).map_err(|error| {
         Error::typed(
             "concord.issue.comment.encoding",
             format!("Issue comment input must be UTF-8: {error}"),
         )
-    })
+    })?;
+    if serde_json::from_str::<serde::de::IgnoredAny>(&body).is_ok() {
+        return Err(Error::typed(
+            "concord.issue.comment.json",
+            "Issue comment input is Markdown prose, not a bare JSON document; use prose or fenced JSON",
+        ));
+    }
+    Ok(body)
 }
 
 fn regular(path: &Path) -> Result<Vec<u8>> {
