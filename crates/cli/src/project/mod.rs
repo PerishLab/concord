@@ -2,9 +2,10 @@ mod field;
 mod inspect;
 mod issue;
 mod manage;
+mod next;
 mod observe;
 mod planning;
-mod query;
+use wire::query;
 mod target;
 mod wire;
 
@@ -15,6 +16,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub(crate) async fn run(command: Command, output: bool) -> Result<()> {
     match command {
         Command::Show(args) => observe::run(args, output).await,
+        Command::Next(args) => next::run(args, output).await,
         command => manage::run(command, output).await,
     }
 }

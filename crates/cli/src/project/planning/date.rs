@@ -2,7 +2,7 @@ use super::super::fault;
 use concord_core::Result;
 
 #[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
-pub(super) struct Date {
+pub(in crate::project) struct Date {
     year: u16,
     month: u8,
     day: u8,
@@ -69,6 +69,16 @@ impl Date {
             self.year += 1;
         }
         Ok(self)
+    }
+
+    pub fn day(self) -> i64 {
+        let years = (1..self.year)
+            .map(|year| if days(year, 2) == 29 { 366i64 } else { 365i64 })
+            .sum::<i64>();
+        let months = (1..self.month)
+            .map(|month| i64::from(days(self.year, month)))
+            .sum::<i64>();
+        years + months + i64::from(self.day) - 1 - 719162
     }
 
     pub fn text(self) -> String {

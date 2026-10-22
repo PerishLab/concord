@@ -1,4 +1,6 @@
-use super::{fault, query};
+pub(in crate::project) mod query;
+
+use super::fault;
 use crate::runtime::transport::Request;
 use concord_core::Result;
 use serde_json::{Value, json};

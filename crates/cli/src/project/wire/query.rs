@@ -1,10 +1,10 @@
-pub(super) const META: &str = "__typename id number title url updatedAt closed public readme shortDescription viewerCanUpdate owner{__typename ... on Organization{id login}}";
+pub(in crate::project) const META: &str = "__typename id number title url updatedAt closed public readme shortDescription viewerCanUpdate owner{__typename ... on Organization{id login}}";
 
 const REFERENCE: &str = "__typename ... on ProjectV2FieldCommon{id name dataType isIssueField}";
 
-pub(super) const PAGE: &str = "totalCount pageInfo{hasNextPage endCursor}";
+pub(in crate::project) const PAGE: &str = "totalCount pageInfo{hasNextPage endCursor}";
 
-pub(super) const FIELD: &str = r#"
+pub(in crate::project) const FIELD: &str = r#"
 __typename
 ... on ProjectV2FieldCommon{id name dataType isIssueField updatedAt project{id}}
 ... on ProjectV2Field{issueField{
@@ -65,7 +65,7 @@ __typename
 }}
 "#;
 
-pub(super) fn selection(name: &str) -> String {
+pub(in crate::project) fn selection(name: &str) -> String {
     match name {
         "fields" => FIELD.into(),
         "items" => format!(
@@ -81,7 +81,7 @@ pub(super) fn selection(name: &str) -> String {
     }
 }
 
-pub(super) fn connection(name: &str) -> String {
+pub(in crate::project) fn connection(name: &str) -> String {
     format!(
         "query($id:ID!,$size:Int!,$after:String){{node(id:$id){{... on ProjectV2{{{META} {name}(first:$size,after:$after){{{PAGE} nodes{{{selection}}}}}}}}}}}",
         selection = selection(name)
