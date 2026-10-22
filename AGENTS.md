@@ -48,6 +48,13 @@ of copying its answer here.
   dates never prove elapsed work. Ordering requires both anchors in the selected
   cycle; these choices never alter Issue dependencies or acceptance authority.
 
+- Project next consumes one unambiguous current native cycle in Asia/Shanghai
+  calendar time and native item order. It reports priority without reranking,
+  skips known blockers and needs labels, and abstains on missing/ambiguous
+  planning scope. Required incomplete facts refuse. It opens no local estate;
+  local execution observations remain available through Issue preflight and
+  never become ownership or automatic exclusion. Next is a query, not a seat.
+
 - Ordinary open replays exactly the current Issue-execution model. It never
   evolves, repairs, migrates, or falls back to an older managed shape.
 - An Issue anchor retains only stable GitHub node identity, the minimum

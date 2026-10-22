@@ -127,3 +127,54 @@ fn grammar() {
     assert!(help.contains("never an atomic snapshot"));
     assert!(!scratch.path().join(".concord").exists());
 }
+
+#[cfg(unix)]
+#[test]
+fn next() {
+    let scratch = tempfile::tempdir().unwrap();
+    for mode in ["ordinary", "permission", "identity", "repeat"] {
+        let provider = fixture::provider(scratch.path(), mode);
+        let output = spawn::concord(scratch.path())
+            .args([
+                "--root",
+                "/deliberately-unavailable-estate",
+                "project",
+                "next",
+                "PerishLab/1",
+                "--github-command",
+            ])
+            .arg(&provider)
+            .arg("--json")
+            .output()
+            .unwrap();
+        if mode == "ordinary" {
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(result["next"]["schema"], "concord.project-next/v1");
+            assert!(result["next"]["issue"].is_null());
+            let human = spawn::concord(scratch.path())
+                .args([
+                    "--root",
+                    "/deliberately-unavailable-estate",
+                    "project",
+                    "next",
+                    "PerishLab/1",
+                    "--github-command",
+                ])
+                .arg(provider)
+                .output()
+                .unwrap();
+            assert!(human.status.success());
+            assert!(human.stdout.is_empty());
+        } else {
+            assert!(!output.status.success(), "{mode}");
+            assert!(output.stdout.is_empty());
+        }
+    }
+    assert!(!scratch.path().join(".concord").exists());
+    assert!(!scratch.path().join(".issues").exists());
+}

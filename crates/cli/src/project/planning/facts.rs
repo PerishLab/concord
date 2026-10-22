@@ -110,7 +110,7 @@ impl<'a> Facts<'a> {
     }
 }
 
-pub(super) fn periods(field: &Value) -> Result<Vec<&Value>> {
+pub(in crate::project) fn periods(field: &Value) -> Result<Vec<&Value>> {
     let configuration = &field["configuration"];
     let current = configuration["iterations"]
         .as_array()
@@ -155,7 +155,11 @@ pub(super) fn cell<'a>(item: &'a Value, field: &str) -> Result<Option<&'a Value>
     Ok(found)
 }
 
-pub(super) fn selected<'a>(item: &'a Value, field: &str, key: &str) -> Result<Option<&'a str>> {
+pub(in crate::project) fn selected<'a>(
+    item: &'a Value,
+    field: &str,
+    key: &str,
+) -> Result<Option<&'a str>> {
     let Some(value) = cell(item, field)? else {
         return Ok(None);
     };

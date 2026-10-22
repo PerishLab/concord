@@ -14,6 +14,11 @@ pub enum Command {
         long_about = "Read an organization Project without opening local execution state, selected by OWNER/NUMBER or https://github.com/orgs/OWNER/projects/NUMBER. The result preserves native field ownership, item order, Issue facts and provider cursors. Root connections page within the selected budget; item pages are capped at 20 to keep their nested native projection within GitHub node limits; nested connections are bounded to 100 and retain their continuation cursors. Unknown content, incomplete collections and inaccessible automation details are explicit. This is a live interval, never an atomic snapshot, delegation or write authorization."
     )]
     Show(Observe),
+    #[command(
+        about = "Read the next Issue from current native Project planning",
+        long_about = "Consume one explicit Project without opening local execution state or writing provider facts. The first-phase policy uses Asia/Shanghai calendar dates, one unambiguous Project-owned iteration field and one Project-owned Urgent/High/Medium/Low priority field. Only the unique current cycle is considered, in native item order; priority never reranks that order. Archived, closed and nonordinary items, open blockers and needs labels are skipped. No backlog or expired-cycle fallback occurs. Missing or ambiguous planning scope returns null in JSON and silent human output. Incomplete necessary facts and provider failures are errors. A result observes planning, not execution readiness or permission; use Issue preflight for local non-exclusive execution observations before starting or continuing work."
+    )]
+    Next(Observe),
     #[command(about = "List the bounded provider-visible organization Project inventory")]
     List {
         owner: String,
@@ -76,6 +81,7 @@ impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
             Self::Show(_) => "project.show",
+            Self::Next(_) => "project.next",
             Self::List { .. } => "project.list",
             Self::Prepare { .. } => "project.prepare",
             Self::Apply { .. } => "project.apply",
