@@ -4,6 +4,10 @@ use std::process::Command;
 
 #[path = "git/delta.rs"]
 mod delta;
+#[path = "git/identity.rs"]
+mod identity;
+
+pub(crate) use identity::Identities;
 
 pub struct Checkout<'a> {
     root: &'a Path,
