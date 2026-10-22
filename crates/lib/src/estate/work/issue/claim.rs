@@ -175,12 +175,13 @@ impl Estate {
         source: &Path,
     ) -> Result<Vec<ClaimOverlap>> {
         let mut observations = Vec::new();
+        let mut identities = git::Identities::default();
         for member in self.issue_worktrees().await? {
             if subject.key == Some(member.key) {
                 continue;
             }
             let held = self.issue_source(&member)?;
-            if same_repository(source, &held)? {
+            if same_repository(&mut identities, source, &held)? {
                 let paths = crate::claim::intersections(&subject.claims, &member.claims);
                 if !paths.is_empty() {
                     let anchor = self.issue(&member.issue).await?;

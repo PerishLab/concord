@@ -3,7 +3,10 @@ use crate::{Result, git};
 use std::path::Path;
 
 pub(super) async fn inspect(plane: &Estate, report: &mut Agreement) -> Result<()> {
-    let survey = Survey { estate: plane };
+    let mut survey = Survey {
+        estate: plane,
+        identities: git::Identities::default(),
+    };
     let anchors = plane.core.live("Anchor").await.map_err(fault)?;
     let members = plane.issue_worktrees().await?;
     survey.integrations(&members, report).await?;
@@ -18,11 +21,11 @@ pub(super) async fn inspect(plane: &Estate, report: &mut Agreement) -> Result<()
             .collect::<Vec<_>>();
         survey.seat(&anchor, &held, report)?;
         for member in held {
-            agreement(&survey, &anchor, member, report);
+            agreement(&mut survey, &anchor, member, report);
         }
     }
     survey.relations(report).await?;
-    overlaps(plane, &members, report)?;
+    overlaps(&mut survey, &members, report)?;
     if let Err(error) = crate::occupancy::readable(&plane.space) {
         report.observe(
             "occupancy.read",
@@ -35,6 +38,7 @@ pub(super) async fn inspect(plane: &Estate, report: &mut Agreement) -> Result<()
 
 struct Survey<'a> {
     estate: &'a Estate,
+    identities: git::Identities,
 }
 
 impl Survey<'_> {
@@ -100,7 +104,7 @@ impl Survey<'_> {
         Ok(())
     }
 
-    fn valid(&self, member: &IssueWorktree, path: &Path) -> bool {
+    fn valid(&mut self, member: &IssueWorktree, path: &Path) -> bool {
         if member.integration.repository.owner != member.issue.owner
             || member.integration.repository.name != member.issue.repository
         {
@@ -109,7 +113,7 @@ impl Survey<'_> {
         let Ok(source) = self.estate.issue_source(member) else {
             return false;
         };
-        if !path.is_dir() || git::at(&source).identity().ok() != git::at(path).identity().ok() {
+        if !path.is_dir() || self.identities.read(&source).ok() != self.identities.read(path).ok() {
             return false;
         }
         if !git::at(&source).registered(path).unwrap_or(false) {
@@ -152,7 +156,12 @@ fn artifacts(root: &Path, report: &mut Agreement) -> Result<()> {
     Ok(())
 }
 
-fn agreement(survey: &Survey<'_>, anchor: &Anchor, member: &IssueWorktree, report: &mut Agreement) {
+fn agreement(
+    survey: &mut Survey<'_>,
+    anchor: &Anchor,
+    member: &IssueWorktree,
+    report: &mut Agreement,
+) {
     let subject = anchor.coordinate.identity();
     let path = survey
         .estate
@@ -177,11 +186,17 @@ fn agreement(survey: &Survey<'_>, anchor: &Anchor, member: &IssueWorktree, repor
     }
 }
 
-fn overlaps(plane: &Estate, members: &[IssueWorktree], report: &mut Agreement) -> Result<()> {
+fn overlaps(
+    survey: &mut Survey<'_>,
+    members: &[IssueWorktree],
+    report: &mut Agreement,
+) -> Result<()> {
     for (index, left) in members.iter().enumerate() {
         for right in members.iter().skip(index + 1) {
-            let same = git::at(&plane.issue_source(left)?).identity()?
-                == git::at(&plane.issue_source(right)?).identity()?;
+            let same = survey.identities.read(&survey.estate.issue_source(left)?)?
+                == survey
+                    .identities
+                    .read(&survey.estate.issue_source(right)?)?;
             let paths = crate::claim::intersections(&left.claims, &right.claims);
             if same && !paths.is_empty() {
                 report.observe(
