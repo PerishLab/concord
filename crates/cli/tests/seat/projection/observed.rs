@@ -96,3 +96,87 @@ fn observed() {
         );
     }
 }
+
+#[test]
+fn refusal() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    success(fixture.path(), &["issue", "bootstrap"]);
+    for (index, (stderr, expected)) in [
+        ("gh: Bad Gateway (HTTP 502)", "reported HTTP status 502"),
+        ("gh: unauthorized (HTTP 401)", "reported HTTP status 401"),
+        ("dial tcp: no such host", "DNS lookup failure"),
+        ("net/http: TLS handshake timeout", "TLS handshake timeout"),
+        ("read tcp: unexpected EOF", "unexpected EOF"),
+        ("HTTP 4010", "cause unknown"),
+        ("HTTP 999", "cause unknown"),
+        ("", "cause unknown"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let provider = tool(
+            fixture.path(),
+            &format!("refusal-{index}"),
+            format!(
+                "printf '%s\\n' '{stderr} ghp_secret Authorization: Bearer private https://user:password@example.invalid' >&2\nexit 7"
+            ),
+        );
+        let output = raw(
+            fixture.path(),
+            &[
+                "issue",
+                "brief",
+                "PerishLab/concord#296",
+                "--github-command",
+                provider.to_str().expect("provider"),
+            ],
+        );
+        assert!(!output.status.success());
+        assert!(output.stdout.is_empty());
+        let error: Value = serde_json::from_slice(&output.stderr).expect("JSON refusal");
+        assert_eq!(error["error"]["code"], "concord.issue.projection.provider");
+        let message = error["error"]["message"].as_str().expect("message");
+        for known in ["api graphql", "exit status: 7", expected] {
+            assert!(message.contains(known), "{message}");
+        }
+        for secret in [
+            "ghp_secret",
+            "Authorization",
+            "private",
+            "password",
+            "example.invalid",
+        ] {
+            assert!(!message.contains(secret), "{message}");
+        }
+        assert!(message.len() < 512);
+    }
+}
+
+#[test]
+fn oversized() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    success(fixture.path(), &["issue", "bootstrap"]);
+    let provider = tool(
+        fixture.path(),
+        "oversized",
+        "head -c 1048577 /dev/zero >&2\nexit 7".into(),
+    );
+    let output = raw(
+        fixture.path(),
+        &[
+            "issue",
+            "brief",
+            "PerishLab/concord#296",
+            "--github-command",
+            provider.to_str().expect("provider"),
+        ],
+    );
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let error: Value = serde_json::from_slice(&output.stderr).expect("JSON refusal");
+    assert_eq!(error["error"]["code"], "concord.issue.projection.provider");
+    assert_eq!(
+        error["error"]["message"],
+        "GitHub Issue projection refusal exceeds the reply limit"
+    );
+}

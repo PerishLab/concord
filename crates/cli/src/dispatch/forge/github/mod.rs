@@ -1,5 +1,6 @@
 pub(super) mod issues;
 pub(super) mod projections;
+mod refusal;
 pub(super) mod transport;
 
 use super::projection::{Fault, PageRequest, Projection};
@@ -224,10 +225,9 @@ fn failure(failure: transport::Failure) -> Fault {
     match failure {
         Failure::Spawn(_) | Failure::Exchange(_) => provider("command", failure.to_string()),
         Failure::Timeout => provider("timeout", "GitHub Issue projection timed out"),
-        Failure::Refused { .. } => provider(
-            "provider",
-            "GitHub Issue projection was refused by the provider",
-        ),
+        Failure::Refused { status, stderr } => {
+            provider("provider", refusal::message(status, &stderr))
+        }
         Failure::Oversized(Stream::Stdout) => provider(
             "malformed",
             "GitHub Issue projection exceeds the reply limit",
