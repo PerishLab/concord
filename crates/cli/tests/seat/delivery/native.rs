@@ -85,6 +85,67 @@ fn runs(seat: &Native) -> usize {
 }
 
 #[test]
+fn projection() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let seat = Native::open(temp.path(), "R_kgDOUesM0Q");
+    let prepared = seat.prepare("wharf-native");
+    assert!(prepared.status.success());
+    let plan: Value = serde_json::from_slice(&prepared.stdout).expect("plan");
+    let before = text(&seat.source, &["rev-parse", "HEAD"]);
+    let provider = seat.space.join("provider");
+    let script = std::fs::read_to_string(&provider).expect("provider");
+    let marker = seat.space.join("projection-refusal");
+    std::fs::write(&marker, "one").expect("one refusal");
+    let script = script.replace(
+        "if [ \"$1 $2\" = \"api graphql\" ]; then",
+        &format!(
+            "if [ \"$1 $2\" = \"api graphql\" ]; then\nif [ -f '{}/status-call' ] && [ -f '{}' ]; then rm '{}'; printf '%s\\n' 'gh: Bad Gateway (HTTP 502) ghp_private' >&2; exit 7; fi",
+            seat.space.display(), marker.display(), marker.display()
+        ),
+    );
+    plumb::testing::executable(&provider, script);
+    let failed = seat.land("wharf-native", &prepared.stdout);
+    refused(&failed, "concord.issue.projection.provider");
+    let error = String::from_utf8(failed.stderr).expect("refusal");
+    assert!(error.contains("reported HTTP status 502"));
+    assert!(error.contains("exit status: 7"));
+    assert!(!error.contains("ghp_private"));
+    assert_eq!(
+        std::fs::read_to_string(seat.space.join("pull-state")).unwrap(),
+        "OPEN"
+    );
+    assert!(!seat.space.join("merge-attempts").exists());
+    assert_eq!(text(&seat.source, &["rev-parse", "HEAD"]), before);
+    assert!(seat.member.exists());
+    assert_eq!(runs(&seat), 2);
+    let labels = json!({"nodes": [{"name": "needs:owner"}], "pageInfo": {"hasNextPage": false}});
+    std::fs::write(seat.space.join("labels"), labels.to_string()).expect("changed facts");
+    refused(
+        &seat.land("wharf-native", &prepared.stdout),
+        "concord.issue.needs",
+    );
+    assert!(!seat.space.join("merge-attempts").exists());
+    std::fs::remove_file(seat.space.join("labels")).expect("restore facts");
+    let landed = seat.land("wharf-native", &prepared.stdout);
+    assert!(
+        landed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&landed.stderr)
+    );
+    let report: Value = serde_json::from_slice(&landed.stdout).expect("readback");
+    assert_eq!(report["candidate"], plan["plan"]["delivery"]["candidate"]);
+    assert_eq!(report["merged"], true);
+    assert_eq!(report["released"], true);
+    assert_eq!(text(&seat.source, &["rev-parse", "HEAD"]), report["merge"]);
+    assert!(!seat.member.exists());
+    assert_eq!(
+        std::fs::read_to_string(seat.space.join("merge-attempts")).unwrap(),
+        "merge\n"
+    );
+    assert_eq!(runs(&seat), 3);
+}
+
+#[test]
 fn identity() {
     let temp = tempfile::tempdir().expect("fixture");
     let seat = Native::open(temp.path(), "R_other");

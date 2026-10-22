@@ -46,6 +46,7 @@ fn inventory() {
             "concord.estate.upgrade_required",
             "concord.issue.automation",
             "concord.issue.needs",
+            "concord.issue.projection.provider",
             "concord.member.cleanup",
         ]
     );

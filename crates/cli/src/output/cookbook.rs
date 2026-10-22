@@ -124,6 +124,15 @@ fn book() -> Cookbook {
             ),
         ),
         entry(
+            "concord.issue.projection.provider",
+            "The external GitHub command refused a read of the current Issue. Its exit status and recognized HTTP or transport diagnostic are reported without provider stderr; an unrecognized diagnostic leaves the cause unknown. A reported diagnostic does not establish the cause of an earlier refusal.",
+            "Read the current Issue with concord issue brief and independently inspect the exact pull and candidate before resuming. Once readable unchanged facts are available, re-run the same prepared land: it revalidates the Issue, acceptance, candidate, base and gate authority. If any prepared fact changed, prepare again. Never bypass the refused read or replay a provider merge directly.",
+            (
+                "Retain the refusal, exact plan, pull and candidate. Do not infer a timeout, authentication failure or API outage from an unknown diagnostic.",
+                "Current facts are readable and exact-plan revalidation succeeds; the native delivery reads back the merge before settling the Member.",
+            ),
+        ),
+        entry(
             "concord.delivery.provider",
             "The explicit external provider command could not complete or confirm a pull-request mutation.",
             "Observe the exact repository, head branch, and pull request on GitHub before retrying. If the mutation already happened, resume from that provider state; otherwise fix the provider command or authentication and re-run the prepared delivery.",
