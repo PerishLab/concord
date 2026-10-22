@@ -43,8 +43,12 @@ pub(super) struct OverlapMember {
     pub(super) proof: Option<Proof>,
 }
 
-pub(super) fn same_repository(left: &Path, right: &Path) -> Result<bool> {
-    Ok(git::at(left).identity()? == git::at(right).identity()?)
+pub(super) fn same_repository(
+    identities: &mut git::Identities,
+    left: &Path,
+    right: &Path,
+) -> Result<bool> {
+    Ok(identities.read(left)? == identities.read(right)?)
 }
 
 pub(super) fn committed_overlap(left: &OverlapMember, right: &OverlapMember) -> CommittedOverlap {
