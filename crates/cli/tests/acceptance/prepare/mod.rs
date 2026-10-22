@@ -3,6 +3,7 @@ use concord_core::acceptance::{Marker, Plan, Step, Target, digest};
 use serde_json::json;
 
 mod advice;
+mod review;
 mod target;
 
 #[test]
@@ -55,7 +56,7 @@ fn transitions() {
         let marker = if operation == "amend" {
             json!({"purpose": "amendment", "target": "release", "promise": "Installed stable verification.", "predecessor": reference, "reason": "Installed consumption is required."})
         } else {
-            json!({"purpose": "closure", "target": "source", "declaration": reference, "judgment": "unmet", "verification": "manual", "review": digest("manual review basis"), "evidence": [], "remaining": ["Merge is still outstanding."], "release": null})
+            json!({"purpose": "closure", "target": "source", "declaration": reference, "judgment": "unmet", "verification": "manual", "review": digest("Current exact acceptance conditions."), "evidence": [], "remaining": ["Merge is still outstanding."], "release": null})
         };
         let mut page = world::page();
         page["data"]["repository"]["issue"]["labels"] =

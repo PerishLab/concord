@@ -39,6 +39,7 @@ pub(super) async fn run(args: Prepare, purpose: Purpose) -> Result<Value> {
             "acceptance preparation requires an open Issue",
         ));
     }
+    super::plan::review(&intent.marker, &snapshot.header.body)?;
     let plan = Plan::prepare(intent.marker, body, &snapshot.labels, &snapshot.comments())?;
     let authority = if advisory {
         Some(advice::read(&args.observe, &snapshot.header).await)

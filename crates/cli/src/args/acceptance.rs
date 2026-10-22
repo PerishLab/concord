@@ -27,7 +27,10 @@ pub enum Command {
         long_about = "Prepare an explicit predecessor amendment without provider writes. Release amendments include read-only repository authority advice in a v2 plan; advice neither changes the promise nor authorizes closure. Source plans and closure judgments remain v1."
     )]
     Amend(Prepare),
-    #[command(about = "Prepare a closure attestation without provider writes or Issue closing")]
+    #[command(
+        about = "Prepare a closure attestation without provider writes or Issue closing",
+        long_about = "Prepare a closure attestation without provider writes or Issue closing. The caller must review the current Issue conditions and set marker.review to the SHA-256 of the exact Issue body, without trimming or newline normalization. This differs from plan.review, which binds the serialized Issue header. Preparation and apply refuse a closure whose marker.review differs from the current body; Concord never substitutes the reviewer's attestation."
+    )]
     Judge(Prepare),
     #[command(about = "Apply or recover one prepared acceptance plan without closing the Issue")]
     Apply(Apply),
