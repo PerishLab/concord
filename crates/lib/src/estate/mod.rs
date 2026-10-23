@@ -186,12 +186,25 @@ impl Estate {
 }
 
 fn fault(error: keel::adapt::Error) -> Error {
-    Error::typed("concord.estate.error", error.to_string())
+    Error::typed("concord.estate.error", told(&error))
 }
 
 fn upgrade(error: keel::adapt::Error) -> Error {
     Error::typed(
         "concord.estate.upgrade_required",
-        format!("{error}; this Concord release opens only its exact Issue estate"),
+        format!(
+            "{}; this Concord release opens only its exact Issue estate",
+            told(&error)
+        ),
     )
 }
+
+fn told(error: &keel::adapt::Error) -> String {
+    match error {
+        keel::adapt::Error::Store(store) => format!("{store}: {}", store.detail()),
+        other => other.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests;
