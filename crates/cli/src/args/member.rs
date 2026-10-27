@@ -23,7 +23,7 @@ pub enum Command {
         claim: Vec<String>,
         #[arg(long)]
         revision: i64,
-        #[arg(long = "github-command")]
+        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,

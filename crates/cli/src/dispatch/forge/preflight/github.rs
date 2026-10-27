@@ -144,7 +144,7 @@ async fn page(request: &Request<'_>, after: Option<&str>) -> Result<RawSearch, D
 fn search_failure(failure: super::super::github::transport::Failure) -> Diagnostic {
     use super::super::github::transport::{Failure, Stream};
     match failure {
-        Failure::Spawn(_) | Failure::Exchange(_) => fault("command", failure.to_string()),
+        Failure::Spawn { .. } | Failure::Exchange(_) => fault("command", failure.to_string()),
         Failure::Timeout => fault("timeout", "GitHub Issue search timed out"),
         Failure::Refused { .. } => fault(
             "provider",

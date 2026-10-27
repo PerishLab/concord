@@ -82,6 +82,35 @@ mod unix {
         );
     }
 
+    #[test]
+    fn refusal() {
+        let fixture = tempfile::tempdir().expect("fixture");
+        success(fixture.path(), &["issue", "bootstrap"]);
+        let program = tool(fixture.path(), "gh", empty());
+        let joined = PathBuf::from(format!("{} issue create", program.display()));
+        let report = run(fixture.path(), &joined, "Preflight Issue collisions");
+        let diagnostic = &report["preflight"]["diagnostics"][0];
+        assert_eq!(report["preflight"]["complete"], false);
+        assert_eq!(diagnostic["code"], "command");
+        let message = diagnostic["message"].as_str().expect("message");
+        assert!(message.contains("--github-command"), "{message}");
+        assert!(message.contains(&joined.display().to_string()), "{message}");
+        assert!(
+            message.contains("Concord supplies every argument"),
+            "{message}"
+        );
+        let refused = tool(fixture.path(), "refused", "exit 1".to_string());
+        let refused = run(fixture.path(), &refused, "Preflight Issue collisions");
+        assert_eq!(refused["preflight"]["diagnostics"][0]["code"], "provider");
+        let help = spawn::concord(fixture.path())
+            .args(["issue", "preflight", "proposed", "--help"])
+            .output()
+            .expect("help");
+        let help = String::from_utf8_lossy(&help.stdout);
+        assert!(help.contains("--github-command <PROGRAM>"), "{help}");
+        assert!(help.contains("Concord supplies every argument"), "{help}");
+    }
+
     fn run(space: &Path, command: &Path, title: &str) -> Value {
         invoke(space, command, title, 4)
     }
