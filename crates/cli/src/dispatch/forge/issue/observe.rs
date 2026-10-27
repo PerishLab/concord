@@ -56,7 +56,7 @@ pub async fn issue(coordinate: &Coordinate, command: &Path, timeout: u64) -> Res
 fn failure(failure: super::super::github::transport::Failure) -> Error {
     use super::super::github::transport::{Failure, Stream};
     match failure {
-        Failure::Spawn(_) | Failure::Exchange(_) => fault("command", failure.to_string()),
+        Failure::Spawn { .. } | Failure::Exchange(_) => fault("command", failure.to_string()),
         Failure::Timeout => fault("timeout", "GitHub Issue observation timed out"),
         Failure::Refused { .. } => fault(
             "provider",

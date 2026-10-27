@@ -29,7 +29,7 @@ pub enum Command {
         repository: String,
         #[arg(long)]
         path: PathBuf,
-        #[arg(long = "github-command")]
+        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10)]
         timeout: u64,
@@ -37,7 +37,7 @@ pub enum Command {
     #[command(about = "Reconcile a renamed repository Integration")]
     Reconcile {
         repository: String,
-        #[arg(long = "github-command")]
+        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10)]
         timeout: u64,

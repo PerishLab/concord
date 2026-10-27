@@ -10,6 +10,9 @@ use crate::skill::Args as Skill;
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
+pub(crate) const PROGRAM: &str =
+    "GitHub CLI program: one path or PATH name, without arguments; Concord supplies every argument";
+
 pub use artifact::Args as Artifact;
 pub use audit::Args as Audit;
 pub use integration::Args as Integration;

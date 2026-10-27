@@ -57,7 +57,7 @@ pub enum Command {
 #[derive(clap::Args)]
 pub struct Observe {
     pub project: String,
-    #[arg(long = "github-command")]
+    #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
     pub command: PathBuf,
     #[arg(long = "page-size", default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=100))]
     pub size: u16,
@@ -69,7 +69,7 @@ pub struct Observe {
 
 #[derive(clap::Args)]
 pub struct Remote {
-    #[arg(long = "github-command")]
+    #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
     pub command: PathBuf,
     #[arg(long = "max-pages", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
     pub pages: u16,

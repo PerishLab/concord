@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::panic::Location;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
@@ -15,11 +15,17 @@ pub enum Stream {
 
 #[derive(Debug)]
 pub enum Failure {
-    Spawn(std::io::Error),
+    Spawn {
+        program: PathBuf,
+        error: std::io::Error,
+    },
     Exchange(std::io::Error),
     Timeout,
     Oversized(Stream),
-    Refused { status: ExitStatus, stderr: Vec<u8> },
+    Refused {
+        status: ExitStatus,
+        stderr: Vec<u8>,
+    },
 }
 
 pub struct Reply {
@@ -80,7 +86,7 @@ impl<'a> Request<'a> {
         let reply = self.exchange().await;
         let outcome = match &reply {
             Ok(_) => "ok",
-            Err(Failure::Spawn(_)) => "spawn",
+            Err(Failure::Spawn { .. }) => "spawn",
             Err(Failure::Exchange(_)) => "exchange",
             Err(Failure::Timeout) => "timeout",
             Err(Failure::Oversized(_)) => "oversized",
@@ -102,7 +108,10 @@ impl<'a> Request<'a> {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
-        let mut child = process.spawn().map_err(Failure::Spawn)?;
+        let mut child = process.spawn().map_err(|error| Failure::Spawn {
+            program: self.command.to_path_buf(),
+            error,
+        })?;
         let mut stdin = child.stdin.take();
         let stdout = child.stdout.take().expect("piped GitHub stdout");
         let stderr = child.stderr.take().expect("piped GitHub stderr");
@@ -183,7 +192,11 @@ async fn bounded(
 impl Display for Failure {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Spawn(error) => write!(formatter, "cannot run GitHub command: {error}"),
+            Self::Spawn { program, error } => write!(
+                formatter,
+                "--github-command program `{}` did not start: {error}; the flag names one program, and Concord supplies every argument",
+                program.display()
+            ),
             Self::Exchange(error) => write!(formatter, "GitHub command exchange failed: {error}"),
             Self::Timeout => formatter.write_str("GitHub command timed out"),
             Self::Oversized(stream) => {
