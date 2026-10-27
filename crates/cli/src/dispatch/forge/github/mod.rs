@@ -223,7 +223,7 @@ fn cursors<'a>(
 fn failure(failure: transport::Failure) -> Fault {
     use transport::{Failure, Stream};
     match failure {
-        Failure::Spawn(_) | Failure::Exchange(_) => provider("command", failure.to_string()),
+        Failure::Spawn { .. } | Failure::Exchange(_) => provider("command", failure.to_string()),
         Failure::Timeout => provider("timeout", "GitHub Issue projection timed out"),
         Failure::Refused { status, stderr } => {
             provider("provider", refusal::message(status, &stderr))

@@ -14,7 +14,7 @@ pub enum Command {
     #[command(about = "Project one bounded GitHub Issue brief without persisting it")]
     Brief {
         issue: String,
-        #[arg(long = "github-command")]
+        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
         #[arg(long = "page-size", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
         page_size: u16,
@@ -37,7 +37,7 @@ pub enum Command {
     #[command(about = "Derive one bounded graph from native GitHub relationships")]
     Graph {
         issue: String,
-        #[arg(long = "github-command")]
+        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
         #[arg(long = "page-size", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
         page_size: u16,
@@ -60,7 +60,7 @@ pub enum Command {
             help = "Markdown comment body (stdin by default); execution card and marker are appended. Bare JSON documents are refused; fenced JSON in prose is allowed"
         )]
         input: PathBuf,
-        #[arg(long = "github-command")]
+        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
@@ -73,7 +73,7 @@ pub enum Command {
     #[command(about = "Attach local execution to one readable typed GitHub Issue")]
     Attach {
         issue: String,
-        #[arg(long = "github-command")]
+        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
@@ -85,7 +85,7 @@ pub enum Command {
         issue: String,
         #[arg(long)]
         revision: i64,
-        #[arg(long = "github-command")]
+        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
@@ -94,7 +94,7 @@ pub enum Command {
     Validate {
         #[arg(long, value_name = "PATH|-", default_value = "-")]
         input: PathBuf,
-        #[arg(long = "github-command")]
+        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
@@ -105,7 +105,7 @@ pub enum Command {
         coordinate: String,
         #[arg(long)]
         revision: i64,
-        #[arg(long = "github-command")]
+        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
@@ -123,7 +123,7 @@ pub enum Preflight {
         title: String,
         #[arg(long)]
         outcome: String,
-        #[arg(long = "github-command")]
+        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
         #[arg(long = "page-size", default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=100))]
         page_size: u16,
@@ -139,7 +139,7 @@ pub enum Preflight {
 #[derive(clap::Args)]
 pub struct Relations {
     pub issue: String,
-    #[arg(long = "github-command")]
+    #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
     pub command: PathBuf,
     #[arg(long = "page-size", default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=100))]
     pub page_size: u16,
@@ -169,7 +169,7 @@ pub enum Delivery {
             help = "Carry preparation failures through a streamed delivery handoff"
         )]
         handoff: bool,
-        #[arg(long = "github-command")]
+        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
@@ -185,7 +185,7 @@ pub enum Delivery {
         authority: concord_core::issue_delivery::Mode,
         #[arg(long, value_name = "PATH|-", default_value = "-")]
         plan: PathBuf,
-        #[arg(long = "github-command")]
+        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,

@@ -249,7 +249,7 @@ pub(in crate::dispatch) async fn submit(
 fn failure(failure: super::super::github::transport::Failure) -> Error {
     use super::super::github::transport::{Failure, Stream};
     match failure {
-        Failure::Spawn(_) => Error::typed("concord.issue.comment.command", failure.to_string()),
+        Failure::Spawn { .. } => Error::typed("concord.issue.comment.command", failure.to_string()),
         Failure::Refused { .. } => Error::typed(
             "concord.issue.comment.provider",
             format!("GitHub refused Issue comment declaration: {failure}"),
