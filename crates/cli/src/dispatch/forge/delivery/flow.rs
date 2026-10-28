@@ -1,4 +1,5 @@
-use super::{SHAPE, branches, client, handoff::Refusal, projection, pull, settle, version};
+use super::adaptor;
+use super::{SHAPE, branches, handoff::Refusal, pull, settle, version};
 use crate::args::issue::Delivery;
 use crate::dispatch::{emit, input};
 use concord_core::authority::Plumb;
@@ -13,6 +14,8 @@ use std::path::{Path, PathBuf};
 #[serde(deny_unknown_fields)]
 struct Envelope {
     version: u64,
+    #[serde(default)]
+    forge: Option<adaptor::Identity>,
     #[serde(default)]
     plan: Option<issue_delivery::Plan>,
     #[serde(default)]
@@ -33,6 +36,7 @@ pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()
         plan: path,
         command,
         timeout,
+        forge: _,
     } = command
     else {
         return Err(Error::typed(
@@ -57,6 +61,7 @@ pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()
             ));
         }
     };
+    adaptor::Identity::validate(envelope.version, envelope.forge.as_ref(), &plan)?;
     if plan.issue != Coordinate::parse(&issue)? {
         return Err(Error::typed(
             "concord.delivery.coordinate",
@@ -221,8 +226,8 @@ impl Flow<'_> {
         pull::Service::open(preparation, identity, self.client()).await
     }
 
-    fn client(&self) -> client::Client<'_> {
-        client::Client {
+    fn client(&self) -> adaptor::Client<'_> {
+        adaptor::Client {
             command: &self.command,
             repository: &self.plan.delivery.repository,
             timeout: self.timeout,
@@ -243,11 +248,9 @@ impl Flow<'_> {
         Ok(ready)
     }
 
-    async fn observe(&self) -> Result<projection::Observation> {
-        let observed =
-            super::super::projection::Projection::new(&self.command, 100, 1, self.timeout)
-                .delivery(&self.plan.issue)
-                .await?;
+    async fn observe(&self) -> Result<adaptor::Observation> {
+        adaptor::integration(&self.plan.member.integration).await?;
+        let observed = adaptor::observe(&self.command, self.timeout, &self.plan.issue).await?;
         if observed.acceptance != self.plan.acceptance {
             return Err(Error::typed(
                 "concord.acceptance.changed",
@@ -259,12 +262,8 @@ impl Flow<'_> {
 
     async fn attach(&self, pull: &pull::Pull, revision: i64) -> Result<i64> {
         let status = self.estate.issue_member_status(&self.plan.issue).await?;
-        let (owner, repository) = pull::coordinate(&self.plan.delivery.repository)?;
-        if status.references.iter().any(|reference| {
-            reference.owner == owner
-                && reference.repository == repository
-                && reference.number == pull.number
-        }) {
+        let reference = adaptor::reference(&self.plan.delivery.repository, pull.number)?;
+        if status.references.iter().any(|held| held == &reference) {
             return Ok(self.estate.issue(&self.plan.issue).await?.revision);
         }
         if !status.references.is_empty() {
@@ -276,9 +275,9 @@ impl Flow<'_> {
         self.estate
             .refer_issue(&IssueDeclaration {
                 issue: self.plan.issue.clone(),
-                provider: "github".to_string(),
-                owner: owner.to_string(),
-                repository: repository.to_string(),
+                provider: reference.provider,
+                owner: reference.owner,
+                repository: reference.repository,
                 number: pull.number,
                 revision,
             })

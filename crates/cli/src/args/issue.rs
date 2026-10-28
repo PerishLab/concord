@@ -72,7 +72,7 @@ pub enum Command {
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
-    #[command(about = "Prepare and land exact Issue-led pull requests")]
+    #[command(about = "Prepare and land exact Issue-led pull requests", long_about = DELIVERY)]
     Delivery {
         #[command(subcommand)]
         command: Delivery,
@@ -176,8 +176,14 @@ pub enum Delivery {
             help = "Carry preparation failures through a streamed delivery handoff"
         )]
         handoff: bool,
-        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
+        #[arg(long = "github-command", default_value = "gh", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
+        #[arg(
+            long,
+            default_value = "github",
+            help = "Delivery adaptor; only github on github.com is supported; command override does not select a platform"
+        )]
+        forge: String,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
@@ -192,8 +198,14 @@ pub enum Delivery {
         authority: concord_core::issue_delivery::Mode,
         #[arg(long, value_name = "PATH|-", default_value = "-")]
         plan: PathBuf,
-        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
+        #[arg(long = "github-command", default_value = "gh", value_name = "PROGRAM", help = super::PROGRAM)]
         command: PathBuf,
+        #[arg(
+            long,
+            default_value = "github",
+            help = "Delivery adaptor; only github on github.com is supported; command override does not select a platform"
+        )]
+        forge: String,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
@@ -236,3 +248,9 @@ impl Delivery {
         }
     }
 }
+
+const DELIVERY: &str = "Prepare and land exact Issue-led pull requests through the qualified GitHub adaptor. Delivery defaults to the external gh program on PATH; --github-command overrides one executable, never the platform or host. Only --forge github and github.com origins are supported. API and pull commands explicitly bind github.com, overriding gh host defaults. No credentials are held by Concord.
+
+New handoffs use envelope v2 with forge kind, host, repository coordinate and repository node. Legacy v1 handoffs retain their GitHub-only meaning and undergo the same current origin, proof, acceptance and provider checks; they cannot opt into another forge. Other or conflicting identities refuse before provider mutation. Existing estate identities are unchanged.
+
+The adaptor exposes bounded Issue/acceptance observations, exact pull facts, checks, mutation and independent readback. Missing platform capabilities refuse rather than appear empty or successful. Codehull, Forgejo and Gitee are unsupported; each requires its own identity namespace and qualification of Issue types/relations, checks, merge and readback. Project capability is separate; URL substitution or a different command executable does not supply a new adaptor. Unknown write outcomes require observation before resuming, never blind replay.";

@@ -1,13 +1,13 @@
-use super::client::Client;
-pub use super::client::Merge;
+use super::adaptor::Client;
+pub(super) use super::adaptor::Merge;
 use super::git::Git;
 use concord_core::issue_delivery::{Mode, Preparation};
-use concord_core::{Error, Reference, ReferenceKind, Result};
+use concord_core::{Error, Reference, Result};
 use std::path::Path;
 
 #[cfg(test)]
-pub use super::model::Commit;
-pub use super::model::{Pull, Report, State};
+pub(super) use super::adaptor::Commit;
+pub(super) use super::adaptor::{Pull, Report, State};
 
 pub async fn fetch(root: &Path) -> Result<()> {
     Git::fetch(root).await
@@ -24,7 +24,7 @@ impl<'a> Service<'a> {
         identity: &Path,
         client: Client<'a>,
     ) -> Result<Self> {
-        let observed = Git::repository(identity).await?;
+        let observed = super::adaptor::repository(identity).await?;
         if observed != client.repository {
             return Err(stale(format!(
                 "delivery repository {} is not worktree origin {observed}",
@@ -62,7 +62,7 @@ impl<'a> Service<'a> {
     }
 
     pub fn current(&self, pull: &Pull) -> bool {
-        super::model::contract(pull, self.preparation, self.client.repository).is_ok()
+        super::adaptor::contract(pull, self.preparation, self.client.repository).is_ok()
     }
 
     pub async fn refresh(&mut self, number: i64) -> Result<Pull> {
@@ -132,23 +132,12 @@ impl<'a> Service<'a> {
     }
 
     fn validate(&self, pull: Pull) -> Result<Pull> {
-        super::model::contract(&pull, self.preparation, self.client.repository)?;
+        super::adaptor::contract(&pull, self.preparation, self.client.repository)?;
         Ok(pull)
     }
 
     fn reference(&self, reference: &Reference) -> Result<()> {
-        if reference.kind != ReferenceKind::Change {
-            return Err(stale("recorded coordinate is not a pull change"));
-        }
-        if reference.provider != "github" {
-            return Err(stale("recorded pull provider is not GitHub"));
-        }
-        if format!("{}/{}", reference.owner, reference.repository) != self.client.repository {
-            return Err(stale(
-                "recorded pull coordinate does not match the delivery repository",
-            ));
-        }
-        Ok(())
+        super::adaptor::validate(reference, self.client.repository)
     }
 }
 
@@ -162,11 +151,11 @@ pub(super) fn answer(output: std::process::Output, command: &str) -> Result<Stri
     )))
 }
 
-pub(super) fn stale(message: impl Into<String>) -> Error {
+pub(crate) fn stale(message: impl Into<String>) -> Error {
     Error::typed("concord.delivery.stale", message)
 }
 
-pub(super) fn provider(message: impl Into<String>) -> Error {
+pub(crate) fn provider(message: impl Into<String>) -> Error {
     Error::typed("concord.delivery.provider", message)
 }
 
@@ -174,22 +163,4 @@ fn merged(pull: &Pull) -> bool {
     pull.merge.is_some() || pull.merged.is_some()
 }
 
-pub fn reference(repository: &str, number: i64) -> Result<Reference> {
-    let (owner, repository) = coordinate(repository)?;
-    Ok(Reference {
-        kind: ReferenceKind::Change,
-        provider: "github".to_string(),
-        owner: owner.to_string(),
-        repository: repository.to_string(),
-        number,
-    })
-}
-
-pub fn coordinate(repository: &str) -> Result<(&str, &str)> {
-    repository.split_once('/').ok_or_else(|| {
-        Error::typed(
-            "concord.delivery.repository",
-            "delivery repository coordinate is malformed",
-        )
-    })
-}
+pub(super) use super::adaptor::reference;

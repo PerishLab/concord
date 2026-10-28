@@ -1,4 +1,4 @@
-use super::pull::stale;
+use super::super::delivery::pull::stale;
 use concord_core::Result;
 use concord_core::issue_delivery::Preparation;
 use serde::Deserialize;
@@ -44,7 +44,7 @@ pub struct Report {
     pub candidate: String,
 }
 
-pub(super) fn contract(pull: &Pull, preparation: &Preparation, repository: &str) -> Result<()> {
+pub(crate) fn contract(pull: &Pull, preparation: &Preparation, repository: &str) -> Result<()> {
     let expected = format!("https://github.com/{repository}/pull/{}", pull.number);
     if pull.id.is_empty() || pull.number < 1 {
         return refusal();
@@ -102,6 +102,33 @@ enum Check {
 pub struct Checks {
     pub pending: Vec<String>,
     pub failed: Vec<String>,
+}
+
+impl Rollup {
+    pub(crate) fn qualified(self) -> Result<Checks> {
+        if self.rollup.iter().all(supported) {
+            return Ok(Checks::from(self));
+        }
+        Err(concord_core::Error::typed(
+            "concord.delivery.adaptor",
+            "GitHub returned an unsupported check state; inspect checks before preparing or resuming delivery",
+        ))
+    }
+}
+
+fn supported(check: &Check) -> bool {
+    match check {
+        Check::Run {
+            status, conclusion, ..
+        } if status == "COMPLETED" => conclusion.as_deref().is_some_and(|value| {
+            failed(value) || matches!(value, "SUCCESS" | "NEUTRAL" | "SKIPPED")
+        }),
+        Check::Run { status, .. } => matches!(
+            status.as_str(),
+            "QUEUED" | "IN_PROGRESS" | "REQUESTED" | "WAITING" | "PENDING"
+        ),
+        Check::Status { state, .. } => pending(state) || failed(state) || state == "SUCCESS",
+    }
 }
 
 impl From<Rollup> for Checks {

@@ -1,5 +1,5 @@
-use super::super::github::envelope;
 use super::super::projection::{PageRequest, Projection, fault};
+use super::envelope;
 use concord_core::acceptance::{Report, Target};
 use concord_core::{Coordinate, Error, Result};
 use serde::Deserialize;

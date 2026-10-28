@@ -1,6 +1,6 @@
-use super::model::Pull;
-use super::model::{Checks, Rollup};
-use super::pull::provider;
+use super::super::delivery::pull::provider;
+use super::pull::Pull;
+use super::pull::{Checks, Rollup};
 use concord_core::Result;
 use std::path::Path;
 use std::time::Duration;
@@ -10,7 +10,7 @@ const LIMIT: usize = 1024 * 1024;
 const FIELDS: &str =
     "id,number,url,state,baseRefName,headRefOid,mergeCommit,mergedAt,updatedAt,title,body";
 
-pub(super) struct Client<'a> {
+pub(crate) struct Client<'a> {
     pub command: &'a Path,
     pub repository: &'a str,
     pub timeout: u64,
@@ -34,8 +34,12 @@ impl Client<'_> {
                 FIELDS,
             ])
             .await?;
-        serde_json::from_str::<Vec<Pull>>(&body)
-            .map_err(|error| provider(format!("gh pr list did not answer JSON: {error}")))
+        let pulls = serde_json::from_str::<Vec<Pull>>(&body)
+            .map_err(|error| provider(format!("gh pr list did not answer JSON: {error}")))?;
+        for pull in &pulls {
+            super::identity::pull(pull, self.repository)?;
+        }
+        Ok(pulls)
     }
 
     pub async fn raise(&mut self, base: &str, head: &str, title: &str, body: &str) -> Result<Pull> {
@@ -81,8 +85,10 @@ impl Client<'_> {
         let body = self
             .gh(&["pr", "view", &pull, "-R", self.repository, "--json", FIELDS])
             .await?;
-        serde_json::from_str(&body)
-            .map_err(|error| provider(format!("gh pr view did not answer JSON: {error}")))
+        let pull = serde_json::from_str(&body)
+            .map_err(|error| provider(format!("gh pr view did not answer JSON: {error}")))?;
+        super::identity::pull(&pull, self.repository)?;
+        Ok(pull)
     }
 
     pub async fn mark(
@@ -155,17 +161,26 @@ impl Client<'_> {
             ])
             .await?;
         serde_json::from_str::<Rollup>(&body)
-            .map(Checks::from)
-            .map_err(|error| provider(format!("gh pr view did not answer check JSON: {error}")))
+            .map_err(|error| provider(format!("gh pr view did not answer check JSON: {error}")))?
+            .qualified()
     }
 
     async fn gh(&mut self, args: &[&str]) -> Result<String> {
-        let output =
-            super::super::github::transport::Request::new(self.command, self.timeout, LIMIT)
-                .args(args.iter().copied())
-                .run()
-                .await
-                .map_err(|failure| provider(failure.to_string()))?;
+        let mut arguments = args
+            .iter()
+            .map(|arg| (*arg).to_string())
+            .collect::<Vec<_>>();
+        if let Some(index) = arguments
+            .iter()
+            .position(|arg| arg == "-R" || arg == "--repo")
+        {
+            arguments[index + 1] = format!("https://github.com/{}", self.repository);
+        }
+        let output = super::transport::Request::new(self.command, self.timeout, LIMIT)
+            .args(arguments)
+            .run()
+            .await
+            .map_err(|failure| provider(failure.to_string()))?;
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 }

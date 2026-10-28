@@ -1,4 +1,4 @@
-mod delivery;
+pub(super) mod delivery;
 mod github;
 mod issue;
 mod preflight;

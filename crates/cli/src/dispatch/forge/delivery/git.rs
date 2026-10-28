@@ -3,7 +3,7 @@ use concord_core::Result;
 use std::path::Path;
 use tokio::process::Command;
 
-pub(super) struct Git;
+pub(crate) struct Git;
 
 impl Git {
     pub async fn fetch(root: &Path) -> Result<()> {
@@ -24,23 +24,6 @@ impl Git {
         } else {
             String::new()
         })
-    }
-
-    pub async fn repository(root: &Path) -> Result<String> {
-        let remote = Self::run(root, &["remote", "get-url", "origin"]).await?;
-        let path = remote
-            .strip_prefix("git@github.com:")
-            .or_else(|| remote.strip_prefix("ssh://git@github.com/"))
-            .or_else(|| remote.strip_prefix("https://github.com/"))
-            .ok_or_else(|| provider("origin is not GitHub"))?
-            .trim_end_matches(".git");
-        let (owner, repository) = path
-            .split_once('/')
-            .filter(|(owner, repository)| {
-                !owner.is_empty() && !repository.is_empty() && !repository.contains('/')
-            })
-            .ok_or_else(|| provider("cannot derive owner/repository from origin"))?;
-        Ok(format!("{owner}/{repository}"))
     }
 
     #[locus::trace(with = plumb::observation::view())]

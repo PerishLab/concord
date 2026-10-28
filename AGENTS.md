@@ -202,3 +202,23 @@ of copying its answer here.
   Release notes and skill generations live on Depot; the binary consumes its
   own skill generation through `concord skill` and never a floating release.
   Guard hooks are projected by `plumb configuration install`.
+
+## Delivery adaptors
+
+`dispatch/forge/delivery/adaptor.rs` is the static delivery boundary. The one
+qualified implementation is GitHub on github.com: `forge/github` owns wire
+queries, pull decoding, checks mapping, platform identities and host routing;
+`runtime/transport` owns bounded process execution. Common delivery keeps
+revision, acceptance, proof and custody orchestration. The adaptor's pull facts
+retain the existing public report serialization. Branch observation reuses the
+same GitHub Issue/projection readers. Acceptance readers share the GitHub request
+facade; no broader Issue/Project rewrite is implied.
+
+New platforms require separate capability qualification and namespaced stable
+repository/Issue/pull identities before admitting estate or plan data. The current
+GitHub node namespace and legacy v1 plans cannot be repurposed by changing URLs.
+Envelope v2 binds the adaptor and repository identity; v1 retains GitHub-only
+compatibility under current validation. Codehull, Forgejo and Gitee each need
+verified native types, relationships, checks and exact merge/readback semantics;
+unsupported capability must refuse, and Project support is independently judged.
+Do not add a dynamic plugin framework or claim platform parity from this seam.

@@ -265,7 +265,7 @@ mod unix {
         assert_eq!(request["variables"]["subject"], "I_issue");
         assert_eq!(request["variables"]["body"], body);
         let arguments = std::fs::read_to_string(space.join("arguments.txt")).expect("arguments");
-        assert_eq!(arguments, "api graphql --input -");
+        assert_eq!(arguments, "api graphql --input - --hostname github.com");
         assert!(!arguments.contains(session));
     }
 }

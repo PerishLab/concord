@@ -1,5 +1,9 @@
+pub(crate) mod delivery;
+pub(crate) mod identity;
 pub(super) mod issues;
+pub(crate) mod observation;
 pub(super) mod projections;
+pub(crate) mod pull;
 mod refusal;
 pub(super) mod transport;
 
