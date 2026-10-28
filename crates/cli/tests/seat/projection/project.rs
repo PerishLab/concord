@@ -79,6 +79,7 @@ fn refusals() {
         ("missing", "unavailable"),
         ("identity", "identity"),
         ("changed", "changed"),
+        ("final", "changed"),
         ("schema", "schema"),
         ("origin", "schema"),
         ("missing-connection", "schema"),
