@@ -3,13 +3,15 @@ mod branches;
 mod flow;
 pub(super) mod git;
 mod handoff;
+mod progress;
 pub(super) mod pull;
 mod settle;
 
 use crate::args::issue::Delivery;
+use crate::dispatch::Completion;
 use concord_core::{Error, Estate, Result};
 
-pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<()> {
+pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<Completion> {
     let forge = match &command {
         Delivery::Prepare { forge, .. } | Delivery::Land { forge, .. } => forge,
     };
@@ -24,22 +26,21 @@ pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<()>
             command,
             timeout,
             forge: _,
-        } => {
-            handoff::prepare(
-                estate,
-                handoff::Parameters {
-                    issue: &issue,
-                    authority,
-                    revision,
-                    base,
-                    carry: handoff,
-                    command: &command,
-                    timeout,
-                },
-                output,
-            )
-            .await
-        }
+        } => handoff::prepare(
+            estate,
+            handoff::Parameters {
+                issue: &issue,
+                authority,
+                revision,
+                base,
+                carry: handoff,
+                command: &command,
+                timeout,
+            },
+            output,
+        )
+        .await
+        .map(|()| Completion::Done),
         command @ Delivery::Land { .. } => flow::land(estate, command, output).await,
     }
 }

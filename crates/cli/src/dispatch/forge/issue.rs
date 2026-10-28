@@ -95,7 +95,7 @@ pub async fn run(
             let comment = comment::declare(&coordinate, &input, &command, timeout).await?;
             comment::output(comment, output)
         }
-        Command::Delivery { command } => super::delivery::run(estate, command, output).await,
+        Command::Delivery { .. } => unreachable!("delivery completion is handled by dispatch"),
         Command::Attach {
             issue,
             command,

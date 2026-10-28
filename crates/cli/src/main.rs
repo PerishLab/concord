@@ -23,11 +23,12 @@ async fn main() {
         Ok(()) => dispatch::run(cli).await,
         Err(error) => Err(concord_core::Error::new(error)),
     };
+    let code = result.as_ref().map_or(1, |completion| completion.code());
     if let Err(error) = &result {
         observation::fault(error);
     }
     if let Some(observation) = observation {
-        observation.finish(i32::from(result.is_err()));
+        observation.finish(code);
     }
     if let Err(error) = result {
         if json {
@@ -41,7 +42,9 @@ async fn main() {
                 eprintln!("concord: see: concord cookbook {code}");
             }
         }
-        std::process::exit(1);
+    }
+    if code != 0 {
+        std::process::exit(code);
     }
 }
 

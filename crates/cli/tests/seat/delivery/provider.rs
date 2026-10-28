@@ -94,6 +94,7 @@ pub fn projection(root: &Path) -> String {
     let delay = root.join("provider-delay");
     let relations = root.join("relationships");
     let labels = root.join("labels");
+    let marks = root.join("gate-marks");
     format!(
         r#"if [ "$1" = api ]; then
   case "$*" in *"--hostname github.com"*) ;; *) echo 'unbound API host' >&2; exit 19 ;; esac
@@ -139,7 +140,7 @@ if [ "$1 $2 $3 $4" = "api -X PATCH repos/PerishLab/probe/pulls/7" ]; then
   printf '%s\n' '{{}}'
   exit 0
 fi
-if [ "$1 $2" = "api -X" ]; then printf '%s\n' '{{}}'; exit 0; fi
+if [ "$1 $2" = "api -X" ]; then printf '%s\n' mark >> '{marks}'; printf '%s\n' '{{}}'; exit 0; fi
 if [ "$1 $2" = "pr list" ]; then
   [ -f '{state}' ] && reply | jq -s . || printf '%s\n' '[]'
   exit 0
@@ -220,6 +221,7 @@ exit 1"#,
         delay = delay.display(),
         relations = relations.display(),
         labels = labels.display(),
+        marks = marks.display(),
         declaration = root.join("declaration").display(),
         waiting = root.join("checks-pending").display(),
         rollup = root.join("checks-rollup").display(),

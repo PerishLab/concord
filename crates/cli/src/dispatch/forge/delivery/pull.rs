@@ -122,7 +122,9 @@ impl<'a> Service<'a> {
     }
 
     pub async fn pending(&mut self, number: i64) -> Result<bool> {
-        Ok(!self.client.checks(number).await?.pending.is_empty())
+        let checks = self.client.checks(number).await?;
+        super::settle::failures(&checks)?;
+        Ok(!checks.pending.is_empty())
     }
     pub fn report(&self, pull: Pull) -> Report {
         Report {
