@@ -1,7 +1,7 @@
 use super::adaptor;
 use super::{SHAPE, branches, handoff::Refusal, pull, settle, version};
 use crate::args::issue::Delivery;
-use crate::dispatch::{emit, input};
+use crate::dispatch::{Completion, emit, input};
 use concord_core::authority::Plumb;
 use concord_core::issue_delivery::{Check, Preparation, Resume, recall, resume};
 use concord_core::{Coordinate, Error, Estate, IssueDeclaration, Result, issue_delivery};
@@ -29,9 +29,10 @@ struct Flow<'a> {
     timeout: u64,
 }
 
-pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()> {
+pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<Completion> {
     let Delivery::Land {
         issue,
+        wait: blocking,
         authority,
         plan: path,
         command,
@@ -82,9 +83,12 @@ pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<()
     };
     let mut wait = settle::Wait::new();
     while let Some(pull) = flow.apply(output).await? {
+        if !blocking {
+            return super::progress::pending(&flow.plan, pull, output);
+        }
         settle::wait(&mut flow.client(), pull, &mut wait).await?;
     }
-    Ok(())
+    Ok(Completion::Done)
 }
 
 impl Flow<'_> {
@@ -109,14 +113,14 @@ impl Flow<'_> {
             .filter(|pull| !provider.current(pull))
             .map(|pull| pull.number)
         {
-            active(&resumed)?;
+            super::progress::active(&resumed)?;
             self.mutation(Check::Confirm).await?;
             provider.publish().await?;
             self.mutation(Check::Confirm).await?;
             held = Some(provider.refresh(number).await?);
         }
         if held.is_none() {
-            active(&resumed)?;
+            super::progress::active(&resumed)?;
             self.mutation(Check::Confirm).await?;
             provider.publish().await?;
             self.mutation(Check::Confirm).await?;
@@ -130,8 +134,9 @@ impl Flow<'_> {
             resumed.revision = self.attach(&held, resumed.revision).await?;
         }
         if held.state == pull::State::Open {
-            active(&resumed)?;
+            super::progress::active(&resumed)?;
             if provider.pending(held.number).await? {
+                self.mutation(Check::Confirm).await?;
                 return Ok(Some(held.number));
             }
             self.mutation(Check::Execute).await?;
@@ -283,14 +288,4 @@ impl Flow<'_> {
             })
             .await
     }
-}
-
-fn active(resumed: &Resume) -> Result<()> {
-    if resumed.released {
-        return Err(Error::typed(
-            "concord.delivery.stale",
-            "released delivery cannot create or mutate a pull request",
-        ));
-    }
-    Ok(())
 }

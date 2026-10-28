@@ -14,9 +14,24 @@ use crate::{output, skill};
 use concord_core::{Estate, Result, Seat};
 use serde_json::json;
 
-pub async fn run(cli: args::Cli) -> Result<()> {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Completion {
+    Done,
+    Pending,
+}
+
+impl Completion {
+    pub(crate) fn code(self) -> i32 {
+        match self {
+            Self::Done => 0,
+            Self::Pending => 3,
+        }
+    }
+}
+
+pub async fn run(cli: args::Cli) -> Result<Completion> {
     if let Command::Cookbook(args) = &cli.command {
-        return output::cookbook::run(args.code.as_deref(), cli.json);
+        return output::cookbook::run(args.code.as_deref(), cli.json).map(|()| Completion::Done);
     }
     if let Command::Member(args) = &cli.command {
         member::supported(&args.command)?;
@@ -28,7 +43,7 @@ pub async fn run(cli: args::Cli) -> Result<()> {
             json!(Config::path(cli.config.as_deref())?.display().to_string()),
             cli.json,
         );
-        return Ok(());
+        return Ok(Completion::Done);
     }
     let loaded = Config::load(
         cli.config.as_deref(),
@@ -38,9 +53,15 @@ pub async fn run(cli: args::Cli) -> Result<()> {
     )?;
     let config = loaded.config();
     let command = match cli.command {
-        Command::Acceptance(args) => return acceptance::run(args.command, cli.json).await,
+        Command::Acceptance(args) => {
+            return acceptance::run(args.command, cli.json)
+                .await
+                .map(|()| Completion::Done);
+        }
         Command::Project(args) => {
-            return crate::project::run(args.command, cli.json, config.phase.as_ref()).await;
+            return crate::project::run(args.command, cli.json, config.phase.as_ref())
+                .await
+                .map(|()| Completion::Done);
         }
         Command::Issue(args)
             if matches!(args.command, crate::args::issue::Command::Phase { .. }) =>
@@ -48,11 +69,15 @@ pub async fn run(cli: args::Cli) -> Result<()> {
             let crate::args::issue::Command::Phase { command } = args.command else {
                 unreachable!()
             };
-            return crate::phase::run(command, config.phase.as_ref(), cli.json).await;
+            return crate::phase::run(command, config.phase.as_ref(), cli.json)
+                .await
+                .map(|()| Completion::Done);
         }
-        Command::Skill(skill) => return skill::run(config, skill.command, cli.json),
+        Command::Skill(skill) => {
+            return skill::run(config, skill.command, cli.json).map(|()| Completion::Done);
+        }
         Command::Config(args) => {
-            return configuration::run(config, args.command, cli.json);
+            return configuration::run(config, args.command, cli.json).map(|()| Completion::Done);
         }
         command => command,
     };
@@ -60,7 +85,7 @@ pub async fn run(cli: args::Cli) -> Result<()> {
     let seat = Seat::new(root.path());
     match command {
         Command::Issue(args) if matches!(args.command, crate::args::issue::Command::Bootstrap) => {
-            bootstrap(&seat, cli.json).await
+            bootstrap(&seat, cli.json).await.map(|()| Completion::Done)
         }
         command => {
             Dispatch {
@@ -93,7 +118,7 @@ struct Dispatch<'a> {
 }
 
 impl Dispatch<'_> {
-    async fn run(&self, command: Command) -> Result<()> {
+    async fn run(&self, command: Command) -> Result<Completion> {
         let operation = command.name();
         let intent = self.occupancy.prepare(&self.estate, &command).await;
         if let Some(issues) = command.activity() {
@@ -104,6 +129,19 @@ impl Dispatch<'_> {
             }
         }
         let result = match command {
+            Command::Issue(args::issue::Args {
+                command: args::issue::Command::Delivery { command },
+            }) => forge::delivery::run(&self.estate, command, self.json).await,
+            command => self.execute(command).await.map(|()| Completion::Done),
+        };
+        if matches!(result, Ok(Completion::Done)) {
+            self.occupancy.commit(&self.estate, intent, operation);
+        }
+        result
+    }
+
+    async fn execute(&self, command: Command) -> Result<()> {
+        match command {
             Command::Acceptance(_)
             | Command::Project(_)
             | Command::Config(_)
@@ -132,11 +170,7 @@ impl Dispatch<'_> {
                     ))
                 }
             }
-        };
-        if result.is_ok() {
-            self.occupancy.commit(&self.estate, intent, operation);
         }
-        result
     }
 }
 

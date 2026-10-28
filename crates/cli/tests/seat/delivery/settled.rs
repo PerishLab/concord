@@ -93,9 +93,11 @@ fn failed() {
         r#"{"statusCheckRollup":[{"__typename":"CheckRun","name":"Guard","status":"COMPLETED","conclusion":"FAILURE"}]}"#,
     );
     let landed = consume(probe.space, &probe.provider, &probe.plan());
-    refused(&landed, "concord.delivery.provider");
+    refused(&landed, "concord.delivery.checks");
     let stderr = String::from_utf8_lossy(&landed.stderr);
-    assert!(stderr.contains("failed checks: Guard"), "{stderr}");
+    assert!(stderr.contains("pull checks failed: Guard"), "{stderr}");
+    assert_eq!(probe.read("gate-marks"), "");
+    assert_eq!(probe.read("merge-attempts"), "");
     assert_eq!(probe.read("pull-state"), "OPEN");
 }
 

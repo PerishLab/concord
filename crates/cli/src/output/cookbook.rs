@@ -116,10 +116,10 @@ fn book() -> Cookbook {
         ),
         entry(
             "concord.delivery.pending",
-            "The pull's checks stayed pending through land's 30-minute wait, or GitHub kept refusing the merge as pending after its checks settled.",
-            "Read the named checks on the pull. If they are still queued or running, re-run the same prepared land; it resumes the existing pull and waits again without holding the Integration lock. If a check is stuck, fix or re-run it on GitHub first. Never merge with `--admin` or `--auto` around the policy.",
+            "Land --no-wait returned an observed pending result on stdout with exit 3, or the default bounded wait refused after 30 minutes or repeated mergeability cycles.",
+            "Retain the same plan and inspect the pull checks. Pending exit 3 is not an error or completed delivery; it keeps the Member and exact pull for resume. Re-run land with the same plan and --no-wait for another single pass, or omit the flag for the existing bounded wait. The caller owns cross-run timing and retry budgets; Concord stores none and schedules no background work. Every run fully revalidates candidate/base, proof, acceptance and custody. Changed facts require fresh preparation; unknown writes require observation, never blind replay. Failed checks refuse immediately rather than return pending. Never use --admin or --auto around policy.",
             (
-                "Retain the refusal, which names the pending checks, and inspect `gh pr checks <pull>`.",
+                "Retain the plan, pending result or refusal, exact candidate and pull identity; inspect gh pr checks <pull>. Exit 0 means completed delivery, 3 means observed pending, 1 means refusal and 2 means syntax error.",
                 "The pull's checks have settled and a re-run land merges and reads the merge back.",
             ),
         ),

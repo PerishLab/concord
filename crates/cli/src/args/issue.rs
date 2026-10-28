@@ -191,6 +191,13 @@ pub enum Delivery {
     Land {
         issue: String,
         #[arg(
+            long = "no-wait",
+            action = clap::ArgAction::SetFalse,
+            default_value_t = true,
+            help = "Return pending on stdout with exit 3 without waiting for CI; rerun the same plan. Default waits up to 30 minutes; cross-run budgets belong to the caller"
+        )]
+        wait: bool,
+        #[arg(
             long,
             default_value = "plumb",
             help = "Must match the prepared proof authority"

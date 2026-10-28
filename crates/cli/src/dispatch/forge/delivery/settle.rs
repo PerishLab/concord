@@ -77,12 +77,7 @@ impl Wait {
     }
 
     pub fn step(&mut self, checks: &Checks) -> Result<Step> {
-        if !checks.failed.is_empty() {
-            return Err(Error::typed(
-                "concord.delivery.checks",
-                format!("pull checks failed: {}", checks.failed.join(", ")),
-            ));
-        }
+        failures(checks)?;
         if checks.pending.is_empty() {
             self.cycles += 1;
             if self.cycles > CYCLES {
@@ -105,6 +100,16 @@ impl Wait {
         self.delay = (delay * 2).min(CEILING);
         Ok(Step::Wait(delay))
     }
+}
+
+pub(super) fn failures(checks: &Checks) -> Result<()> {
+    if !checks.failed.is_empty() {
+        return Err(Error::typed(
+            "concord.delivery.checks",
+            format!("pull checks failed: {}", checks.failed.join(", ")),
+        ));
+    }
+    Ok(())
 }
 
 pub async fn wait(client: &mut Client<'_>, pull: i64, wait: &mut Wait) -> Result<()> {

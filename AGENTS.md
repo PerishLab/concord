@@ -78,7 +78,7 @@ of copying its answer here.
   construction to Plumb's released delivery kernel, and invokes an explicit
   external provider command for PR mutation. Concord never carries provider
   credentials or replaces repository policy.
-- Land waits for the pull's checks without holding the Integration lock.
+- By default land waits for the pull's checks without holding the Integration lock.
   While any check is pending, before marking or after a merge GitHub refuses
   as pending, it returns from the locked flow, polls the checks with backoff
   for at most 30 minutes, then re-enters and revalidates the whole land.
@@ -87,6 +87,11 @@ of copying its answer here.
   `concord.delivery.checks`, naming each failed check and its link, without
   marking or merging; a rerun check is pending again, not failed. A merge
   refused with nothing pending names the failed checks.
+  Explicit no-wait runs a complete validation pass and returns observed pending
+  with exit 3 instead of polling CI. Pending preserves the Member and is no
+  completion or acceptance proof. The caller owns cross-run timing and retry
+  budgets; the same plan resumes through current proof, candidate/base,
+  acceptance and custody validation. No timer replica or background job exists.
 - A Guard proof is accepted only from the Plumb Concord was compiled against
   or the current Plumb stable named by its release seal; Plumb's exact
   producer and depot judgment is unchanged. A plan records the authority it
