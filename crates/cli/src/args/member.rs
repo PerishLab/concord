@@ -1,6 +1,8 @@
 use clap::Subcommand;
 use std::path::PathBuf;
 
+const LANDING: &str = "This Member handoff is retired. Repository-only plumb land deletes the source branch and detaches the checkout before Concord can release its Member. Use concord issue delivery prepare and concord issue delivery land: that flow owns current acceptance, exact merge readback, main synchronization, Member release and branch cleanup. Old arguments remain accepted only to report this migration; old plans must be prepared again through issue delivery.";
+
 #[derive(clap::Args)]
 pub struct Args {
     #[command(subcommand)]
@@ -52,7 +54,7 @@ pub enum Command {
         #[arg(long)]
         revision: i64,
     },
-    #[command(about = "Prepare or revalidate one exact Issue Member landing")]
+    #[command(about = "Retired handoff; use issue delivery prepare/land", long_about = LANDING)]
     Landing {
         #[command(subcommand)]
         command: Landing,
@@ -102,7 +104,7 @@ pub enum Command {
 
 #[derive(Subcommand)]
 pub enum Landing {
-    #[command(about = "Prepare an exact Issue Member landing plan")]
+    #[command(about = "Retired preparation; use issue delivery prepare", long_about = LANDING)]
     Prepare {
         issue: String,
         #[arg(long, default_value = "main")]
@@ -120,7 +122,7 @@ pub enum Landing {
         #[arg(long)]
         revision: i64,
     },
-    #[command(about = "Revalidate an exact Issue Member landing plan")]
+    #[command(about = "Retired readiness; use issue delivery prepare/land", long_about = LANDING)]
     Ready {
         issue: String,
         #[arg(long, default_value = "-")]
