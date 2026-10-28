@@ -199,6 +199,10 @@ if q.startswith('mutation'):
         item=next(i for i in s['items'] if i['id']==p['itemId']);s['items'].remove(item)
         index=next((i+1 for i,x in enumerate(s['items']) if x['id']==p['afterId']),0)
         s['items'].insert(index,item)
+    elif name=='createProjectV2IssueField':
+        origin=s['origin'];assert p=={'projectId':s['project']['id'],'issueFieldId':origin['id']}
+        s['fields'].append({'__typename':'ProjectV2SingleSelectField','id':'F_attached','name':origin['name'],'dataType':'SINGLE_SELECT','isIssueField':True,'updatedAt':'attached','project':{'id':s['project']['id']},'issueField':origin,'options':origin['options']})
+        if s['mode']=='attachment-unknown':stamp();save();fail()
     elif name=='deleteProjectV2Field':s['fields']=[f for f in s['fields'] if f['id']!=p['fieldId']]
     elif name=='deleteProjectV2Workflow':s['workflows']=[w for w in s['workflows'] if w['id']!=p['workflowId']]
     elif name=='deleteProjectV2View':s['views']=[w for w in s['views'] if w['id']!=p['viewId']]
@@ -216,6 +220,7 @@ if q.startswith('mutation'):
         s['repositories']=([{'id':'R_repo','nameWithOwner':'PerishLab/concord','url':'https://github.com/PerishLab/concord','owner':{'id':'O_lab'}}] if name.startswith('link') else [])
     else:fail()
     stamp();save();emit({'data':{'change':{'clientMutationId':None}}})
+if 'issueFields(first:' in q:emit({'data':{'organization':{'id':s.get('origin_owner','O_lab'),'issueFields':page([s['origin']])}}})
 if 'projectsV2(first:' in q:
     projects=[s['project'] if x['id']==s['project']['id'] else x for x in s['projects']]
     emit({'data':{'organization':{'id':'O_lab','login':'PerishLab','url':'https://github.com/PerishLab','projectsV2':page(projects)}}})

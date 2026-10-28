@@ -1,7 +1,7 @@
-use super::fault;
+use super::{fault, wire::Client};
 use concord_core::Result;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::collections::BTreeSet;
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -168,3 +168,58 @@ pub(super) fn owned<'a>(state: &'a Value, id: &str) -> Result<&'a Value> {
     }
     Ok(field)
 }
+
+pub(in crate::project) async fn origin(
+    client: &Client<'_>,
+    project: &Value,
+    intent: &super::manage::Intent,
+) -> Result<Value> {
+    let super::manage::Action::Attach { origin } = &intent.action else {
+        unreachable!("attachment intent")
+    };
+    let data = client
+        .read(ORIGIN, json!({"owner":project["owner"]["login"]}))
+        .await?;
+    let owner = &data["organization"];
+    if owner["id"] != project["owner"]["id"] {
+        return Err(fault(
+            "identity",
+            "Issue field organization differs from Project owner",
+        ));
+    }
+    let fields = &owner["issueFields"];
+    let nodes = fields["nodes"]
+        .as_array()
+        .ok_or_else(|| fault("unavailable", "organization Issue fields are unreadable"))?;
+    if fields["pageInfo"]["hasNextPage"] != false
+        || fields["totalCount"].as_u64() != Some(nodes.len() as u64)
+        || nodes.iter().any(Value::is_null)
+    {
+        return Err(fault(
+            "incomplete",
+            "organization Issue field coverage is incomplete; no attachment prepared",
+        ));
+    }
+    let found = nodes
+        .iter()
+        .filter(|field| field["id"] == *origin)
+        .collect::<Vec<_>>();
+    let [field] = found.as_slice() else {
+        return Err(fault(
+            "identity",
+            "exact field is not a visible Issue field of the Project organization",
+        ));
+    };
+    if field["__typename"] != "IssueFieldSingleSelect"
+        || field["dataType"] != "SINGLE_SELECT"
+        || field["visibility"] != "ORG_ONLY"
+    {
+        return Err(fault(
+            "ownership",
+            "attachment requires an organization-only native single-select Issue field",
+        ));
+    }
+    Ok((*field).clone())
+}
+
+const ORIGIN: &str = "query($owner:String!){organization(login:$owner){id issueFields(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on IssueFieldSingleSelect{id fullDatabaseId name dataType visibility options{id name color description}} ... on IssueFieldText{id} ... on IssueFieldNumber{id} ... on IssueFieldDate{id} ... on IssueFieldMultiSelect{id}}}}}";

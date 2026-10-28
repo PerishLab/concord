@@ -13,10 +13,14 @@ use crate::args::project::Command;
 use concord_core::{Error, Result};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub(crate) async fn run(command: Command, output: bool) -> Result<()> {
+pub(crate) async fn run(
+    command: Command,
+    output: bool,
+    phase: Option<&crate::phase::Binding>,
+) -> Result<()> {
     match command {
         Command::Show(args) => observe::run(args, output).await,
-        Command::Next(args) => next::run(args, output).await,
+        Command::Next(args) => next::run(args, output, phase).await,
         command => manage::run(command, output).await,
     }
 }

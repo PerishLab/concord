@@ -39,7 +39,17 @@ pub async fn run(cli: args::Cli) -> Result<()> {
     let config = loaded.config();
     let command = match cli.command {
         Command::Acceptance(args) => return acceptance::run(args.command, cli.json).await,
-        Command::Project(args) => return crate::project::run(args.command, cli.json).await,
+        Command::Project(args) => {
+            return crate::project::run(args.command, cli.json, config.phase.as_ref()).await;
+        }
+        Command::Issue(args)
+            if matches!(args.command, crate::args::issue::Command::Phase { .. }) =>
+        {
+            let crate::args::issue::Command::Phase { command } = args.command else {
+                unreachable!()
+            };
+            return crate::phase::run(command, config.phase.as_ref(), cli.json).await;
+        }
         Command::Skill(skill) => return skill::run(config, skill.command, cli.json),
         Command::Config(args) => {
             return configuration::run(config, args.command, cli.json);
@@ -61,6 +71,7 @@ pub async fn run(cli: args::Cli) -> Result<()> {
                     .map_err(|error| loaded.absent(&root, error))?,
                 json: cli.json,
                 occupancy: occupancy::Run::new(cli.json),
+                phase: config.phase.as_ref(),
             }
             .run(command)
             .await
@@ -73,14 +84,15 @@ async fn bootstrap(seat: &Seat, output: bool) -> Result<()> {
     emit(json!({"estate": {"kind": "issue"}}), output)
 }
 
-struct Dispatch {
+struct Dispatch<'a> {
+    phase: Option<&'a crate::phase::Binding>,
     activity: activity::Run,
     estate: Estate,
     json: bool,
     occupancy: occupancy::Run,
 }
 
-impl Dispatch {
+impl Dispatch<'_> {
     async fn run(&self, command: Command) -> Result<()> {
         let operation = command.name();
         let intent = self.occupancy.prepare(&self.estate, &command).await;
@@ -99,7 +111,9 @@ impl Dispatch {
             | Command::Skill(_) => {
                 unreachable!("handled before estate open")
             }
-            Command::Issue(args) => forge::run(&self.estate, args.command, self.json).await,
+            Command::Issue(args) => {
+                forge::run(&self.estate, args.command, self.json, self.phase).await
+            }
             Command::Integration(args) => {
                 integration::run(&self.estate, args.command, self.json).await
             }

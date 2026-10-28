@@ -5,7 +5,7 @@ mod project;
 mod runtime;
 mod skill;
 
-pub(crate) use runtime::{config, observation};
+pub(crate) use runtime::{config, observation, phase};
 
 use args::Cli;
 use clap::Parser;

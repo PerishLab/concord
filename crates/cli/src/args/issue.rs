@@ -9,6 +9,13 @@ pub struct Args {
 
 #[derive(Subcommand)]
 pub enum Command {
+    #[command(
+        about = "Explicit native Issue Phase operations; requires [phase] owner/organization/field and [phase.options] exact native IDs; no stored values or history"
+    )]
+    Phase {
+        #[command(subcommand)]
+        command: crate::phase::Command,
+    },
     #[command(about = "Bootstrap a fresh Issue-execution estate")]
     Bootstrap,
     #[command(about = "Project one bounded GitHub Issue brief without persisting it")]
@@ -196,6 +203,7 @@ impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
             Self::Bootstrap => "issue.bootstrap",
+            Self::Phase { command } => command.name(),
             Self::Brief { .. } => "issue.brief",
             Self::Preflight { command } => command.name(),
             Self::Graph { .. } => "issue.graph",
