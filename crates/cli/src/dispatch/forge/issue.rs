@@ -19,8 +19,14 @@ struct Plan {
     observation: observe::Observed,
 }
 
-pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> {
+pub async fn run(
+    estate: &Estate,
+    command: Command,
+    output: bool,
+    phase: Option<&crate::phase::Binding>,
+) -> Result<()> {
     match command {
+        Command::Phase { .. } => unreachable!("handled before estate open"),
         Command::Bootstrap => unreachable!("handled before estate open"),
         Command::Brief {
             issue,
@@ -46,9 +52,13 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                     },
                 )
                 .await?;
-            emit(json!({"brief": brief}), output)
+            let observed =
+                crate::phase::observe(phase, &issue, &brief.issue.node, (&command, timeout)).await;
+            let mut value = json!(brief);
+            value["phase"] = observed;
+            emit(json!({"brief": value}), output)
         }
-        Command::Preflight { command } => preflight(estate, command, output).await,
+        Command::Preflight { command } => preflight(estate, command, output, phase).await,
         Command::Graph {
             issue,
             command,
@@ -179,7 +189,12 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
     }
 }
 
-async fn preflight(estate: &Estate, command: Preflight, output: bool) -> Result<()> {
+async fn preflight(
+    estate: &Estate,
+    command: Preflight,
+    output: bool,
+    phase: Option<&crate::phase::Binding>,
+) -> Result<()> {
     match command {
         Preflight::Proposed {
             repository,
@@ -211,7 +226,16 @@ async fn preflight(estate: &Estate, command: Preflight, output: bool) -> Result<
         }
         Preflight::Existing(relations) => {
             let report = super::preflight::existing(estate, &relations).await?;
-            emit(json!({"preflight": report}), output)
+            let observed = crate::phase::observe(
+                phase,
+                &relations.issue,
+                &report.issue.node,
+                (&relations.command, relations.timeout),
+            )
+            .await;
+            let mut value = json!(report);
+            value["phase"] = observed;
+            emit(json!({"preflight": value}), output)
         }
     }
 }

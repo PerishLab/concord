@@ -18,6 +18,7 @@ fn show(config: &Config, json_output: bool) -> Result<()> {
             "home": config.home.display().to_string(),
             "releases": config.releases,
             "depot": config.depot,
+            "phase": config.phase,
         }),
         json_output,
     );

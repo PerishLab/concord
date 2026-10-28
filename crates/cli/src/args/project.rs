@@ -16,7 +16,7 @@ pub enum Command {
     Show(Observe),
     #[command(
         about = "Read the next Issue from current native Project planning",
-        long_about = "Consume one explicit Project without opening local execution state or writing provider facts. The first-phase policy uses Asia/Shanghai calendar dates, one unambiguous Project-owned iteration field and one Project-owned Urgent/High/Medium/Low priority field. Only the unique current cycle is considered, in native item order; priority never reranks that order. Archived, closed and nonordinary items, open blockers and needs labels are skipped. No backlog or expired-cycle fallback occurs. Missing or ambiguous planning scope returns null in JSON and silent human output. Incomplete necessary facts and provider failures are errors. A result observes planning, not execution readiness or permission; use Issue preflight for local non-exclusive execution observations before starting or continuing work."
+        long_about = "Consume one explicit Project without opening local execution state or writing provider facts. The first-phase policy uses Asia/Shanghai calendar dates, one unambiguous Project-owned iteration field and one Project-owned Urgent/High/Medium/Low priority field. Only the unique current cycle is considered, in native item order; priority never reranks that order. Archived, closed and nonordinary items, open blockers and needs labels are skipped. No backlog or expired-cycle fallback occurs. Missing or ambiguous planning scope returns null in JSON and silent human output. Incomplete necessary facts and provider failures are errors. Phase is carried from the explicit [phase] binding without reranking or treating unset/unavailable as a new selection rule. A result observes planning, not execution readiness or permission; use Issue preflight for local non-exclusive execution observations before starting or continuing work."
     )]
     Next(Observe),
     #[command(about = "List the bounded provider-visible organization Project inventory")]
@@ -103,6 +103,7 @@ candidates: issues (1..500 original Issue node IDs), present (boolean)
 field: name, datatype (TEXT/NUMBER/DATE/SINGLE_SELECT/MULTI_SELECT), options
 rename: field (Project field node ID), name, options?
 remove: field (empty Project-owned field only; cycles/history remain protected)
+attach: origin (exact organization-only native single-select Issue-field node ID; attaches presentation, preserving Issue authority)
 detach: field (attached Project field node ID), origin (exact organization Issue-field node ID)
 view: name, layout (table/board/roadmap), filter, visible, group, vertical, sort
 revise: view (node ID), name?, layout?, filter?, visible?

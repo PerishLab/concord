@@ -43,6 +43,15 @@ impl Builder<'_> {
                 json!({"projectId":project,"repositoryId":repository}),
             ),
             Action::Candidates { .. } => return self.candidates(intent),
+            Action::Attach { origin } => {
+                if super::desired::result(self.state, intent).is_some() {
+                    return Ok(Vec::new());
+                }
+                (
+                    "createProjectV2IssueField",
+                    json!({"projectId":project,"issueFieldId":origin}),
+                )
+            }
             Action::Field { .. } => ("createProjectV2Field", self.field(&intent.action)),
             Action::Rename { .. } => ("updateProjectV2Field", self.rename(&intent.action)?),
             Action::Remove { field } | Action::Detach { field, .. } => {

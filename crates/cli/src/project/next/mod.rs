@@ -9,7 +9,11 @@ use crate::args::project::Observe;
 use concord_core::Result;
 use serde_json::{Value, json};
 
-pub(super) async fn run(args: Observe, output: bool) -> Result<()> {
+pub(super) async fn run(
+    args: Observe,
+    output: bool,
+    phase: Option<&crate::phase::Binding>,
+) -> Result<()> {
     let client = Client {
         command: &args.command,
         timeout: args.timeout,
@@ -24,6 +28,22 @@ pub(super) async fn run(args: Observe, output: bool) -> Result<()> {
     })?;
     let mut result = select(&state, day)?;
     if !result["issue"].is_null() {
+        read::confirm(&client, &result["issue"]).await?;
+        let issue = &result["issue"];
+        let target = format!(
+            "{}#{}",
+            issue["repository"]["nameWithOwner"]
+                .as_str()
+                .unwrap_or_default(),
+            issue["number"]
+        );
+        result["phase"] = crate::phase::observe(
+            phase,
+            &target,
+            issue["id"].as_str().expect("native Issue"),
+            (&args.command, args.timeout),
+        )
+        .await;
         read::confirm(&client, &result["issue"]).await?;
     }
     read::finish(&client, &state["project"]).await?;
@@ -50,6 +70,7 @@ pub(super) async fn run(args: Observe, output: bool) -> Result<()> {
             result["issue"]["title"].as_str().unwrap_or(""),
             result["reason"].as_str().unwrap_or("")
         );
+        println!("Phase: {}", result["phase"]);
     }
     Ok(())
 }

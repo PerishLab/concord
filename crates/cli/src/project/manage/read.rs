@@ -84,7 +84,11 @@ impl Reader<'_, '_> {
         columns(&state)?;
         state["issues"] = self.issues(intent).await?;
         state["repository"] = self.repository(intent).await?;
-        state["origin"] = self.origin(intent).await?;
+        state["origin"] = if matches!(intent.action, Action::Attach { .. }) {
+            super::super::field::origin(self.client, project, intent).await?
+        } else {
+            self.origin(intent).await?
+        };
         Ok(state)
     }
 

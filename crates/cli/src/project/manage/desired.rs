@@ -81,6 +81,21 @@ impl<'a> Facts<'a> {
                 .find("fields", field)
                 .is_none()
                 .then(|| json!({"field":field,"present":false})),
+            Action::Attach { origin } => {
+                let found = self
+                    .list("fields")
+                    .iter()
+                    .filter(|field| {
+                        field["authority"] == "issue" && field["issueField"]["id"] == *origin
+                    })
+                    .collect::<Vec<_>>();
+                let [field] = found.as_slice() else {
+                    return None;
+                };
+                (field["dataType"] == self.state["origin"]["dataType"]
+                    && field["issueField"]["options"] == self.state["origin"]["options"])
+                    .then(|| (*field).clone())
+            }
             Action::Detach { field, origin } => {
                 let absent = self.find("fields", field).is_none();
                 (absent && self.state["origin"]["id"] == *origin)

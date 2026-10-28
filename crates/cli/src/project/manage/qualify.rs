@@ -91,6 +91,7 @@ impl<'a> Context<'a> {
                 }
             }
             Action::Remove { field } => super::super::field::empty(self.state, field)?,
+            Action::Attach { .. } => {}
             Action::Detach { field, origin } => {
                 let field = self.find("fields", field)?;
                 if field["authority"] != "issue" || field["issueField"]["id"] != *origin {

@@ -26,6 +26,7 @@ pub(super) async fn perform(client: &Client<'_>, state: &Value, step: &Step) -> 
         "unlinkProjectV2FromRepository" => "UnlinkProjectV2FromRepositoryInput",
         "addProjectV2ItemById" => "AddProjectV2ItemByIdInput",
         "deleteProjectV2Item" => "DeleteProjectV2ItemInput",
+        "createProjectV2IssueField" => "CreateProjectV2IssueFieldInput",
         "createProjectV2Field" => "CreateProjectV2FieldInput",
         "updateProjectV2Field" => "UpdateProjectV2FieldInput",
         "deleteProjectV2Field" => "DeleteProjectV2FieldInput",

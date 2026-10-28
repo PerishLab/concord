@@ -3,6 +3,8 @@ mod automation;
 #[cfg(unix)]
 mod fixture;
 mod landing;
+#[cfg(unix)]
+mod phase;
 
 #[cfg(unix)]
 mod unix {

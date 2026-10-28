@@ -12,6 +12,7 @@ pub struct Config {
     pub home: PathBuf,
     pub releases: String,
     pub depot: String,
+    pub phase: Option<crate::phase::Binding>,
 }
 
 pub struct Loaded {
@@ -47,6 +48,7 @@ impl Default for Config {
             home: plumb::config::data("concord").unwrap_or_default(),
             releases: RELEASES.to_string(),
             depot: DEPOT.to_string(),
+            phase: None,
         }
     }
 }
@@ -88,6 +90,7 @@ impl Config {
             home: home.map(Path::to_path_buf),
             releases: releases.map(str::to_string),
             depot: None,
+            phase: None,
         });
         let config = config.validate()?;
         let selected = Selection {

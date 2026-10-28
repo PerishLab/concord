@@ -42,6 +42,9 @@ pub(in crate::project) enum Action {
     Remove {
         field: String,
     },
+    Attach {
+        origin: String,
+    },
     Detach {
         field: String,
         origin: String,
