@@ -18,6 +18,9 @@ pub async fn run(cli: args::Cli) -> Result<()> {
     if let Command::Cookbook(args) = &cli.command {
         return output::cookbook::run(args.code.as_deref(), cli.json);
     }
+    if let Command::Member(args) = &cli.command {
+        member::supported(&args.command)?;
+    }
     if let Command::Config(config) = &cli.command
         && matches!(config.command, args::Configure::Path)
     {

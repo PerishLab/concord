@@ -11,6 +11,13 @@ mod reference;
 mod start;
 mod status;
 
+pub(super) fn supported(command: &Command) -> Result<()> {
+    if let Command::Landing { command } = command {
+        landing::run(command)?;
+    }
+    Ok(())
+}
+
 pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> {
     match command {
         Command::List { issue } => list(estate, issue, output).await,
@@ -77,7 +84,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             }).await?}),
             output,
         ),
-        Command::Landing { command } => landing::run(estate, command, output).await,
+        Command::Landing { command } => landing::run(&command),
         Command::Reference { command } => reference::run(estate, command, output).await,
         Command::Release {
             issue,
