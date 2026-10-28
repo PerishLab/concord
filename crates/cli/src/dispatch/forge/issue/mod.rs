@@ -26,6 +26,7 @@ pub async fn run(
     phase: Option<&crate::phase::Binding>,
 ) -> Result<()> {
     match command {
+        Command::Close { .. } => unreachable!("handled before estate open"),
         Command::Phase { .. } => unreachable!("handled before estate open"),
         Command::Bootstrap => unreachable!("handled before estate open"),
         Command::Brief {

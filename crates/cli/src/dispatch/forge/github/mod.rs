@@ -1,10 +1,10 @@
 pub(crate) mod delivery;
 pub(crate) mod identity;
 pub(super) mod issues;
+pub(super) mod lifecycle;
 pub(crate) mod observation;
 pub(super) mod projections;
 pub(crate) mod pull;
-mod refusal;
 pub(super) mod transport;
 
 use super::projection::{Fault, PageRequest, Projection};
@@ -229,9 +229,13 @@ fn failure(failure: transport::Failure) -> Fault {
     match failure {
         Failure::Spawn { .. } | Failure::Exchange(_) => provider("command", failure.to_string()),
         Failure::Timeout => provider("timeout", "GitHub Issue projection timed out"),
-        Failure::Refused { status, stderr } => {
-            provider("provider", refusal::message(status, &stderr))
-        }
+        Failure::Refused { status, stderr } => provider(
+            "provider",
+            format!(
+                "GitHub Issue projection was refused by the provider (api graphql; {status}; {}). Provider stderr is withheld; read concord cookbook concord.issue.projection.provider before resuming delivery.",
+                transport::diagnostic(&stderr)
+            ),
+        ),
         Failure::Oversized(Stream::Stdout) => provider(
             "malformed",
             "GitHub Issue projection exceeds the reply limit",
