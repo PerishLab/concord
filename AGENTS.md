@@ -55,6 +55,12 @@ of copying its answer here.
   local execution observations remain available through Issue preflight and
   never become ownership or automatic exclusion. Next is a query, not a seat.
 
+- Complete Project observation reads attached Issue fields in groups of at most
+  four concurrent Issue read/confirmation pairs. Each pair retains its pages
+  and exact identity/freshness check; item order and the final Project metadata
+  check remain unchanged. A group finishes all its bounded reads before any
+  error returns; no later group or background continuation starts on failure.
+
 - Ordinary open replays exactly the current Issue-execution model. It never
   evolves, repairs, migrates, or falls back to an older managed shape.
 - An Issue anchor retains only stable GitHub node identity, the minimum

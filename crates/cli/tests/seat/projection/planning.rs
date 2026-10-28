@@ -68,7 +68,11 @@ pub(super) fn provider(root: &Path, mode: &str) -> PathBuf {
     let repository = json!({"id":"R_repo"});
     let stamp = json!({"id":"I_work", "updatedAt":"2026-10-21T00:00:00Z", "repository":repository});
     script.push_str(&format!("*'on Issue'*) {} ;;\n", node(&stamp)));
-    script.push_str(&format!("*) {} ;;\nesac\n", node(&project)));
+    let mut finality = project.clone();
+    if mode == "final" {
+        finality["title"] = "Concurrent edit".into();
+    }
+    script.push_str(&format!("*) {} ;;\nesac\n", node(&finality)));
     let path = root.join(format!("provider-{mode}"));
     plumb::testing::executable(&path, script);
     path
