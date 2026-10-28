@@ -1,6 +1,6 @@
-use super::client::Client;
+use super::adaptor::Checks;
+use super::adaptor::Client;
 use super::git::Git;
-use super::model::Checks;
 use super::pull::{Pull, State, stale};
 use concord_core::issue_delivery::Preparation;
 use concord_core::{Error, Result};
@@ -122,7 +122,7 @@ fn exhausted(message: String) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::super::model::Checks;
+    use super::super::adaptor::Checks;
     use super::super::pull::{Commit, Pull, State};
     use super::{BUDGET, CEILING, FIRST, Step, Wait, merged};
 

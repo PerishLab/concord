@@ -187,7 +187,7 @@ fn inspect(space: &Path) -> Child {
         .expect("audit")
 }
 
-fn open(space: &Path) -> String {
+pub(super) fn open(space: &Path) -> String {
     success(space, &["issue", "bootstrap"]);
     let provider = tool(space, "provider", projection(space));
     let command = provider.to_str().expect("provider path");
@@ -273,7 +273,7 @@ fn open(space: &Path) -> String {
     provider.to_str().expect("provider path").to_string()
 }
 
-fn revision(space: &Path) -> String {
+pub(super) fn revision(space: &Path) -> String {
     let shown = success(space, &["issue", "show", "PerishLab/probe#1"]);
     shown["anchor"]["revision"].to_string()
 }

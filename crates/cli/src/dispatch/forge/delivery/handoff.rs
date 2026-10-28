@@ -1,5 +1,5 @@
 use super::super::super::emit;
-use super::super::projection::Projection;
+use super::adaptor;
 use concord_core::authority::Plumb;
 use concord_core::{Coordinate, Error, Estate, Result, issue_delivery};
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,13 @@ pub struct Parameters<'a> {
 pub async fn prepare(estate: &Estate, parameters: Parameters<'_>, output: bool) -> Result<()> {
     let prepared = request(estate, &parameters).await;
     match prepared {
-        Ok(plan) => emit(json!({"plan": plan}), output),
+        Ok(plan) => {
+            crate::output::value(
+                json!({"version": 2, "forge": adaptor::Identity::of(&plan), "plan": plan}),
+                output,
+            );
+            Ok(())
+        }
         Err(error) if parameters.carry => emit(json!({"error": Refusal::capture(&error)}), output),
         Err(error) => Err(error),
     }
@@ -35,10 +41,9 @@ pub async fn prepare(estate: &Estate, parameters: Parameters<'_>, output: bool) 
 
 async fn request(estate: &Estate, parameters: &Parameters<'_>) -> Result<issue_delivery::Plan> {
     let issue = Coordinate::parse(parameters.issue)?;
-    let observed = Projection::new(parameters.command, 100, 1, parameters.timeout)
-        .delivery(&issue)
-        .await?;
     let member = estate.issue_member(&issue).await?;
+    adaptor::integration(&member.integration).await?;
+    let observed = adaptor::observe(parameters.command, parameters.timeout, &issue).await?;
     super::branches::clean(
         estate,
         &member.integration,

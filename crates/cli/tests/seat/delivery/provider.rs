@@ -95,7 +95,13 @@ pub fn projection(root: &Path) -> String {
     let relations = root.join("relationships");
     let labels = root.join("labels");
     format!(
-        r#"reply() {{
+        r#"if [ "$1" = api ]; then
+  case "$*" in *"--hostname github.com"*) ;; *) echo 'unbound API host' >&2; exit 19 ;; esac
+fi
+if [ "$1" = pr ]; then
+  case "$*" in *"https://github.com/PerishLab/probe"*) ;; *) echo 'unbound pull host' >&2; exit 19 ;; esac
+fi
+reply() {{
   state=$(cat '{state}')
   candidate=$(cat '{merge}.head' 2>/dev/null || git --git-dir='{remote}' rev-parse "refs/heads/$(cat '{head}')") || exit 1
   merge=$(cat '{merge}' 2>/dev/null || true)
@@ -160,8 +166,9 @@ if [ "$1 $2" = "pr view" ] && [ "$7" = statusCheckRollup ]; then
   if [ -f '{rollup}' ]; then cat '{rollup}'; exit 0; fi
   left=$(cat '{waiting}' 2>/dev/null || echo 0)
   status=COMPLETED
-  if [ "$left" -gt 0 ]; then printf '%s' $((left - 1)) > '{waiting}'; status=IN_PROGRESS; fi
-  printf '{{"statusCheckRollup":[{{"__typename":"CheckRun","name":"Guard","status":"%s","conclusion":null}}]}}\n' "$status"
+  conclusion='"SUCCESS"'
+  if [ "$left" -gt 0 ]; then printf '%s' $((left - 1)) > '{waiting}'; status=IN_PROGRESS; conclusion=null; fi
+  printf '{{"statusCheckRollup":[{{"__typename":"CheckRun","name":"Guard","status":"%s","conclusion":%s}}]}}\n' "$status" "$conclusion"
   exit 0
 fi
 if [ "$1 $2" = "pr view" ]; then
