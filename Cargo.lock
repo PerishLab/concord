@@ -692,9 +692,9 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "keel"
-version = "0.27.0"
+version = "0.28.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "fd10c547f8238938b39c69b027317639ba9ef5d38758819e2148cecf44a59ff7"
+checksum = "a5628fc96dfe299db7609482be43f82f553793f23fa46a68628fe167b345725f"
 dependencies = [
  "getrandom 0.3.4",
  "keel-macro",
@@ -708,9 +708,9 @@ dependencies = [
 
 [[package]]
 name = "keel-macro"
-version = "0.27.0"
+version = "0.28.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "c3ffe5efc3aa7fa76a6802858d1251b7a23c6a4cfc4abc3b8223b9f2f10f74dc"
+checksum = "a7af2883b82bb82aba28244481503efeb6976abc383121b30ca788045458eb20"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -890,9 +890,9 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
 name = "plumb"
-version = "0.111.0"
+version = "0.112.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "584a556dfd00d1dca0adbbbfe86becbbd5540326f620f359b0ec30c9031c1660"
+checksum = "162e4675a03086513da468c3e7fe033efbfb7ec609b4b6172c4c5697975366dc"
 dependencies = [
  "base64",
  "clap",
@@ -902,6 +902,7 @@ dependencies = [
  "object",
  "pin-project-lite",
  "plumb-macro",
+ "radicula-lock",
  "semver",
  "serde",
  "serde_json",
@@ -918,9 +919,9 @@ dependencies = [
 
 [[package]]
 name = "plumb-macro"
-version = "0.111.0"
+version = "0.112.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "8860b9beb1c40d8c8856d565eb310025a99bb41345b9bcf1b728c89408694aa2"
+checksum = "1bd61483c287d1bc5a4f79c33e4a305805878af033fd74bf95b517b24434f0b4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -979,6 +980,12 @@ name = "r-efi"
 version = "5.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
+
+[[package]]
+name = "radicula-lock"
+version = "0.2.0"
+source = "sparse+https://cargo.perish.uk/"
+checksum = "860fb4665f70d4e9f6358cb0c6019d7d9af9f259c906e5aae4a9049ed3df977f"
 
 [[package]]
 name = "redox_syscall"
