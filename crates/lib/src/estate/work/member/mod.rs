@@ -144,7 +144,7 @@ impl Estate {
             }) {
                 return Err(Error::typed(
                     "concord.artifact.absent",
-                    "no Artifact matches the given patterns",
+                    "no Artifact matches the given patterns; preserve the unlanded work with concord artifact import, then select matching Issue-held Artifact names with concord member retire --artifacts",
                 ));
             }
         }

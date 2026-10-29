@@ -93,10 +93,13 @@ pub enum Command {
         #[arg(long)]
         apply: bool,
     },
-    #[command(about = "Remove one clean unlanded Issue Member against matching Artifacts")]
+    #[command(
+        about = "Remove one clean unlanded Issue Member against matching Artifacts",
+        long_about = "Remove one clean unlanded Issue Member against matching Artifacts held by its Issue. First capture the unlanded work and preserve it with concord artifact import. Supply matching Artifact names with --artifacts; '*' matches any held Artifact. Import and retirement remain separate explicit operations."
+    )]
     Retire {
         issue: String,
-        #[arg(long, required = true, num_args = 1..)]
+        #[arg(long, required = true, num_args = 1.., help = "Artifact names held by this Issue; '*' matches any. Preserve unlanded work with concord artifact import first")]
         artifacts: Vec<String>,
         #[arg(long)]
         revision: i64,
