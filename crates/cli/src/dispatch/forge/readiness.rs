@@ -2,7 +2,7 @@ use super::projection::authority::{evidence, trust};
 use super::projection::{self, Connection, Fault, Projection, Readiness, ReadinessChecks};
 use concord_core::acceptance::{Verdict, checkboxes, sections};
 use concord_core::{Coordinate, Error, Result};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::Instant;
 
 impl Projection<'_> {
@@ -111,15 +111,7 @@ pub(in crate::dispatch) fn conditions(
     blockers: bool,
 ) -> (ReadinessChecks, Vec<String>) {
     let sections = sections(body);
-    let missing = required_sections(kind)
-        .iter()
-        .filter(|name| {
-            sections
-                .get(**name)
-                .is_none_or(|body| body.trim().is_empty())
-        })
-        .copied()
-        .collect::<Vec<_>>();
+    let missing = missing(&sections, kind);
     let acceptance = sections
         .get("acceptance")
         .map(String::as_str)
@@ -136,6 +128,31 @@ pub(in crate::dispatch) fn conditions(
     };
     let reasons = reasons(&missing, &checks);
     (checks, reasons)
+}
+
+fn missing(sections: &BTreeMap<String, String>, kind: &str) -> Vec<&'static str> {
+    required_sections(kind)
+        .iter()
+        .filter(|name| {
+            sections
+                .get(**name)
+                .is_none_or(|body| body.trim().is_empty())
+        })
+        .copied()
+        .collect()
+}
+
+pub(super) fn advice(body: &str, kind: &str) -> Option<String> {
+    if !matches!(kind, "Feature" | "Bug" | "Task") {
+        return None;
+    }
+    let missing = missing(&sections(body), kind);
+    (!missing.is_empty()).then(|| {
+        format!(
+            "{kind} needs nonempty required sections: {}. Add these sections before starting Member work; see concord issue preflight existing --help",
+            missing.iter().map(|name| format!("## {name}")).collect::<Vec<_>>().join(", "),
+        )
+    })
 }
 
 fn refuse(started: Instant, error: Fault) -> Error {

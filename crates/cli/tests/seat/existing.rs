@@ -1,5 +1,7 @@
 #[cfg(unix)]
+#[path = "issue"]
 mod unix {
+    mod sections;
     use super::super::execution::unix::{Facts, provider, repository};
     use super::super::spawn;
     use serde_json::{Value, json};
