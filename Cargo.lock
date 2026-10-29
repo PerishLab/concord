@@ -194,6 +194,7 @@ dependencies = [
  "locus",
  "plumb",
  "pulldown-cmark",
+ "radicula-lock",
  "rustix",
  "serde",
  "serde_json",

@@ -1,8 +1,8 @@
 use crate::path::at;
 use crate::{Error, Result};
-use fs2::FileExt;
 use keel::adapt::db::Sqlite;
 use keel::{Core, Status};
+use radicula_lock::Mode;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
@@ -162,13 +162,13 @@ impl Estate {
 
     fn guard(&self) -> Result<File> {
         let file = self.latch()?;
-        file.lock_exclusive()?;
+        radicula_lock::lock(&file, Mode::Exclusive)?;
         Ok(file)
     }
 
     fn share(&self) -> Result<File> {
         let file = self.latch()?;
-        file.lock_shared()?;
+        radicula_lock::lock(&file, Mode::Shared)?;
         Ok(file)
     }
 
