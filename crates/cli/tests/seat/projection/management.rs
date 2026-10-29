@@ -143,6 +143,7 @@ def view(payload):
     value={'id':'V_'+str(len(s['views'])),'project':{'id':s['project']['id']},'number':len(s['views'])+1,'fullDatabaseId':'501','name':payload['name'],'layout':payload['layout'].upper()+'_LAYOUT','filter':payload['filter'],'updatedAt':'view-original','configuration':{'visibleFields':visible},'groupByFields':refs(payload['group_by']),'verticalGroupByFields':refs(payload['vertical_group_by']),'sortByFields':page([{'direction':direction.upper(),'field':{'id':mapping[identity]}} for identity,direction in payload['sort_by']])}
     s['views'].append(value);return value
 args=sys.argv[1:]
+s['calls']=s.get('calls',0)+1;save()
 if args[:3]==['api','--method','GET']:
     if '--include' not in args:fail()
     print('HTTP/2.0 200 OK\r\nContent-Type: application/json\r\n\r\n'+json.dumps(fields()),end='');sys.exit(0)
@@ -225,11 +226,23 @@ if 'projectsV2(first:' in q:
     projects=[s['project'] if x['id']==s['project']['id'] else x for x in s['projects']]
     emit({'data':{'organization':{'id':'O_lab','login':'PerishLab','url':'https://github.com/PerishLab','projectsV2':page(projects)}}})
 if 'organization(login:' in q:
+    s['starts']=s.get('starts',0)+1
+    if s['starts']==2:
+        if s['mode']=='prepare-project':s['project']['title']='DIAGNOSTIC_SECRET'
+        if s['mode']=='prepare-items':s['items'].append({'id':'ITEM_DIAGNOSTIC_SECRET','type':'ISSUE','isArchived':False,'updatedAt':'DIAGNOSTIC_SECRET','project':{'id':s['project']['id']},'content':copy.deepcopy(s['issues'][0])})
+        if s['mode']=='prepare-issues':s['issues'][0]['updatedAt']='DIAGNOSTIC_SECRET'
+        if s['mode']=='prepare-fields':s['fields'].reverse()
+        if s['mode'].startswith('prepare-history-'):s['statusUpdates'].append({'id':'DIAGNOSTIC_SECRET','body':'DIAGNOSTIC_SECRET '+s['mode'],'createdAt':'DIAGNOSTIC_SECRET','updatedAt':'DIAGNOSTIC_SECRET'})
+        if s['mode']=='prepare-key-order':s['project']=dict(reversed(list(s['project'].items())))
+        if s['mode']=='prepare-failure':save();fail()
     s['projection']=s['mode']=='delayed-project' and s.get('delay',0)>0
     if s['projection']:s['delay']-=1
     save();emit({'data':{'organization':{'projectV2':projected()}}})
 for name in ['fields','items','views','workflows','repositories','statusUpdates']:
     if name+'(first:' in q:
+        if name=='fields' and s['mode']=='prepare-incomplete' and s.get('starts',0)==2:
+            project=projected();project[name]=page(s[name]);project[name]['pageInfo']['hasNextPage']=True
+            emit({'data':{'node':project}})
         if name=='items' and s['mode'].startswith('snapshot') and s.get('snapshot',0)>0:
             project=projected()
             if v.get('after') is None:

@@ -95,3 +95,50 @@ fn context() {
     assert_eq!(writes(&fixture), 1);
     assert_eq!(fixture.state()["statusUpdates"][1]["id"], "U_foreign");
 }
+
+#[test]
+fn diagnostics() {
+    for (mode, changed) in [
+        ("project", json!(["project"])),
+        ("items", json!(["items"])),
+        ("issues", json!(["issues"])),
+        ("fields", json!(["fields", "columns"])),
+        ("history-own", json!(["statusUpdates"])),
+        ("history-peer", json!(["statusUpdates"])),
+    ] {
+        let fixture = Fixture::new(&format!("prepare-{mode}"));
+        let action = if mode == "issues" {
+            selection()
+        } else {
+            intent(json!({"kind":"record","body":"A bounded fixture note"}))
+        };
+        let error = refused(&fixture.run("prepare", &action), "concord.project.changed");
+        assert_eq!(error["error"]["details"]["changed"], changed, "{mode}");
+        assert_eq!(error["error"]["details"]["truncated"], false);
+        assert!(!error.to_string().contains("DIAGNOSTIC_SECRET"));
+        assert!(!error.to_string().contains("I_one"));
+        let state = fixture.state();
+        assert_eq!(state["starts"], 2);
+        assert_eq!(state["calls"], if mode == "issues" { 18 } else { 16 });
+        assert!(state["writes"].as_array().unwrap().is_empty());
+    }
+}
+
+#[test]
+fn acquisition() {
+    let action = intent(json!({"kind":"record","body":"A bounded fixture note"}));
+    let fixture = Fixture::new("prepare-key-order");
+    decoded(&fixture.run("prepare", &action));
+    assert_eq!(fixture.state()["starts"], 2);
+    assert_eq!(fixture.state()["calls"], 16);
+    for (mode, code, calls) in [
+        ("prepare-failure", "concord.project.provider", 9),
+        ("prepare-incomplete", "concord.project.schema", 10),
+    ] {
+        let fixture = Fixture::new(mode);
+        let error = refused(&fixture.run("prepare", &action), code);
+        assert!(error["error"]["details"].is_null());
+        assert_eq!(fixture.state()["calls"], calls);
+        assert!(fixture.state()["writes"].as_array().unwrap().is_empty());
+    }
+}
