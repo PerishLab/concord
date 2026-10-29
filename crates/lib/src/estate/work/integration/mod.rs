@@ -4,7 +4,7 @@ pub(in crate::estate) mod registration;
 mod retirement;
 
 use crate::{Error, Result};
-use fs2::FileExt;
+use radicula_lock::Mode;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::path::PathBuf;
@@ -62,7 +62,7 @@ pub(in crate::estate) fn guard(estate: &crate::estate::Estate, held: &Integratio
         .truncate(false)
         .open(&path)?;
     crate::path::at(&path).mode(0o600)?;
-    file.lock_exclusive()?;
+    radicula_lock::lock(&file, Mode::Exclusive)?;
     Ok(file)
 }
 

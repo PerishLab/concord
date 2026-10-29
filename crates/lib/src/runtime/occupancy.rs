@@ -1,7 +1,7 @@
 use crate::activity::Operator;
 use crate::path::at;
 use crate::{Error, Result};
-use fs2::FileExt;
+use radicula_lock::Mode;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::path::Path;
@@ -130,7 +130,7 @@ fn persist(space: &Path, entry: Entry<'_>) -> Result<Occupancy> {
     let encoded = serde_json::to_vec_pretty(&ledger)
         .map_err(|error| Error::typed("concord.occupancy.encode", error.to_string()))?;
     at(&path).write(&encoded, 0o600)?;
-    FileExt::unlock(&guard).map_err(|error| {
+    radicula_lock::unlock(&guard).map_err(|error| {
         Error::typed(
             "concord.occupancy.unlock",
             format!("cannot release occupancy ledger: {error}"),
@@ -218,7 +218,7 @@ fn guard(root: &Path) -> Result<File> {
         .truncate(false)
         .open(&path)?;
     at(&path).mode(0o600)?;
-    file.try_lock_exclusive().map_err(|error| {
+    radicula_lock::attempt(&file, Mode::Exclusive).map_err(|error| {
         Error::typed(
             "concord.occupancy.busy",
             format!("occupancy ledger is busy: {error}"),
