@@ -38,7 +38,10 @@ pub enum Command {
         #[arg(long)]
         revision: i64,
     },
-    #[command(about = "Shrink one Issue Member claim to an explicit set")]
+    #[command(
+        about = "Shrink one Issue Member claim to an explicit set",
+        long_about = "Shrink one Issue Member claim after its current work is committed and both the Member worktree and registered Integration checkout are clean. Supply the complete remaining Claim, the current Issue revision and --apply. Concord checks the committed delta from the merge base with the current Integration against that set; every changed path must remain covered. Commit through the repository Guard before narrowing, then prove a current Boundary before delivery."
+    )]
     Narrow {
         issue: String,
         #[arg(long, required = true, num_args = 1..)]
