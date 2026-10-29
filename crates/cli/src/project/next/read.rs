@@ -40,7 +40,11 @@ pub(super) async fn state(client: &Client<'_>, args: &Observe) -> Result<Value> 
         let spec = Spec {
             name,
             query: connection(name),
-            size: args.size.min(20),
+            size: if name == "items" {
+                args.size
+            } else {
+                args.size.min(20)
+            },
             pages: args.pages,
         };
         let mut collection = wire::collect(client, project, spec).await?;

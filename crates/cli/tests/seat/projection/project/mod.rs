@@ -1,3 +1,6 @@
+#[cfg(unix)]
+mod paging;
+
 use super::super::spawn;
 #[cfg(unix)]
 use super::planning as fixture;
