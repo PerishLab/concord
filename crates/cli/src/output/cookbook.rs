@@ -70,6 +70,15 @@ fn book() -> Cookbook {
             ),
         ),
         entry(
+            "concord.issue.close.indeterminate",
+            "An explicitly requested Issue close did not yield a complete acknowledgement and independent lifecycle/acceptance confirmation. The Issue may already be closed; GitHub provides no atomic body/review condition for close.",
+            "Retain the closure plan and refusal. Run concord issue close recover ISSUE --input PLAN to read current facts without writes. Observed closed or open establishes neither authorship nor permission to replay. Review the exact Issue, body review, declaration, closure, target and current lifecycle; resolve any changed or unknown acceptance through its owning flow. A further close requires a new explicit decision and fresh preparation; never blindly repeat apply, reopen, edit the body or replace a judgment to hide the outcome.",
+            (
+                "Retain the outcome, attempted flag, stage and cause code with the plan. Independent recovery reports current lifecycle, acceptance and whether the prepared basis still matches; provider failure remains unknown.",
+                "Current facts and the remaining disposition are explicitly reviewed, or a fresh authorized action is independently confirmed against its own current basis.",
+            ),
+        ),
+        entry(
             "concord.boundary.refused",
             "A Member Claim or Boundary proof does not authorize the observed committed delta.",
             "Inspect the Member's normalized Claim and committed diff. Narrow the change or explicitly revise the Claim, then create a fresh Boundary proof against the resulting HEAD.",

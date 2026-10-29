@@ -1,3 +1,6 @@
+mod fixture;
+mod issue;
+
 use super::{evaluate::World, world};
 use serde_json::{Value, json};
 use std::path::Path;

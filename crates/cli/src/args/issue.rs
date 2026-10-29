@@ -9,6 +9,11 @@ pub struct Args {
 
 #[derive(Subcommand)]
 pub enum Command {
+    #[command(about = "Explicit acceptance-bound Issue closure without opening local execution", long_about = super::close::HELP)]
+    Close {
+        #[command(subcommand)]
+        command: super::close::Command,
+    },
     #[command(
         about = "Explicit native Issue Phase operations; requires [phase] owner/organization/field and [phase.options] exact native IDs; no stored values or history"
     )]
@@ -222,6 +227,7 @@ impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
             Self::Bootstrap => "issue.bootstrap",
+            Self::Close { command } => command.name(),
             Self::Phase { command } => command.name(),
             Self::Brief { .. } => "issue.brief",
             Self::Preflight { command } => command.name(),

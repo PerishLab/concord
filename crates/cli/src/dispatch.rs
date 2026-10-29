@@ -53,6 +53,16 @@ pub async fn run(cli: args::Cli) -> Result<Completion> {
     )?;
     let config = loaded.config();
     let command = match cli.command {
+        Command::Issue(args)
+            if matches!(args.command, crate::args::issue::Command::Close { .. }) =>
+        {
+            let crate::args::issue::Command::Close { command } = args.command else {
+                unreachable!()
+            };
+            return forge::close::run(command, cli.json)
+                .await
+                .map(|()| Completion::Done);
+        }
         Command::Acceptance(args) => {
             return acceptance::run(args.command, cli.json)
                 .await

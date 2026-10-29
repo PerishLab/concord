@@ -63,6 +63,15 @@ of copying its answer here.
 
 - Ordinary open replays exactly the current Issue-execution model. It never
   evolves, repairs, migrates, or falls back to an older managed shape.
+- Explicit Issue closure is independent of the local estate. Preparation binds
+  the exact Issue/body and current adopted declaration/closure; apply reuses
+  the current acceptance evaluator before one GitHub completed-close request
+  and independently confirms lifecycle and the same basis afterwards. Auto,
+  unknown types and own needs labels refuse. No body, judgment, Phase, Project
+  or Member writes occur. GitHub supplies no atomic body/review CAS: changed
+  post-write facts remain indeterminate. Recovery only observes, claims no
+  authorship and never retries, reopens or changes acceptance. A fresh action
+  after recovery remains the operator's explicit decision.
 - An Issue anchor retains only stable GitHub node identity, the minimum
   coordinate needed to observe it again, and a local execution revision. Forge
   prose, state, type, comments, and relationships remain GitHub truth.

@@ -1,6 +1,7 @@
 pub(crate) mod acceptance;
 pub(crate) mod artifact;
 pub(crate) mod audit;
+pub(crate) mod close;
 pub(crate) mod integration;
 pub(crate) mod issue;
 pub(crate) mod member;

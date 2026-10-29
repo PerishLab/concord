@@ -18,6 +18,14 @@ pub(in crate::dispatch) struct Projection {
 }
 
 impl Projection {
+    pub(in crate::dispatch) fn repository(&self) -> &str {
+        &self.snapshot.header.repository
+    }
+
+    pub(in crate::dispatch) fn labels(&self) -> &[String] {
+        &self.snapshot.labels
+    }
+
     pub(in crate::dispatch) fn report(&self) -> Result<concord_core::acceptance::Report> {
         let history = History::read(&self.snapshot.comments())?;
         let promise = match history.declaration.map(|record| record.marker) {
