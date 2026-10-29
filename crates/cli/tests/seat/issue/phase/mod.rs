@@ -226,3 +226,58 @@ fn opaque() {
     );
     assert_eq!(world.writes(), 0);
 }
+
+#[test]
+fn minimal() {
+    for expected in [Value::Null, json!("Verify")] {
+        let world = World::new();
+        if !expected.is_null() {
+            let plan = decoded(&world.phase("prepare", &intent(expected.clone())));
+            decoded(&world.phase("apply", &plan));
+        }
+        let writes = world.writes();
+        world.change(|state| state["mode"] = "minimal".into());
+        for mode in ["brief", "preflight", "next"] {
+            let key = if mode == "next" { "next" } else { mode };
+            let result = world.observe(mode);
+            let phase = &result[key]["phase"];
+            assert_eq!(
+                phase["status"],
+                if expected.is_null() { "unset" } else { "set" }
+            );
+            assert_eq!(phase["value"], expected);
+        }
+        assert_eq!(world.writes(), writes);
+    }
+}
+
+#[test]
+fn separation() {
+    for key in ["comments", "subIssues", "blocking"] {
+        let world = World::new();
+        let plan = decoded(&world.phase("prepare", &intent(json!("Verify"))));
+        world.change(|state| state["issue"][key]["pageInfo"]["hasNextPage"] = true.into());
+        assert_eq!(
+            world.observe("next")["next"]["phase"]["status"],
+            "unset",
+            "{key}"
+        );
+        refused(
+            &world.phase("prepare", &intent(json!("Verify"))),
+            "concord.phase.unavailable",
+        );
+        refused(&world.phase("apply", &plan), "concord.phase.unavailable");
+        refused(&world.phase("recover", &plan), "concord.phase.unavailable");
+        assert_eq!(world.writes(), 0);
+    }
+    let world = World::new();
+    let plan = decoded(&world.phase("prepare", &intent(json!("Verify"))));
+    world.change(|state| state["issue"]["body"] = "A fresh external edit".into());
+    refused(&world.phase("apply", &plan), "concord.phase.stale");
+    let recovered = decoded(&world.phase("recover", &plan));
+    assert_eq!(
+        recovered["phase"]["current"]["issue"]["body"],
+        "A fresh external edit"
+    );
+    assert_eq!(world.writes(), 0);
+}

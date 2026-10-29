@@ -164,6 +164,10 @@ if q.startswith('mutation'):
     emit({'change':{'clientMutationId':None}})
 if 'issueFields(first:' in q:emit({'organization':{'id':s['owner'],'login':'PerishLab','issueFields':page([s['field']])}})
 i=copy.deepcopy(s['issue'])
+if 'issueFieldValues(first:' in q and s['mode']=='minimal':
+    for word in ['body','state','updatedAt','viewerCanUpdate','parent','subIssues','labels','blockedBy','blocking','comments','issueType']:assert word not in q
+    i={key:i[key] for key in ['id','number','url','repository','issueFieldValues']}
+    emit({'repository':{'id':'R_repo','issue':i}})
 if 'projectV2(number:' in q or 'on ProjectV2' in q:
     project={'__typename':'ProjectV2','id':'PVT_plan','number':1,'title':'Plan','url':'https://github.com/orgs/PerishLab/projects/1','updatedAt':'original','closed':False,'public':False,'readme':'Boundary','shortDescription':'Goal','viewerCanUpdate':True,'owner':{'__typename':'Organization','id':'O_lab','login':'PerishLab'}}
     today=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(hours=8)).date().isoformat()
