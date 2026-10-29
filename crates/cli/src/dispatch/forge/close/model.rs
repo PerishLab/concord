@@ -85,10 +85,7 @@ impl Observation {
             ));
         }
         if self.acceptance.verdict != Verdict::Satisfied {
-            return Err(fault(
-                "acceptance",
-                "current adopted acceptance is not satisfied; inspect acceptance evaluate and issue ready",
-            ));
+            return Err(super::diagnostic::refused(&self.acceptance));
         }
         Ok(Basis {
             issue: self.issue.clone(),
