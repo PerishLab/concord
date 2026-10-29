@@ -25,7 +25,7 @@ pub(crate) async fn observe(
         command: remote.0,
         timeout: remote.1,
     };
-    let result = read::snapshot(&client, binding, target)
+    let result = read::observe(&client, binding, target)
         .await
         .and_then(|state| {
             if state["issue"]["id"] != node {

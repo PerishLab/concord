@@ -3,10 +3,53 @@ use concord_core::{Coordinate, Result};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 
+struct Projection {
+    query: &'static str,
+    connections: &'static [&'static str],
+}
+
 pub(super) async fn snapshot(
     client: &Client<'_>,
     binding: &Binding,
     target: &str,
+) -> Result<Value> {
+    read(
+        client,
+        binding,
+        target,
+        Projection {
+            query: QUERY,
+            connections: &[
+                "issueFieldValues",
+                "labels",
+                "blockedBy",
+                "blocking",
+                "comments",
+                "subIssues",
+            ],
+        },
+    )
+    .await
+}
+
+pub(super) async fn observe(client: &Client<'_>, binding: &Binding, target: &str) -> Result<Value> {
+    read(
+        client,
+        binding,
+        target,
+        Projection {
+            query: OBSERVE,
+            connections: &["issueFieldValues"],
+        },
+    )
+    .await
+}
+
+async fn read(
+    client: &Client<'_>,
+    binding: &Binding,
+    target: &str,
+    projection: Projection,
 ) -> Result<Value> {
     let coordinate = Coordinate::parse(target)?;
     if coordinate.owner != binding.owner {
@@ -16,7 +59,7 @@ pub(super) async fn snapshot(
         ));
     }
     let schema = schema::read(client, binding).await?;
-    let data = client.query(QUERY, json!({"owner":coordinate.owner,"name":coordinate.repository,"number":coordinate.number})).await?;
+    let data = client.query(projection.query, json!({"owner":coordinate.owner,"name":coordinate.repository,"number":coordinate.number})).await?;
     let issue = &data["repository"]["issue"];
     let url = format!(
         "https://github.com/{}/{}/issues/{}",
@@ -31,14 +74,7 @@ pub(super) async fn snapshot(
             "exact native Issue identity is unavailable",
         ));
     }
-    for key in [
-        "issueFieldValues",
-        "labels",
-        "blockedBy",
-        "blocking",
-        "comments",
-        "subIssues",
-    ] {
+    for &key in projection.connections {
         complete(&issue[key])?;
     }
     let mut fields = BTreeSet::new();
@@ -110,3 +146,5 @@ fn complete(connection: &Value) -> Result<()> {
 }
 
 const QUERY: &str = r#"query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){id number url body state updatedAt viewerCanUpdate parent{id} subIssues(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id state}} issueType{id name} repository{id nameWithOwner owner{id}} labels(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id name}} blockedBy(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id state}} blocking(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id state}} comments(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id body updatedAt}} issueFieldValues(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on IssueFieldSingleSelectValue{id optionId name field{... on Node{id}}} ... on IssueFieldTextValue{id value field{... on Node{id}}} ... on IssueFieldNumberValue{id value field{... on Node{id}}} ... on IssueFieldDateValue{id value field{... on Node{id}}} ... on IssueFieldMultiSelectValue{id value field{... on Node{id}}}}}}}}"#;
+
+const OBSERVE: &str = r#"query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){id number url repository{id nameWithOwner owner{id}} issueFieldValues(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on IssueFieldSingleSelectValue{id optionId name field{... on Node{id}}} ... on IssueFieldTextValue{id value field{... on Node{id}}} ... on IssueFieldNumberValue{id value field{... on Node{id}}} ... on IssueFieldDateValue{id value field{... on Node{id}}} ... on IssueFieldMultiSelectValue{id value field{... on Node{id}}}}}}}}"#;
