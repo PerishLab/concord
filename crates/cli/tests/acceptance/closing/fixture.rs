@@ -19,7 +19,7 @@ impl World {
         std::fs::write(root.path().join("data.json"), data.to_string()).unwrap();
         std::fs::write(
             root.path().join("state.json"),
-            json!({"mode":"ok","closed":false,"attempts":0,"heads":0}).to_string(),
+            json!({"mode":"ok","closed":false,"attempts":0,"heads":0,"calls":0}).to_string(),
         )
         .unwrap();
         plumb::testing::executable(&provider, format!("#!/usr/bin/env python3\n{SCRIPT}"));
@@ -150,6 +150,9 @@ assert '--hostname' in sys.argv and sys.argv[sys.argv.index('--hostname')+1] == 
 def save():
     (root / 'state.json').write_text(json.dumps(state))
 
+state['calls'] += 1
+save()
+
 def issue(value):
     if state['closed']:
         value['state'] = 'CLOSED'
@@ -203,11 +206,13 @@ elif query.startswith('query ConcordIssueClose'):
 else:
     if 'children:subIssues' in query:
         reply = data['relations']
-        if mode in ('child','blocked'):
+        if mode in ('child','blocked') or (mode == 'after-unmet' and state['closed']):
             key = 'children' if mode == 'child' else 'blockers'
             reply['data']['repository']['issue'][key] = {'total':1,'nodes':[{'id':'I_blocker','state':'OPEN'}],'page':{'next':False,'cursor':None}}
     elif 'events:timelineItems' in query:
         reply = data['fresh']
+        if mode == 'unordered' or (mode == 'after-unknown' and state['closed']):
+            reply['data']['repository']['issue']['edited'] = '2026-09-30T00:00:00Z'
         if mode == 'reopen':
             reply['data']['repository']['issue']['events'] = {'total':1,'nodes':[{'id':'RE_new','created':'2026-10-01T00:00:00Z'}],'page':{'next':False,'cursor':None}}
         if mode == 'closure':

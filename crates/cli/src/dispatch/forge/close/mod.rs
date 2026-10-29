@@ -1,3 +1,4 @@
+mod diagnostic;
 pub(in crate::dispatch::forge) mod model;
 mod read;
 
@@ -115,11 +116,13 @@ fn fault(kind: &str, message: impl Into<String>) -> Error {
 }
 
 fn unknown(error: Error, stage: &str) -> Error {
-    Error::detailed(
-        "concord.issue.close.indeterminate",
-        "Issue close was attempted but its exact lifecycle and acceptance are not confirmed; run issue close recover with the retained plan before choosing another action",
-        json!({"outcome":"unknown","attempted":true,"stage":stage,"cause_code":error.code(),"semantics":SEMANTICS}),
-    )
+    let mut message = "Issue close was attempted but its exact lifecycle and acceptance are not confirmed; run issue close recover with the retained plan before choosing another action".to_owned();
+    let mut details = json!({"outcome":"unknown","attempted":true,"stage":stage,"cause_code":error.code(),"semantics":SEMANTICS});
+    if error.code() == "concord.issue.close.acceptance" {
+        message = format!("{message}; {}", error.message());
+        details["cause"] = json!(error.details());
+    }
+    Error::detailed("concord.issue.close.indeterminate", message, details)
 }
 
 fn untouched(error: Error) -> Error {
