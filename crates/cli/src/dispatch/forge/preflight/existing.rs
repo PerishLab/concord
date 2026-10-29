@@ -142,6 +142,13 @@ pub async fn run(estate: &Estate, request: &Relations) -> Result<Existing> {
     relationships.sort_by_key(|held| (held.kind.clone(), held.issue.coordinate.number));
     let automation =
         concord_core::automation::held(&complete.kind, &complete.body, &complete.issue.state);
+    let mut diagnostics = observed.diagnostics;
+    if let Some(message) = super::super::readiness::advice(&complete.body, &complete.kind) {
+        diagnostics.push(Diagnostic {
+            code: "concord.issue.sections".into(),
+            message,
+        });
+    }
     Ok(Existing {
         observations: observed.observations,
         automation,
@@ -158,7 +165,7 @@ pub async fn run(estate: &Estate, request: &Relations) -> Result<Existing> {
                 pull,
             })
             .collect(),
-        diagnostics: observed.diagnostics,
+        diagnostics,
         complete: observed.complete,
         observed_at: projection::now(),
     })

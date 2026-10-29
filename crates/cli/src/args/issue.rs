@@ -144,7 +144,10 @@ pub enum Preflight {
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
-    #[command(about = "Explain native relationships and active execution for an existing Issue")]
+    #[command(
+        about = "Explain native relationships and active execution for an existing Issue",
+        long_about = "Explain native relationships and active execution for an existing Issue, and report missing or empty required Markdown sections before Member work. Feature: Problem, Outcome, Acceptance, Non-goals. Bug: Problem, Evidence, Expected outcome, Acceptance, Non-goals. Task: Outcome, Scope, Acceptance, Non-goals. Use level-two headings (##) with nonempty content; quoted, fenced and repeated headings do not establish valid sections. Preflight reports section advice; attach and Member operations keep their own admission checks, and complete describes observation coverage. Auto and unknown types remain read-only."
+    )]
     Existing(Relations),
 }
 
