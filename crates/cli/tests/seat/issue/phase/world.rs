@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::Output;
 
 pub(super) struct World {
-    root: tempfile::TempDir,
+    pub(super) root: tempfile::TempDir,
     provider: PathBuf,
 }
 
@@ -149,7 +149,9 @@ def save():p.write_text(json.dumps(s))
 args=sys.argv[1:]
 if '--input' in args:r=json.load(sys.stdin);q=r['query'];v=r.get('variables',{})
 else:q=next(a[6:] for a in args if a.startswith('query='));v={}
-if s['mode']=='unavailable':sys.exit(1)
+kind='schema' if 'issueFields(first:' in q else 'values' if 'issueFieldValues(first:' in q else 'peer' if 'issues(states:' in q else 'root'
+s.setdefault('reads',[]).append(kind);save()
+if s['mode']=='unavailable' or (s['mode']=='provider' and kind=='root') or (s['mode']=='peer' and kind=='peer'):sys.exit(1)
 if q.startswith('mutation'):
     s['writes'].append(r);f=v['input']['issueFields'];assert len(f)==1 and f[0]['fieldId']=='IFSS_phase'
     values=s['issue']['issueFieldValues']['nodes'];values[:]=[x for x in values if x['field']['id']!='IFSS_phase']
@@ -164,6 +166,8 @@ if q.startswith('mutation'):
     emit({'change':{'clientMutationId':None}})
 if 'issueFields(first:' in q:emit({'organization':{'id':s['owner'],'login':'PerishLab','issueFields':page([s['field']])}})
 i=copy.deepcopy(s['issue'])
+if s['mode']=='drift' and kind=='values':i['id']='I_changed'
+if s['mode']=='paging' and kind=='root':i['blocking']['pageInfo']={'hasNextPage':True,'endCursor':None}
 if 'issueFieldValues(first:' in q and s['mode']=='minimal':
     for word in ['body','state','updatedAt','viewerCanUpdate','parent','subIssues','labels','blockedBy','blocking','comments','issueType']:assert word not in q
     i={key:i[key] for key in ['id','number','url','repository','issueFieldValues']}

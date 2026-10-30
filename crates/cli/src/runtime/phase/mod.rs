@@ -21,6 +21,9 @@ pub(crate) async fn observe(
     let Some(binding) = binding else {
         return json!({"status":"not-configured","observed_at":now(),"value":null,"semantics":"no explicit native Phase binding; unset is not Clarify"});
     };
+    if node.is_empty() {
+        return json!({"status":"unavailable","value":null,"reason":"Phase observation requires a qualified upstream Issue identity","binding":binding,"observed_at":now(),"authority":"issue"});
+    }
     let client = wire::Client {
         command: remote.0,
         timeout: remote.1,
