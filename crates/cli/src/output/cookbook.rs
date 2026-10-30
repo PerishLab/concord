@@ -56,7 +56,7 @@ fn book() -> Cookbook {
             "Member removal or estate settlement failed after Git cleanup started. Concord attempted to restore the original clean checkout; no estate revision was advanced by the refused settlement.",
             "Run outside the Member directory, especially on Windows. Read the exact Issue revision, retained branch and Boundary head (or unchanged base), and audit. If the original Member was restored, retry the original lifecycle command. Otherwise run concord member recover <Issue> --revision <revision> --head <retained-head> --apply. Recovery only restores the declared original branch at an absent or empty derived path, refuses changed or unrelated payload and all unrelated audit faults, and preserves estate, Claims, Boundary and references. Then retry normal release or unchanged completion. Never reset the estate or hand-edit managed seats.",
             (
-                "Preserve the error, exact source commit and merged facts; inspect member list, issue show, Git branch heads and concord audit. A nonempty path or changed branch needs preservation and diagnosis, not deletion or a forced restore.",
+                "Preserve the error, exact source commit and merged facts; inspect member list, issue show, Git branch heads and concord audit. Unchanged completion retires its exact branch; rollback recreates it only if still absent. A newly occupied ref, nonempty path or changed branch needs preservation and diagnosis, not deletion or a forced restore.",
                 "Audit agrees and the original normal lifecycle completes at its exact current revision; repeated recovery never removes payload or advances estate state.",
             ),
         ),

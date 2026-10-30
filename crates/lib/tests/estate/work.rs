@@ -1,5 +1,6 @@
 mod anchor;
 mod authority;
+mod completion;
 mod issue_delivery;
 mod issue_execution;
 mod overlap;

@@ -114,6 +114,32 @@ async fn unchanged() {
             .code(),
         "concord.member.absent"
     );
+    assert!(
+        !world
+            .temp
+            .path()
+            .join(".issues/I_research/worktree")
+            .exists()
+    );
+    let restarted = world
+        .estate
+        .start(&Start {
+            issue: issue.clone(),
+            node: "I_research".into(),
+            stable: "R_concord".into(),
+            kind: "Task".into(),
+            claims: vec!["docs".into()],
+            revision: 2,
+        })
+        .await
+        .expect("restart completed research")
+        .member;
+    assert_eq!(restarted.branch, "task/27");
+    assert_eq!(
+        world.estate.issue(&issue).await.expect("Anchor").revision,
+        3
+    );
+    assert!(world.estate.inspect().await.expect("agreement").agrees());
 }
 
 pub(super) async fn world() -> World {

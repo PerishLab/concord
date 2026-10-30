@@ -76,7 +76,7 @@ impl Estate {
             head: &head,
         };
         cleanup
-            .settle(async {
+            .complete(async {
                 self.core
                     .batch(async |tx| {
                         for row in claims

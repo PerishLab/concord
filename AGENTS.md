@@ -174,6 +174,9 @@ of copying its answer here.
   missing Member at its retained Boundary head or unchanged base, under the
   estate lock, with no unrelated agreement faults and no overwritten payload.
   Recovery preserves revision and proof; normal lifecycle gates still own release.
+  Unchanged completion retires only its exact topic head before estate settlement;
+  rollback recreates a deleted branch only while that ref remains absent. A moved
+  or newly occupied ref is preserved and reported as failed restoration.
 - Keep `.concord`, `.issues`, execution seats, and Artifacts private.
   Never edit or infer managed state by hand.
 - Lock the Space, re-read the relevant revision, compare, and commit one Keel

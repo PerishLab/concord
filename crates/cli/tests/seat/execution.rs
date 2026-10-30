@@ -159,6 +159,21 @@ pub(super) mod unix {
         );
         assert_eq!(completed["revision"], 3);
         assert!(!fixture.path().join(".issues/I_execution/worktree").exists());
+        let mut arguments = arguments;
+        arguments[6] = "3";
+        let restarted = success(fixture.path(), &arguments);
+        assert_eq!(restarted["member"]["branch"], branch);
+        assert!(pending.join(".git").is_file());
+        assert_eq!(
+            success(fixture.path(), &["issue", "show", "PerishLab/concord#26"])["anchor"]["revision"],
+            4
+        );
+        assert!(
+            success(fixture.path(), &["audit"])["agreement"]["faults"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
     }
 
     pub(crate) fn repository(root: &Path, coordinate: &str) -> std::path::PathBuf {

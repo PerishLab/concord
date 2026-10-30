@@ -3,6 +3,9 @@ use crate::{Admission, Coordinate, Seat, git};
 use keel::adapt::db::Sqlite;
 use keel::wire::Wire;
 
+#[path = "closing.rs"]
+mod closing;
+
 #[tokio::test(flavor = "current_thread")]
 async fn unchanged() {
     failure(false).await;
@@ -57,20 +60,23 @@ async fn failure(changed: bool) {
         branch: "task/1",
         head: &head,
     };
-    let error = cleanup
-        .settle(async {
-            assert!(
-                !path.exists(),
-                "external cleanup must precede the failing batch"
-            );
-            estate
-                .core
-                .batch(async |tx| tx.set("Anchor", anchor.key, &[("revision", "1")]).await)
-                .await
-                .map_err(crate::estate::fault)
-        })
-        .await
-        .expect_err("deterministic Keel batch failure");
+    let change = async {
+        assert!(
+            !path.exists(),
+            "external cleanup must precede the failing batch"
+        );
+        estate
+            .core
+            .batch(async |tx| tx.set("Anchor", anchor.key, &[("revision", "1")]).await)
+            .await
+            .map_err(crate::estate::fault)
+    };
+    let error = if changed {
+        cleanup.settle(change).await
+    } else {
+        cleanup.complete(change).await
+    }
+    .expect_err("deterministic Keel batch failure");
     assert_eq!(error.code(), "concord.member.cleanup");
     assert!(
         error
