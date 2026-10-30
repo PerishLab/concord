@@ -11,6 +11,7 @@ pub(super) struct Native<'a> {
     pub source: PathBuf,
     pub member: PathBuf,
     provider: PathBuf,
+    path: Option<std::ffi::OsString>,
 }
 
 impl<'a> Native<'a> {
@@ -128,7 +129,31 @@ impl<'a> Native<'a> {
             source,
             member,
             provider,
+            path: None,
         }
+    }
+
+    pub fn tools(&mut self) {
+        let directory = self.space.join("tools");
+        std::fs::create_dir(&directory).expect("tools");
+        let search = plumb::config::search(self.space).expect("tool search");
+        for name in ["python3", "git"] {
+            let actual = search
+                .resolve(name)
+                .expect("tool")
+                .canonicalize()
+                .expect("path");
+            let quoted = actual.to_str().expect("tool path").replace('\'', "'\\''");
+            plumb::testing::executable(
+                &directory.join(name),
+                format!("#!/bin/sh\nexec '{quoted}' \"$@\"\n"),
+            );
+        }
+        let mut paths = vec![directory];
+        paths.extend(std::env::split_paths(
+            &std::env::var_os("PATH").expect("PATH"),
+        ));
+        self.path = Some(std::env::join_paths(paths).expect("tool PATH"));
     }
 
     pub fn prepare(&self, authority: &str) -> Output {
@@ -157,6 +182,9 @@ impl<'a> Native<'a> {
 
     fn command(&self, verb: &str, authority: &str) -> Command {
         let mut command = spawn::concord(self.space);
+        if let Some(path) = &self.path {
+            command.env("PATH", path);
+        }
         command
             .args([
                 "--root",

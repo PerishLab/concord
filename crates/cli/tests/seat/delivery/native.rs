@@ -202,7 +202,8 @@ fn governed() {
 #[test]
 fn restart() {
     let temp = tempfile::tempdir().expect("fixture");
-    let seat = Native::open(temp.path(), "R_kgDOUesM0Q");
+    let mut seat = Native::open(temp.path(), "R_kgDOUesM0Q");
+    seat.tools();
     let first = seat.land("wharf-native", &seat.prepare("wharf-native").stdout);
     assert!(
         first.status.success(),
@@ -269,4 +270,5 @@ fn restart() {
     let again: Value = serde_json::from_slice(&second.stdout).expect("report");
     assert_eq!(again["merged"], true);
     assert_ne!(again["merge"], report["merge"]);
+    assert_eq!(runs(&seat), 4);
 }
