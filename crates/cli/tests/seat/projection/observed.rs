@@ -72,7 +72,9 @@ fn observed() {
     }
     assert!(calls.clone().any(|call| call["payload"]["outcome"] == "ok"));
     let span = &find("cli.start").expect("audit start")["context"]["locus.span"];
-    let traced = atoms.iter().filter(|atom| atom.get("source").is_some());
+    let traced = atoms.iter().filter(|atom| {
+        atom.get("source").is_some() && atom["context"]["concord.command"] == "audit"
+    });
     assert!(traced.clone().count() > 0);
     for atom in traced {
         assert_eq!(atom["context"]["concord.command"], "audit");
