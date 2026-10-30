@@ -14,6 +14,37 @@ pub(super) struct Cleanup<'a> {
 }
 
 impl Cleanup<'_> {
+    pub async fn complete(&self, change: impl Future<Output = Result<()>>) -> Result<()> {
+        let source = git::at(self.source);
+        source
+            .remove(self.path)
+            .map_err(|error| self.failure(error))?;
+        let reference = format!("refs/heads/{}", self.branch);
+        self.retire(&reference)
+            .map_err(|error| self.failure(error))?;
+        if let Err(error) = change.await {
+            let restored = source
+                .run(&["update-ref", "--no-deref", &reference, self.head, ""])
+                .and_then(|()| self.restore());
+            return Err(self.refusal(error, restored));
+        }
+        Ok(())
+    }
+
+    fn retire(&self, reference: &str) -> Result<()> {
+        let source = git::at(self.source);
+        if !source
+            .text(&["branch", "--list", self.branch, "--format=%(worktreepath)"])?
+            .is_empty()
+        {
+            return Err(Error::typed(
+                "concord.member.cleanup",
+                "Member branch is still checked out; preserve its worktree",
+            ));
+        }
+        source.run(&["update-ref", "--no-deref", "-d", reference, self.head])
+    }
+
     pub async fn settle(&self, change: impl Future<Output = Result<()>>) -> Result<()> {
         if let Err(error) = git::at(self.source).remove(self.path) {
             return Err(self.failure(error));
@@ -25,7 +56,10 @@ impl Cleanup<'_> {
     }
 
     fn failure(&self, error: Error) -> Error {
-        let restored = self.restore();
+        self.refusal(error, self.restore())
+    }
+
+    fn refusal(&self, error: Error, restored: Result<()>) -> Error {
         let recovery = match restored {
             Ok(()) => "original Member restored; retry the same exact revision".to_string(),
             Err(error) => format!(
