@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 
 #[path = "../delivery/engine.rs"]
 mod engine;
+#[path = "../delivery/execution.rs"]
+pub mod execution;
 #[path = "../delivery/gate.rs"]
 mod gate;
 #[path = "../delivery/model.rs"]

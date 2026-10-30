@@ -1,6 +1,10 @@
 #[cfg(unix)]
+#[path = "calls/execution.rs"]
+mod execution;
+#[cfg(unix)]
 mod fixture;
 #[cfg(unix)]
+#[path = "calls/handoff.rs"]
 mod handoff;
 #[cfg(unix)]
 mod native;
@@ -173,23 +177,7 @@ mod unix {
             first.wait_with_output().expect("first land"),
             second.wait_with_output().expect("second land"),
         ];
-        let reports = outputs
-            .iter()
-            .map(|completed| {
-                assert!(
-                    completed.status.success(),
-                    "{}",
-                    String::from_utf8_lossy(&completed.stderr)
-                );
-                serde_json::from_slice::<Value>(&completed.stdout).expect("completion report")
-            })
-            .collect::<Vec<_>>();
-        for report in &reports {
-            assert_eq!(report["schema"], "concord.issue-delivery-land/v3");
-            assert_eq!(report["revision"], 4);
-            assert_eq!(report["pull"]["state"], "MERGED");
-            assert_eq!(report["merge"], reports[0]["merge"]);
-        }
+        let reports = super::execution::reports(&outputs);
         let released = reports
             .iter()
             .filter(|report| report["released"] == true)

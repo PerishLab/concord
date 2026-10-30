@@ -75,20 +75,24 @@ pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<Co
             "land authority does not match the explicitly prepared plan",
         ));
     }
+    let permit = issue_delivery::execution::acquire(estate, &plan).await?;
     let flow = Flow {
         estate,
         plan,
         command,
         timeout,
     };
-    let mut wait = settle::Wait::new();
-    while let Some(pull) = flow.apply(output).await? {
-        if !blocking {
-            return super::progress::pending(&flow.plan, pull, output);
+    super::execution::run(permit, async {
+        let mut wait = settle::Wait::new();
+        while let Some(pull) = flow.apply(output).await? {
+            if !blocking {
+                return super::progress::pending(&flow.plan, pull, output);
+            }
+            settle::wait(&mut flow.client(), pull, &mut wait).await?;
         }
-        settle::wait(&mut flow.client(), pull, &mut wait).await?;
-    }
-    Ok(Completion::Done)
+        Ok(Completion::Done)
+    })
+    .await
 }
 
 impl Flow<'_> {

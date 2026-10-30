@@ -94,6 +94,12 @@ of copying its answer here.
   external provider command for PR mutation. Concord never carries provider
   credentials or replaces repository policy.
 - By default land waits for the pull's checks without holding the Integration lock.
+  One immediate Radicula file admission per stable Issue Anchor covers the whole
+  invocation, including waits and reentry. Its original handle remains held until
+  scoped release; persistent holder PID/plan diagnostics never grant admission.
+  Diagnostics are atomically published separately so Windows contenders need not
+  read the exclusively locked file. Lock files are never replaced or deleted.
+  Contenders refuse before provider work. Other Issues retain independent admission.
   While any check is pending, before marking or after a merge GitHub refuses
   as pending, it returns from the locked flow, polls the checks with backoff
   for at most 30 minutes, then re-enters and revalidates the whole land.

@@ -180,7 +180,7 @@ impl<'a> Native<'a> {
         child.wait_with_output().expect("complete")
     }
 
-    fn command(&self, verb: &str, authority: &str) -> Command {
+    pub fn command(&self, verb: &str, authority: &str) -> Command {
         let mut command = spawn::concord(self.space);
         if let Some(path) = &self.path {
             command.env("PATH", path);
