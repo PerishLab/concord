@@ -7,6 +7,8 @@ use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::thread;
 
+mod entry;
+
 #[cfg(unix)]
 mod estate;
 

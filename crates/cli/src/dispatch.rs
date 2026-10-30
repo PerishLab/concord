@@ -29,6 +29,7 @@ impl Completion {
     }
 }
 
+#[locus::trace(with = plumb::observation::view())]
 pub async fn run(cli: args::Cli) -> Result<Completion> {
     if let Command::Cookbook(args) = &cli.command {
         return output::cookbook::run(args.code.as_deref(), cli.json).map(|()| Completion::Done);
