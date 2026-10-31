@@ -115,6 +115,15 @@ fn book() -> Cookbook {
             ),
         ),
         entry(
+            "concord.delivery.review",
+            "An explicit governance-manual authority lacks a current, correctly bound manual review, or its canonical manual-maintenance declaration changed.",
+            "Only the registered PerishLab/.github repository qualifies. Manually review the exact Issue and source/base/tree under its canonical exception, then prepare with --authority governance-manual --review PATH. The strict JSON requires schema concord.manual-review/v1, verification manual, repository (R_kgDOUsHIOQ), issue (the stable Issue node), source (Member HEAD), target (exact fetched main commit), tree (Member HEAD tree), and reason (1..4096 bytes). Source and base must retain the manual declarations in AGENTS.md and GOVERNANCE.md and carry no Plumb governance. Review again after any bound input changes; land explicitly with the same authority and prepared plan. Prepared plans retain the review rather than rereading its original file. Other authorities reject --review. No arbitrary command or automatic-test claim is supported.",
+            (
+                "Preserve the refusal, exact Issue/repository nodes, committed policy and Git IDs. Read source/base and the complete diff manually; provide the actual review rationale. Inspect the plan and PR narrative for manual verification. Never copy a stale review, fabricate Guard evidence, use the Wharf exception, or use an empty review to bypass the refusal.",
+                "A fresh explicit plan binds the reviewed current inputs, exact provider/candidate checks pass, and native merged-tree readback synchronizes main and releases the Member. Installed and Issue acceptance remain separate.",
+            ),
+        ),
+        entry(
             "concord.delivery.native",
             "The explicit Wharf native gate failed, exceeded its budget, observed a changed tool world, or was used for a Plumb-governed source or base.",
             "Inspect the named failure in the exact clean Wharf Member. Fix the gate or source through its Issue, prove the updated Boundary, and explicitly prepare again. Do not change the fixed gate command, inherit provider credentials, or fall back from Plumb Guard.",

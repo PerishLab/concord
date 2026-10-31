@@ -101,6 +101,10 @@ impl Client<'_> {
                 "guard / guard (pull_request)",
                 "Concord revalidated the exact Plumb Guard proof",
             ),
+            concord_core::issue_delivery::Mode::GovernanceManual => (
+                "manual / governance (pull_request)",
+                "Concord revalidated exact manual review inputs, not automated tests",
+            ),
             concord_core::issue_delivery::Mode::WharfNative => (
                 "native / wharf (pull_request)",
                 "Concord revalidated the exact Wharf native proof",

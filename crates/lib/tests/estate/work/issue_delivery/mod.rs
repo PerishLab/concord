@@ -39,6 +39,7 @@ pub(super) fn released() -> Authority {
 pub(super) fn request(issue: &Coordinate) -> issue_delivery::Request {
     issue_delivery::Request {
         authority: issue_delivery::Mode::Plumb,
+        review: None,
         issue: issue.clone(),
         revision: 2,
         base: "main".into(),

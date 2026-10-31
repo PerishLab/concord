@@ -532,3 +532,7 @@ paths = [
     "crates/lib/src/runtime/build.rs",
 ]
 syntax = "embed"
+
+[[vocabulary.term]]
+description = "The explicit manual-review delivery authority confined to the registered governance repository."
+name = "GovernanceManual"

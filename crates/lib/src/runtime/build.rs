@@ -21,13 +21,21 @@ fn main() {
         "cargo:rustc-env=CONCORD_PLUMB_VERSION=v{}",
         versions.into_iter().next().expect("Plumb version")
     );
+    bind(&manifest, "WHARF", &["gate.rs", "process.rs"]);
+    bind(&manifest, "MANUAL", &["manual.rs", "model.rs", "engine.rs"]);
+}
+
+fn bind(manifest: &std::path::Path, name: &str, files: &[&str]) {
     let mut digest = Sha256::new();
-    for name in ["gate.rs", "process.rs"] {
-        let file = manifest.join("src/estate/work/delivery").join(name);
+    for file in files {
+        let file = manifest.join("src/estate/work/delivery").join(file);
         println!("cargo:rerun-if-changed={}", file.display());
         let bytes = std::fs::read(&file).expect("read native gate implementation");
         digest.update((bytes.len() as u64).to_be_bytes());
         digest.update(bytes);
     }
-    println!("cargo:rustc-env=CONCORD_WHARF_GATE={:x}", digest.finalize());
+    println!(
+        "cargo:rustc-env=CONCORD_{name}_GATE={:x}",
+        digest.finalize()
+    );
 }
