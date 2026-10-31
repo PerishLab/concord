@@ -11,11 +11,14 @@ mod engine;
 pub mod execution;
 #[path = "../delivery/gate.rs"]
 mod gate;
+#[path = "../delivery/manual.rs"]
+mod manual;
 #[path = "../delivery/model.rs"]
 mod model;
 #[path = "../delivery/process.rs"]
 mod process;
 
+pub use manual::Review;
 pub use model::{Authority, Candidate, Check, Mode, Preparation};
 
 pub use super::authority::delivery::{Resume, recall, resume};
@@ -28,6 +31,8 @@ pub const READY: &str = "concord.issue-member-delivery-ready/v5";
 #[serde(deny_unknown_fields)]
 pub struct Request {
     pub authority: Mode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<Review>,
     pub issue: super::super::super::Coordinate,
     pub revision: i64,
     pub base: String,
@@ -80,7 +85,16 @@ struct Context {
 }
 
 pub async fn prepare<A: Authorities>(estate: &Estate, request: &Request) -> Result<Plan> {
+    if (request.authority == Mode::GovernanceManual) != request.review.is_some() {
+        return Err(Error::typed(
+            "concord.delivery.review",
+            "governance-manual requires --review; other authorities refuse review input",
+        ));
+    }
     let context = context(estate, &request.issue, request.revision).await?;
+    if let Some(review) = &request.review {
+        review.check(&context)?;
+    }
     agree(&context, &request.snapshot)?;
     let pull = narrative(&context, request)?;
     let (authority, delivery) = engine::prepare::<A>(&context, request, &pull)?;
@@ -188,6 +202,9 @@ fn narrative(context: &Context, request: &Request) -> Result<plumb::delivery::Na
             "\n\nRepository authority: `{}`\n\nFixed native gate: `python3 -B -m scripts.selfcheck` and `python3 -B -m unittest discover -s tests -t . -q`, with no inherited provider environment. Exact source/tree and Python/Git identities are carried by native candidate evidence; this is not a Plumb Guard proof.",
             gate::AUTHORITY,
         ));
+    }
+    if let Some(review) = &request.review {
+        pull.body.push_str(&review.render()?);
     }
     Ok(pull)
 }

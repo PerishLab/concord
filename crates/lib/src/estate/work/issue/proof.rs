@@ -197,7 +197,7 @@ pub(super) mod delivery {
                 Authority::Plumb { .. } => {
                     plumb::delivery::landed(&source, &request.candidate, &request.merge)
                 }
-                Authority::WharfNative { .. } => {
+                Authority::WharfNative { .. } | Authority::GovernanceManual { .. } => {
                     plumb::delivery::native::landed(&source, &request.candidate, &request.merge)
                 }
             }

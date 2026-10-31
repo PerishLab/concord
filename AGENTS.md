@@ -145,6 +145,16 @@ of copying its answer here.
   runner and gate implementation so changed policy invalidates old evidence.
   Native evidence and status names never claim
   Guard authority; exact provider readback and Member release remain required.
+- Governance manual delivery is a distinct explicit authority restricted to the
+  exact registered `PerishLab/.github` node. Strict review input binds stable
+  repository/Issue identities, source/base/tree and a nonempty manual rationale.
+  Source and base retain their committed canonical manual-maintenance declarations;
+  Plumb-governed source or base refuses. The shared native kernel carries these
+  review inputs, implementation and Git identity through candidate/squash evidence;
+  this authority claims manual review, never automated test execution. Every
+  provider step revalidates that evidence through the normal Issue, acceptance,
+  candidate and custody flow. Other authorities reject review input. Missing
+  configuration is no fallback, and no arbitrary validation command is accepted.
 - Optional Locus facts and the private activity ledger are observations only.
   They never establish authorship, ownership, presence, authorization, or
   lifecycle state and never replace a command result.

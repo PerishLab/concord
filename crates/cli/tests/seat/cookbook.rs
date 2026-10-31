@@ -43,6 +43,7 @@ fn inventory() {
             "concord.delivery.native",
             "concord.delivery.pending",
             "concord.delivery.provider",
+            "concord.delivery.review",
             "concord.estate.upgrade_required",
             "concord.issue.automation",
             "concord.issue.close.indeterminate",

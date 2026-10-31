@@ -172,9 +172,15 @@ pub enum Delivery {
         #[arg(
             long,
             default_value = "plumb",
-            help = "Explicit proof authority: plumb or wharf-native"
+            help = "Explicit authority: plumb, wharf-native or governance-manual"
         )]
         authority: concord_core::issue_delivery::Mode,
+        #[arg(
+            long,
+            value_name = "PATH|-",
+            help = "Manual review JSON, required only for governance-manual; see concord cookbook concord.delivery.review"
+        )]
+        review: Option<PathBuf>,
         #[arg(long)]
         revision: i64,
         #[arg(long, default_value = "main")]

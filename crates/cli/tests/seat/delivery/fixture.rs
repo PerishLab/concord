@@ -11,11 +11,21 @@ pub(super) struct Native<'a> {
     pub source: PathBuf,
     pub member: PathBuf,
     provider: PathBuf,
+    pub issue: String,
     path: Option<std::ffi::OsString>,
 }
 
 impl<'a> Native<'a> {
     pub fn open(space: &'a Path, stable: &str) -> Self {
+        Self::build(space, "PerishLab/wharf", stable)
+    }
+
+    pub fn governance(space: &'a Path, stable: &str) -> Self {
+        Self::build(space, "PerishLab/.github", stable)
+    }
+
+    fn build(space: &'a Path, coordinate: &str, stable: &str) -> Self {
+        let issue = format!("{coordinate}#1");
         success(space, &["issue", "bootstrap"]);
         let provider = tool(
             space,
@@ -23,23 +33,30 @@ impl<'a> Native<'a> {
             projection(space)
                 .replace(r#"if [ "$1 $2" = "api -X" ]; then"#, &format!(r#"if [ "$1 $2" = "api -X" ]; then printf '%s\n' "$@" > '{}/status-call';"#, space.display()))
                 .replace("  commit=$(", &format!("  if [ -f '{}/lose-proof' ]; then message='receipt missing'; fi\n  commit=$(", space.display()))
-                .replace("PerishLab/probe", "PerishLab/wharf")
+                .replace("PerishLab/probe", coordinate)
                 .replace("R_probe", stable),
         );
         let command = provider.to_str().expect("provider");
         success(
             space,
-            &[
-                "issue",
-                "attach",
-                "PerishLab/wharf#1",
-                "--github-command",
-                command,
-            ],
+            &["issue", "attach", &issue, "--github-command", command],
         );
-        let source = repository(space, "PerishLab/wharf");
-        checks(&source, space);
-        git(&source, &["add", "scripts", "tests"]);
+        let source = repository(space, coordinate);
+        if coordinate == "PerishLab/.github" {
+            std::fs::write(
+                source.join("AGENTS.md"),
+                "This repository is maintained manually and is outside product governance.\n",
+            )
+            .expect("manual entry");
+            std::fs::write(
+                source.join("GOVERNANCE.md"),
+                "This repository is maintained manually.\n",
+            )
+            .expect("manual policy");
+        } else {
+            checks(&source, space);
+        }
+        git(&source, &["add", "."]);
         git(&source, &["commit", "-m", "native checks"]);
         git(&source, &["push", "origin", "main"]);
         let observer = tool(
@@ -47,7 +64,7 @@ impl<'a> Native<'a> {
             "observer",
             std::fs::read_to_string(observer(space))
                 .expect("observer")
-                .replace("PerishLab/probe", "PerishLab/wharf")
+                .replace("PerishLab/probe", coordinate)
                 .replace("R_probe", stable),
         );
         success(
@@ -55,7 +72,7 @@ impl<'a> Native<'a> {
             &[
                 "integration",
                 "register",
-                "PerishLab/wharf",
+                coordinate,
                 "--path",
                 source.to_str().expect("source"),
                 "--github-command",
@@ -67,7 +84,7 @@ impl<'a> Native<'a> {
             Facts {
                 node: "I_delivery",
                 stable,
-                coordinate: "PerishLab/wharf",
+                coordinate,
                 number: 1,
             },
         );
@@ -76,7 +93,7 @@ impl<'a> Native<'a> {
             &[
                 "member",
                 "start",
-                "PerishLab/wharf#1",
+                &issue,
                 "--claim",
                 "topic.md",
                 "--revision",
@@ -98,7 +115,7 @@ impl<'a> Native<'a> {
             space,
             "ssh",
             format!(
-                "for last; do :; done\nexec sh -c \"$(printf '%s' \"$last\" | sed \"s|'/PerishLab/wharf'|'{}'|\")\"",
+                "for last; do :; done\nexec sh -c \"$(printf '%s' \"$last\" | sed \"s|'/{coordinate}'|'{}'|\")\"",
                 remote.display()
             ),
         );
@@ -108,7 +125,7 @@ impl<'a> Native<'a> {
                 "remote",
                 "set-url",
                 "origin",
-                "ssh://git@github.com/PerishLab/wharf",
+                &format!("ssh://git@github.com/{coordinate}"),
             ],
         );
         git(
@@ -120,15 +137,13 @@ impl<'a> Native<'a> {
         std::fs::write(member.join("topic.md"), "native\n").expect("change");
         git(&member, &["add", "topic.md"]);
         git(&member, &["commit", "-m", "native delivery"]);
-        success(
-            space,
-            &["member", "prove", "PerishLab/wharf#1", "--revision", "1"],
-        );
+        success(space, &["member", "prove", &issue, "--revision", "1"]);
         Self {
             space,
             source,
             member,
             provider,
+            issue,
             path: None,
         }
     }
@@ -157,7 +172,7 @@ impl<'a> Native<'a> {
     }
 
     pub fn prepare(&self, authority: &str) -> Output {
-        let shown = success(self.space, &["issue", "show", "PerishLab/wharf#1"]);
+        let shown = success(self.space, &["issue", "show", &self.issue]);
         let revision = shown["anchor"]["revision"].to_string();
         self.command("prepare", authority)
             .args(["--revision", &revision])
@@ -193,7 +208,7 @@ impl<'a> Native<'a> {
                 "issue",
                 "delivery",
                 verb,
-                "PerishLab/wharf#1",
+                &self.issue,
                 "--authority",
                 authority,
                 "--github-command",

@@ -1,3 +1,6 @@
+#[path = "calls/manual.rs"]
+mod manual;
+
 use super::super::execution::unix::{self as execution, Facts, git, text};
 use super::fixture::Native;
 use super::unix::{refused, success};

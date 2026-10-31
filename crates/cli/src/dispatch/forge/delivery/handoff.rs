@@ -16,6 +16,7 @@ pub struct Refusal {
 
 pub struct Parameters<'a> {
     pub authority: issue_delivery::Mode,
+    pub review: Option<&'a Path>,
     pub issue: &'a str,
     pub revision: i64,
     pub base: String,
@@ -40,6 +41,16 @@ pub async fn prepare(estate: &Estate, parameters: Parameters<'_>, output: bool) 
 }
 
 async fn request(estate: &Estate, parameters: &Parameters<'_>) -> Result<issue_delivery::Plan> {
+    let review = parameters
+        .review
+        .map(|path| crate::dispatch::input::read(path, issue_delivery::Review::SHAPE))
+        .transpose()?;
+    if (parameters.authority == issue_delivery::Mode::GovernanceManual) != review.is_some() {
+        return Err(Error::typed(
+            "concord.delivery.review",
+            "governance-manual requires --review; other authorities refuse review input",
+        ));
+    }
     let issue = Coordinate::parse(parameters.issue)?;
     let member = estate.issue_member(&issue).await?;
     adaptor::integration(&member.integration).await?;
@@ -55,6 +66,7 @@ async fn request(estate: &Estate, parameters: &Parameters<'_>) -> Result<issue_d
         estate,
         &issue_delivery::Request {
             authority: parameters.authority,
+            review,
             issue,
             revision: parameters.revision,
             base: parameters.base.clone(),

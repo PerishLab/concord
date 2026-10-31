@@ -1,5 +1,7 @@
 use super::super::authority::{self, Authorities};
-use super::{Authority, Candidate, Check, Context, Mode, Plan, Request, gate, model, refused};
+use super::{
+    Authority, Candidate, Check, Context, Mode, Plan, Request, gate, manual, model, refused,
+};
 use crate::Result;
 
 pub(super) fn prepare<A: Authorities>(
@@ -26,6 +28,17 @@ pub(super) fn prepare<A: Authorities>(
             let authority = Authority::Plumb {
                 warrant,
                 guard: plan.guard.clone(),
+            };
+            Ok((authority, plan.into()))
+        }
+        Mode::GovernanceManual => {
+            let review = request.review.as_ref().expect("review checked");
+            review.check(context)?;
+            let plan = plumb::delivery::native::prepare(input, &manual::Governance(review))
+                .map_err(refused)?;
+            let authority = Authority::GovernanceManual {
+                evidence: plan.evidence.clone(),
+                review: review.clone(),
             };
             Ok((authority, plan.into()))
         }
@@ -59,6 +72,16 @@ pub(super) fn revalidate<A: Authorities>(
             let accepted = authority::keep::<A>(warrant, "concord.delivery.authority")?;
             plumb::delivery::revalidate(input, &plan.delivery.guard(guard), &accepted)
                 .map_err(refused)?;
+        }
+        Authority::GovernanceManual { evidence, review } => {
+            review.check(context)?;
+            let expected = plan.delivery.native(evidence);
+            let gate = manual::Governance(review);
+            match check {
+                Check::Execute => plumb::delivery::native::revalidate(input, &expected, &gate),
+                Check::Confirm => plumb::delivery::native::confirm(input, &expected, &gate),
+            }
+            .map_err(refused)?;
         }
         Authority::WharfNative { evidence } => {
             model::admit(&context.member.integration)?;

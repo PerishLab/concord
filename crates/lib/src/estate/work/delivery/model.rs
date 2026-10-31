@@ -1,5 +1,5 @@
 use super::super::authority::{self, Authorities, Warrant};
-use super::gate;
+use super::{gate, manual};
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -16,6 +16,7 @@ pub enum Mode {
     #[default]
     Plumb,
     WharfNative,
+    GovernanceManual,
 }
 
 impl std::str::FromStr for Mode {
@@ -25,7 +26,8 @@ impl std::str::FromStr for Mode {
         match value {
             "plumb" => Ok(Self::Plumb),
             "wharf-native" => Ok(Self::WharfNative),
-            _ => Err("authority must be plumb or wharf-native"),
+            "governance-manual" => Ok(Self::GovernanceManual),
+            _ => Err("authority must be plumb, wharf-native or governance-manual"),
         }
     }
 }
@@ -39,6 +41,10 @@ pub enum Authority {
     },
     WharfNative {
         evidence: plumb::delivery::native::Evidence,
+    },
+    GovernanceManual {
+        evidence: plumb::delivery::native::Evidence,
+        review: super::Review,
     },
 }
 
@@ -76,6 +82,7 @@ impl Authority {
         match self {
             Self::Plumb { .. } => Mode::Plumb,
             Self::WharfNative { .. } => Mode::WharfNative,
+            Self::GovernanceManual { .. } => Mode::GovernanceManual,
         }
     }
 
@@ -86,6 +93,16 @@ impl Authority {
         match self {
             Self::Plumb { warrant, .. } => {
                 authority::keep::<A>(warrant, "concord.delivery.authority")?;
+            }
+            Self::GovernanceManual { evidence, review } => {
+                manual::admit(integration)?;
+                review.valid()?;
+                if evidence.authority != manual::AUTHORITY {
+                    return Err(Error::typed(
+                        "concord.delivery.authority",
+                        "manual review implementation changed; prepare again",
+                    ));
+                }
             }
             Self::WharfNative { evidence } => {
                 admit(integration)?;
@@ -107,6 +124,7 @@ impl Authority {
         match self {
             Self::Plumb { .. } => Ok(()),
             Self::WharfNative { .. } => admit(integration),
+            Self::GovernanceManual { .. } => manual::admit(integration),
         }
     }
 }

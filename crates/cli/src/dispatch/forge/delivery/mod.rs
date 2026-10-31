@@ -21,6 +21,7 @@ pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<Com
         Delivery::Prepare {
             issue,
             authority,
+            review,
             revision,
             base,
             handoff,
@@ -32,6 +33,7 @@ pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<Com
             handoff::Parameters {
                 issue: &issue,
                 authority,
+                review: review.as_deref(),
                 revision,
                 base,
                 carry: handoff,
