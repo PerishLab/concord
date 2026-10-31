@@ -48,6 +48,7 @@ paths = [
     "crates/lib/src/runtime/build.rs",
     "crates/*/tests/**/*.rs",
     "crates/lib/src/runtime/config.rs",
+    "crates/cli/src/runtime/config/legacy.rs",
 ]
 syntax = "environment"
 
@@ -73,10 +74,6 @@ include = [
 
 [word]
 single = true
-
-[[vocabulary.term]]
-description = "The stable config and environment key for Concord's domain-space root."
-name = "domain_space_root"
 
 [[vocabulary.term]]
 description = "Boundary proof absence, currency, or staleness is one Member health atom."

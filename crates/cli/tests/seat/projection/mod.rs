@@ -247,7 +247,7 @@ mod unix {
 
     pub(super) fn raw(space: &Path, arguments: &[&str]) -> Output {
         spawn::concord(space)
-            .args(["--root", space.to_str().expect("root path"), "--json"])
+            .args(["--space", space.to_str().expect("root path"), "--json"])
             .args(arguments)
             .output()
             .expect("run Concord")

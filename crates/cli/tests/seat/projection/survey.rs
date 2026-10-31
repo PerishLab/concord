@@ -128,7 +128,7 @@ fn tool(root: &Path, name: &str, body: String) -> PathBuf {
 
 fn success(space: &Path, arguments: &[&str]) -> Value {
     let output = spawn::concord(space)
-        .args(["--root", space.to_str().expect("root path"), "--json"])
+        .args(["--space", space.to_str().expect("root path"), "--json"])
         .args(arguments)
         .output()
         .expect("run Concord");

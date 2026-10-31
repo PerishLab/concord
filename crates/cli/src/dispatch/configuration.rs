@@ -14,7 +14,7 @@ pub fn run(config: &Config, command: Configure, json_output: bool) -> Result<()>
 fn show(config: &Config, json_output: bool) -> Result<()> {
     output::value(
         json!({
-            "domain_space_root": config.domain_space_root.display().to_string(),
+            "space": config.space.display().to_string(),
             "home": config.home.display().to_string(),
             "releases": config.releases,
             "depot": config.depot,

@@ -35,7 +35,7 @@ pub fn verify(space: &Path, provider: &str) {
     let malformed = space.join("malformed-plan.json");
     std::fs::write(&malformed, b"").expect("malformed plan");
     let output = spawn::concord(space)
-        .args(["--root", space.to_str().expect("root"), "--json"])
+        .args(["--space", space.to_str().expect("root"), "--json"])
         .args(["issue", "delivery", "land", "PerishLab/probe#1"])
         .args(["--plan", malformed.to_str().expect("plan path")])
         .args(["--github-command", "/missing/provider"])
@@ -197,7 +197,7 @@ fn programs() {
 fn delivery(space: &Path, action: &str) -> std::process::Command {
     let mut command = spawn::concord(space);
     command
-        .args(["--root", space.to_str().expect("root"), "--json"])
+        .args(["--space", space.to_str().expect("root"), "--json"])
         .args(["issue", "delivery", action, "PerishLab/probe#1"])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());

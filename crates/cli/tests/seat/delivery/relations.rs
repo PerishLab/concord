@@ -229,7 +229,7 @@ impl<'a> Probe<'a> {
         let mut command = super::super::spawn::concord(space);
         command
             .args([
-                "--root",
+                "--space",
                 space.to_str().expect("root"),
                 "issue",
                 "delivery",

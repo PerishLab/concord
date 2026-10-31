@@ -6,6 +6,8 @@ mod identity;
 
 mod observation;
 
+mod refusal;
+
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -52,7 +54,7 @@ fn default() {
     let fixture = tempfile::tempdir().expect("fixture");
     let old = legacy(fixture.path());
     fs::create_dir_all(old.parent().expect("legacy parent")).expect("legacy parent");
-    fs::write(&old, "domain_space_root = \"/legacy\"\n").expect("legacy config");
+    fs::write(&old, "space = \"/legacy\"\n").expect("legacy config");
 
     let path = run(fixture.path(), &["config", "path"]);
     assert!(
@@ -72,12 +74,12 @@ fn default() {
         String::from_utf8_lossy(&shown.stderr)
     );
     let config: Value = serde_json::from_slice(&shown.stdout).expect("config json");
-    assert_eq!(config["domain_space_root"], "");
+    assert_eq!(config["space"], "");
     assert_eq!(config["depot"], "https://depot.concord.perish.uk");
 
     let missing = run(fixture.path(), &["--json", "audit"]);
     let missing = failure(&missing, "concord.space.root");
-    assert_eq!(missing["error"]["details"]["root"], "");
+    assert_eq!(missing["error"]["details"]["space"], "");
     assert_eq!(
         missing["error"]["details"]["provenance"]["kind"],
         "built-in-default"
@@ -108,24 +110,24 @@ fn space() {
         &[
             "--config",
             file.to_str().expect("config"),
-            "--root",
+            "--space",
             explicit.to_str().expect("explicit root"),
             "--json",
             "audit",
         ],
     );
     let absent = failure(&absent, "concord.estate.absent");
-    assert_eq!(absent["error"]["details"]["root"], path(&explicit));
+    assert_eq!(absent["error"]["details"]["space"], path(&explicit));
     assert_eq!(
         absent["error"]["details"]["estate"],
         path(&explicit.join(".concord"))
     );
     assert_eq!(
         absent["error"]["details"]["provenance"],
-        serde_json::json!({"kind": "explicit", "input": "--root"})
+        serde_json::json!({"kind": "explicit", "input": "--space"})
     );
     assert_eq!(
-        absent["error"]["details"]["configured_alternative"]["root"],
+        absent["error"]["details"]["configured_alternative"]["space"],
         path(&configured)
     );
     assert_eq!(
@@ -138,13 +140,13 @@ fn space() {
         &[
             "--config",
             file.to_str().expect("config"),
-            "--root",
+            "--space",
             explicit.to_str().expect("explicit root"),
             "audit",
         ],
     );
     let prose = String::from_utf8_lossy(&human.stderr);
-    assert!(prose.contains("remove or correct --root"), "{prose}");
+    assert!(prose.contains("remove or correct --space"), "{prose}");
     assert!(prose.contains("concord config show"), "{prose}");
 
     let missing = directory(fixture.path(), "configured-absent");
@@ -166,13 +168,13 @@ fn space() {
     );
 
     let environmental = process(fixture.path(), &["--json", "audit"])
-        .env("CONCORD_DOMAIN_SPACE_ROOT", &environment)
+        .env("CONCORD_SPACE", &environment)
         .output()
         .expect("environment root");
     let environmental = failure(&environmental, "concord.estate.absent");
     assert_eq!(
         environmental["error"]["details"]["provenance"]["input"],
-        "CONCORD_DOMAIN_SPACE_ROOT"
+        "CONCORD_SPACE"
     );
 
     let conflict = process(
@@ -180,13 +182,13 @@ fn space() {
         &[
             "--config",
             file.to_str().expect("config"),
-            "--root",
+            "--space",
             explicit.to_str().expect("explicit root"),
             "--json",
             "audit",
         ],
     )
-    .env("CONCORD_DOMAIN_SPACE_ROOT", &environment)
+    .env("CONCORD_SPACE", &environment)
     .output()
     .expect("conflicting roots");
     let conflict = failure(&conflict, "concord.estate.absent");
@@ -225,7 +227,7 @@ fn directory(root: &Path, name: &str) -> PathBuf {
 }
 
 fn settings(file: &Path, root: &Path) {
-    fs::write(file, format!("domain_space_root = {root:?}\n")).expect("config");
+    fs::write(file, format!("space = {root:?}\n")).expect("config");
 }
 
 fn path(path: &Path) -> String {

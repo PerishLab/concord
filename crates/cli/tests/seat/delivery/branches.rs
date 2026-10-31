@@ -154,7 +154,7 @@ fn sections() {
 
 fn invoke(seat: &Seat<'_>, provider: &std::path::Path, json: bool) -> std::process::Output {
     let mut command = super::super::super::spawn::concord(seat.space);
-    command.args(["--root", seat.space.to_str().unwrap()]);
+    command.args(["--space", seat.space.to_str().unwrap()]);
     if json {
         command.arg("--json");
     }

@@ -45,7 +45,7 @@ pub(super) fn provider(scratch: &Path, replies: &[Value]) -> PathBuf {
 pub(super) fn command(scratch: &Path, provider: &Path, operation: &str) -> Command {
     let mut command = crate::spawn::concord(scratch);
     command.args([
-        "--root",
+        "--space",
         scratch.to_str().unwrap(),
         "--json",
         "acceptance",

@@ -88,7 +88,7 @@ pub(super) fn run(root: &Path, mode: &str, pages: &str) -> Output {
     spawn::concord(root)
         .current_dir(root)
         .args([
-            "--root",
+            "--space",
             "/deliberately-unavailable-estate",
             "--json",
             "project",

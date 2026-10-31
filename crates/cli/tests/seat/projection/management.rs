@@ -29,7 +29,7 @@ impl Fixture {
         std::fs::write(&path, input.to_string()).unwrap();
         let mut command = spawn::concord(self.root.path());
         command.current_dir(self.root.path()).args([
-            "--root",
+            "--space",
             "/unavailable-estate",
             "--json",
             "project",

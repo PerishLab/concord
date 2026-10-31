@@ -200,7 +200,7 @@ mod unix {
     pub(super) fn prepare(space: &Path, provider: &str, revision: &str, handoff: bool) -> Command {
         let mut command = spawn::concord(space);
         command
-            .args(["--root", space.to_str().expect("root"), "--json"])
+            .args(["--space", space.to_str().expect("root"), "--json"])
             .args([
                 "issue",
                 "delivery",
@@ -271,7 +271,7 @@ mod unix {
 
     pub(super) fn success(space: &Path, arguments: &[&str]) -> Value {
         let output = spawn::concord(space)
-            .args(["--root", space.to_str().expect("root"), "--json"])
+            .args(["--space", space.to_str().expect("root"), "--json"])
             .args(arguments)
             .output()
             .expect("run Concord");

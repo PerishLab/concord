@@ -187,7 +187,7 @@ impl<'a> Native<'a> {
         }
         command
             .args([
-                "--root",
+                "--space",
                 self.space.to_str().expect("space"),
                 "--json",
                 "issue",

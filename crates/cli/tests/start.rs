@@ -40,7 +40,7 @@ mod unix {
         let provider = tool(fixture.path(), "fact", fact());
         let output = spawn::concord(fixture.path())
             .env("PLUMB_HOME", &home)
-            .args(["--root", fixture.path().to_str().expect("Space")])
+            .args(["--space", fixture.path().to_str().expect("Space")])
             .args([
                 "member",
                 "start",
@@ -77,7 +77,7 @@ mod unix {
         let audit = spawn::concord(fixture.path())
             .env("PLUMB_HOME", &home)
             .args([
-                "--root",
+                "--space",
                 fixture.path().to_str().expect("Space"),
                 "--json",
                 "audit",
@@ -223,7 +223,7 @@ mod unix {
 
     fn refusal(space: &Path, provider: &Path) -> Value {
         let output = spawn::concord(space)
-            .args(["--root", space.to_str().expect("Space"), "--json"])
+            .args(["--space", space.to_str().expect("Space"), "--json"])
             .args([
                 "member",
                 "start",

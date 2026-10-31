@@ -48,7 +48,7 @@ pub async fn run(cli: args::Cli) -> Result<Completion> {
     }
     let loaded = Config::load(
         cli.config.as_deref(),
-        cli.root.as_deref(),
+        cli.space.as_deref(),
         cli.home.as_deref(),
         cli.releases.as_deref(),
     )?;

@@ -89,7 +89,7 @@ impl World {
         let mut command = crate::spawn::concord(self.root.path());
         command
             .args([
-                "--root",
+                "--space",
                 "/deliberately-unavailable-estate",
                 "issue",
                 "close",

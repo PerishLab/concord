@@ -31,7 +31,7 @@ impl World {
         spawn::concord(self.root.path())
             .current_dir(self.root.path())
             .args([
-                "--root",
+                "--space",
                 self.root.path().to_str().unwrap(),
                 "--config",
                 self.root.path().join("config.toml").to_str().unwrap(),
@@ -76,7 +76,7 @@ impl World {
         let result = spawn::concord(self.root.path())
             .current_dir(self.root.path())
             .args([
-                "--root",
+                "--space",
                 self.root.path().to_str().unwrap(),
                 "--config",
                 self.root.path().join("config.toml").to_str().unwrap(),

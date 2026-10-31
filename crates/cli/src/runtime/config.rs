@@ -1,3 +1,5 @@
+mod legacy;
+
 use concord_core::{Error, Result, Root};
 use plumb::config::Cascade;
 use serde_json::{Value, json};
@@ -8,7 +10,7 @@ const DEPOT: &str = "https://depot.concord.perish.uk";
 
 #[derive(Clone, Debug, Cascade)]
 pub struct Config {
-    pub domain_space_root: PathBuf,
+    pub space: PathBuf,
     pub home: PathBuf,
     pub releases: String,
     pub depot: String,
@@ -44,7 +46,7 @@ struct File {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            domain_space_root: PathBuf::new(),
+            space: PathBuf::new(),
             home: plumb::config::data("concord").unwrap_or_default(),
             releases: RELEASES.to_string(),
             depot: DEPOT.to_string(),
@@ -60,33 +62,32 @@ impl Config {
         home: Option<&Path>,
         releases: Option<&str>,
     ) -> Result<Loaded> {
+        legacy::environment()?;
         let file = selected(file)?;
         let mut config = Self::default();
-        let mut source =
-            (!config.domain_space_root.as_os_str().is_empty()).then_some(Source::Default);
+        let mut source = (!config.space.as_os_str().is_empty()).then_some(Source::Default);
         if let Some(file) = &file {
-            let seen = plumb::config::load::<ConfigPartial>(&file.path)
-                .map_err(|error| Error::new(error.to_string()))?;
-            if seen.domain_space_root.is_some() {
+            let seen = legacy::load(&file.path)?;
+            if seen.space.is_some() {
                 source = Some(Source::Config(file.clone()));
             }
             config = config.merge(seen);
         }
         let environment = <Self as Cascade>::env(&Self::prefix())
             .map_err(|error| Error::new(error.to_string()))?;
-        if environment.domain_space_root.is_some() {
+        if environment.space.is_some() {
             source = Some(Source::Environment);
         }
         config = config.merge(environment);
         let configured = source.clone().map(|source| Selection {
-            root: config.domain_space_root.clone(),
+            root: config.space.clone(),
             source,
         });
         if root.is_some() {
             source = Some(Source::Explicit);
         }
         config = config.merge(ConfigPartial {
-            domain_space_root: root.map(Path::to_path_buf),
+            space: root.map(Path::to_path_buf),
             home: home.map(Path::to_path_buf),
             releases: releases.map(str::to_string),
             depot: None,
@@ -94,7 +95,7 @@ impl Config {
         });
         let config = config.validate()?;
         let selected = Selection {
-            root: config.domain_space_root.clone(),
+            root: config.space.clone(),
             source: source.unwrap_or(Source::Default),
         };
         let alternative = matches!(selected.source, Source::Explicit)
@@ -143,8 +144,8 @@ impl Loaded {
         if self.selected.root.as_os_str().is_empty() {
             return Err(Error::detailed(
                 "concord.space.root",
-                "no Space root is configured; inspect `concord config show`, then set --root, CONCORD_DOMAIN_SPACE_ROOT, or domain_space_root",
-                json!({"root": "", "provenance": self.selected.source.json()}),
+                "no Space root is configured; inspect `concord config show`, then set --space, CONCORD_SPACE, or space",
+                json!({"space": "", "provenance": self.selected.source.json()}),
             ));
         }
         Root::new(&self.selected.root)
@@ -161,7 +162,7 @@ impl Loaded {
             self.selected
                 .message(root.path(), &estate, alternative.as_ref()),
             json!({
-                "root": root.path().display().to_string(),
+                "space": root.path().display().to_string(),
                 "estate": estate.display().to_string(),
                 "provenance": self.selected.source.json(),
                 "configured_alternative": alternative,
@@ -173,7 +174,7 @@ impl Loaded {
 impl Selection {
     fn json(&self) -> Value {
         json!({
-            "root": resolved(&self.root).display().to_string(),
+            "space": resolved(&self.root).display().to_string(),
             "provenance": self.source.json(),
         })
     }
@@ -181,18 +182,18 @@ impl Selection {
     fn message(&self, root: &Path, estate: &Path, alternative: Option<&Value>) -> String {
         match (&self.source, alternative) {
             (Source::Explicit, Some(alternative)) => format!(
-                "Concord estate is absent at {}; --root selected Space {} while the configured alternative is {}; remove or correct --root, then inspect `concord config show`",
+                "Concord estate is absent at {}; --space selected Space {} while the configured alternative is {}; remove or correct --space, then inspect `concord config show`",
                 estate.display(),
                 root.display(),
-                alternative["root"].as_str().unwrap_or("unavailable"),
+                alternative["space"].as_str().unwrap_or("unavailable"),
             ),
             (Source::Explicit, None) => format!(
-                "Concord estate is absent at {}; --root selected Space {}; correct --root or inspect `concord config show`, and bootstrap only if this is intentionally a new Space",
+                "Concord estate is absent at {}; --space selected Space {}; correct --space or inspect `concord config show`, and bootstrap only if this is intentionally a new Space",
                 estate.display(),
                 root.display(),
             ),
             (Source::Environment, _) => format!(
-                "Concord estate is absent at {}; CONCORD_DOMAIN_SPACE_ROOT selected Space {}; correct or unset it, then inspect `concord config show`",
+                "Concord estate is absent at {}; CONCORD_SPACE selected Space {}; correct or unset it, then inspect `concord config show`",
                 estate.display(),
                 root.display(),
             ),
@@ -214,10 +215,10 @@ impl Selection {
 impl Source {
     fn json(&self) -> Value {
         match self {
-            Self::Explicit => json!({"kind": "explicit", "input": "--root"}),
+            Self::Explicit => json!({"kind": "explicit", "input": "--space"}),
             Self::Environment => json!({
                 "kind": "environment",
-                "input": "CONCORD_DOMAIN_SPACE_ROOT",
+                "input": "CONCORD_SPACE",
             }),
             Self::Config(file) => json!({
                 "kind": "config",

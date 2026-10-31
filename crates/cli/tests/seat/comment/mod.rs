@@ -156,7 +156,7 @@ mod unix {
         assert!(
             spawn::concord(space)
                 .args([
-                    "--root",
+                    "--space",
                     space.to_str().expect("root"),
                     "issue",
                     "bootstrap"
@@ -172,7 +172,7 @@ mod unix {
         let timeout = run.timeout.to_string();
         let mut process = spawn::concord(space);
         process
-            .args(["--root", space.to_str().expect("root"), "--json"])
+            .args(["--space", space.to_str().expect("root"), "--json"])
             .args([
                 "issue",
                 "comment",

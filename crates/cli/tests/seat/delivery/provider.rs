@@ -32,7 +32,7 @@ pub fn feed(mut command: Command, plan: &[u8]) -> Child {
 pub fn land(space: &Path, provider: &str, plan: &str) -> Command {
     let mut command = spawn::concord(space);
     command
-        .args(["--root", space.to_str().expect("root"), "--json"])
+        .args(["--space", space.to_str().expect("root"), "--json"])
         .args([
             "issue",
             "delivery",
