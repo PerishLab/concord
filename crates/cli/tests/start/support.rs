@@ -71,7 +71,7 @@ pub fn git(root: &Path, arguments: &[&str]) {
 
 pub fn success(space: &Path, arguments: &[&str]) -> Value {
     let output = spawn::concord(space)
-        .args(["--root", space.to_str().expect("Space"), "--json"])
+        .args(["--space", space.to_str().expect("Space"), "--json"])
         .args(arguments)
         .output()
         .expect("run Concord");

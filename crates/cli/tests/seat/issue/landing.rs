@@ -13,7 +13,7 @@ fn retired() {
             let mut command = spawn::concord(scratch.path());
             command
                 .env("PATH", scratch.path().join("no-tools"))
-                .arg("--root")
+                .arg("--space")
                 .arg(&root)
                 .arg("--config")
                 .arg(scratch.path().join("unreadable.toml"));

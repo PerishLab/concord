@@ -16,17 +16,14 @@ pub struct Root {
 impl Root {
     pub fn new(path: &Path) -> Result<Self> {
         if !path.is_absolute() {
-            return Err(Error::new("domain_space_root must be absolute"));
+            return Err(Error::new("space must be absolute"));
         }
         let path = path.canonicalize().map_err(|error| {
-            Error::new(format!(
-                "cannot resolve domain_space_root {}: {error}",
-                path.display()
-            ))
+            Error::new(format!("cannot resolve space {}: {error}", path.display()))
         })?;
         if !path.is_dir() {
             return Err(Error::new(format!(
-                "domain_space_root is not a directory: {}",
+                "space is not a directory: {}",
                 path.display()
             )));
         }

@@ -98,7 +98,7 @@ impl Fixture {
         let mut command = spawn::concord(self.root.path());
         command
             .args([
-                "--root",
+                "--space",
                 "/deliberately-unavailable-estate",
                 "project",
                 operation,

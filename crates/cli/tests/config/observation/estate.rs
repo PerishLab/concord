@@ -45,7 +45,7 @@ fn estate(config: &str) -> Vec<(Option<i32>, String)> {
     ] {
         let output = process(
             home.0.path(),
-            &["--root", root.to_str().expect("root"), "--json"],
+            &["--space", root.to_str().expect("root"), "--json"],
         )
         .args(&arguments)
         .output()

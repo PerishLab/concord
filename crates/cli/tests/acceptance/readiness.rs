@@ -27,7 +27,7 @@ fn invoke(before: &Value, held: &evaluate::World) -> Output {
     let scratch = tempfile::tempdir().unwrap();
     let bootstrap = crate::spawn::concord(scratch.path())
         .args([
-            "--root",
+            "--space",
             scratch.path().to_str().unwrap(),
             "issue",
             "bootstrap",
@@ -55,7 +55,7 @@ fn invoke(before: &Value, held: &evaluate::World) -> Output {
     let provider = world::provider(scratch.path(), &replies);
     crate::spawn::concord(scratch.path())
         .args([
-            "--root",
+            "--space",
             scratch.path().to_str().unwrap(),
             "--json",
             "issue",

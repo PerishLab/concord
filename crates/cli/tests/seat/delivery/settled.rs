@@ -182,7 +182,7 @@ impl<'a> Probe<'a> {
 
 fn inspect(space: &Path) -> Child {
     spawn::concord(space)
-        .args(["--root", space.to_str().expect("root"), "--json", "audit"])
+        .args(["--space", space.to_str().expect("root"), "--json", "audit"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()

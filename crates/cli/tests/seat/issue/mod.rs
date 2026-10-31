@@ -244,7 +244,7 @@ mod unix {
 
     fn raw(space: &Path, arguments: &[&str]) -> Output {
         spawn::concord(space)
-            .args(["--root", space.to_str().expect("root path"), "--json"])
+            .args(["--space", space.to_str().expect("root path"), "--json"])
             .args(arguments)
             .output()
             .expect("run Concord")
@@ -262,7 +262,7 @@ mod unix {
 
     fn invoke(space: &Path, arguments: &[&str], body: Value) -> Output {
         let mut child = spawn::concord(space)
-            .args(["--root", space.to_str().expect("root path"), "--json"])
+            .args(["--space", space.to_str().expect("root path"), "--json"])
             .args(arguments)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())

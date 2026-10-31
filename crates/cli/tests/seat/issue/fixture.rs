@@ -63,7 +63,11 @@ impl Seat<'_> {
 
     pub(super) fn run(&self, args: &[&str]) -> std::process::Output {
         spawn::concord(self.space)
-            .args(["--root", self.space.to_str().expect("self.space"), "--json"])
+            .args([
+                "--space",
+                self.space.to_str().expect("self.space"),
+                "--json",
+            ])
             .args(args)
             .output()
             .expect("Concord")

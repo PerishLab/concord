@@ -268,7 +268,7 @@ pub(super) mod unix {
         session: &str,
     ) -> Output {
         spawn::concord(space)
-            .args(["--root", space.to_str().expect("root path"), "--json"])
+            .args(["--space", space.to_str().expect("root path"), "--json"])
             .args(arguments)
             .env(variable, session)
             .output()

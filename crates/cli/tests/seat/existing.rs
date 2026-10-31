@@ -280,7 +280,7 @@ mod unix {
 
     fn success(space: &Path, arguments: &[&str]) -> Value {
         let output = spawn::concord(space)
-            .args(["--root", space.to_str().expect("root path"), "--json"])
+            .args(["--space", space.to_str().expect("root path"), "--json"])
             .args(arguments)
             .env("CODEX_THREAD_ID", "existing-preflight")
             .output()

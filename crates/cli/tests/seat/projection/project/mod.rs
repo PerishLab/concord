@@ -140,7 +140,7 @@ fn next() {
         let provider = fixture::provider(scratch.path(), mode);
         let output = spawn::concord(scratch.path())
             .args([
-                "--root",
+                "--space",
                 "/deliberately-unavailable-estate",
                 "project",
                 "next",
@@ -162,7 +162,7 @@ fn next() {
             assert!(result["next"]["issue"].is_null());
             let human = spawn::concord(scratch.path())
                 .args([
-                    "--root",
+                    "--space",
                     "/deliberately-unavailable-estate",
                     "project",
                     "next",
