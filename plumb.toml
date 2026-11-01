@@ -39,3 +39,12 @@ targets = [
 "test" = ["*"]
 "ectropy" = ["ectropy.toml", "crates"]
 "plumb" = ["*"]
+
+[windtun]
+cases = ["context", "release"]
+image = "ghcr.io/perishlab/images:stable"
+
+[windtun.scenes]
+authority = "https://depot.seatrial.perish.uk"
+product = "seatrial"
+channel = "stable"
