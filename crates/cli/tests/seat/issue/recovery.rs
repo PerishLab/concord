@@ -34,3 +34,43 @@ pub(super) fn run(space: &Path, source: &Path, pending: &Path) {
     assert_eq!(success(space, &arguments)["revision"], 2);
     assert_eq!(success(space, &arguments)["revision"], 2);
 }
+
+#[test]
+fn detached() {
+    use super::super::spawn;
+    use super::unix::repository;
+    use serde_json::json;
+
+    let fixture = tempfile::tempdir().expect("fixture");
+    let root = fixture.path();
+    success(root, &["issue", "bootstrap"]);
+    let source = repository(root, "PerishLab/concord");
+    let provider = root.join("repository-provider");
+    let reply = json!({"node": "R_concord", "coordinate": "PerishLab/concord", "branch": "main"});
+    plumb::testing::executable(&provider, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
+    let output = spawn::concord(root)
+        .args(["--space", root.to_str().expect("root"), "--json"])
+        .args(["integration", "register", "PerishLab/concord", "--path"])
+        .arg(&source)
+        .args(["--github-command"])
+        .arg(&provider)
+        .env("GIT_DIR", root.join("missing.git"))
+        .env("GIT_WORK_TREE", root.join("wrong"))
+        .env("GIT_INDEX_FILE", root.join("wrong-index"))
+        .env("GIT_CONFIG_COUNT", "1")
+        .env("GIT_CONFIG_KEY_0", "remote.origin.url")
+        .env(
+            "GIT_CONFIG_VALUE_0",
+            "https://github.com/foreign/repository.git",
+        )
+        .env("GIT_NAMESPACE", "foreign")
+        .output()
+        .expect("register detached repository");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).expect("integration");
+    assert_eq!(result["integration"]["repository"]["name"], "concord");
+}

@@ -1,9 +1,10 @@
 use super::process;
 use plumb::delivery::native::{Context, Evidence, Gate, Identity};
 use plumb::landing::Refusal;
+use radicula_process::{Search, Tool};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 pub(super) const AUTHORITY: &str = concat!("concord.wharf-native/v1@", env!("CONCORD_WHARF_GATE"));
@@ -20,12 +21,6 @@ struct World {
     git: Tool,
     path: String,
     version: String,
-}
-
-#[derive(Eq, PartialEq, Serialize)]
-struct Tool {
-    path: PathBuf,
-    digest: String,
 }
 
 #[derive(Serialize)]
@@ -81,8 +76,12 @@ impl World {
     }
 
     fn read(root: &Path) -> Result<Self, Refusal> {
-        let python = Tool::read("python3")?;
-        let git = Tool::read("git")?;
+        Self::resolve(root, &crate::config::tools().map_err(process::refuse)?)
+    }
+
+    fn resolve(root: &Path, search: &Search) -> Result<Self, Refusal> {
+        let python = tool(search, "python3")?;
+        let git = tool(search, "git")?;
         let directories = [
             python.path.parent(),
             git.path.parent(),
@@ -115,15 +114,42 @@ impl World {
     }
 }
 
-impl Tool {
-    fn read(name: &str) -> Result<Self, Refusal> {
-        let path = which::which(name)
-            .and_then(|path| {
-                path.canonicalize()
-                    .map_err(|_| which::Error::CannotCanonicalize)
-            })
-            .map_err(|error| process::refuse(format!("native gate requires {name}: {error}")))?;
-        let digest = process::hash(&path)?;
-        Ok(Self { path, digest })
+fn tool(search: &Search, name: &str) -> Result<Tool, Refusal> {
+    let path = search
+        .resolve(name)
+        .map_err(|error| process::refuse(format!("native gate requires {name}: {error}")))?;
+    Tool::at(path).map_err(|error| process::refuse(error.to_string()))
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::{Search, World};
+
+    #[test]
+    fn aliases() {
+        let seat = tempfile::tempdir().expect("seat");
+        let root = seat.path().canonicalize().expect("root");
+        let bin = root.join("bin");
+        let subject = root.join("subject");
+        std::fs::create_dir(&bin).expect("bin");
+        std::fs::create_dir(&subject).expect("subject");
+        let source = root.join("interpreter");
+        plumb::testing::executable(&source, "#!/bin/sh\nprintf '%s\\n' \"$0\"\n");
+        for name in ["python3", "git"] {
+            std::os::unix::fs::symlink(&source, bin.join(name)).expect("alias");
+        }
+        let search = Search::new(&root, Some("bin".into()), None).expect("search");
+        let world = World::resolve(&subject, &search).expect("native world");
+        assert_eq!(world.python.path, bin.join("python3"));
+        assert_eq!(world.git.path, bin.join("git"));
+        assert_eq!(
+            world.version.trim(),
+            bin.join("python3").to_str().expect("path")
+        );
+        assert_eq!(world.python.digest, world.git.digest);
+        let value = serde_json::to_value(&world.python).expect("tool projection");
+        assert_eq!(value.as_object().expect("tool").len(), 2);
+        assert_eq!(value["path"], bin.join("python3").to_str().expect("path"));
+        assert_eq!(value["digest"], world.python.digest);
     }
 }

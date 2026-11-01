@@ -1,6 +1,5 @@
 use plumb::landing::Refusal;
 use std::io::{Read, Seek, SeekFrom};
-use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -55,20 +54,6 @@ fn bounded(command: &mut Command, timeout: Duration) -> Result<String, Refusal> 
             return Ok(output);
         }
         std::thread::sleep(Duration::from_millis(25));
-    }
-}
-
-pub(super) fn hash(path: &Path) -> Result<String, Refusal> {
-    use sha2::{Digest, Sha256};
-    let mut file = std::fs::File::open(path).map_err(fault)?;
-    let mut digest = Sha256::new();
-    let mut buffer = [0_u8; 65536];
-    loop {
-        let size = file.read(&mut buffer).map_err(fault)?;
-        if size == 0 {
-            return Ok(format!("{:x}", digest.finalize()));
-        }
-        digest.update(&buffer[..size]);
     }
 }
 
