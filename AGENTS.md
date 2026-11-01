@@ -142,7 +142,8 @@ of copying its answer here.
   excessive output and failed exit refuse, with attempted children killed and
   reaped on refusal; this does not promise process-group confinement. Budget
   policy remains compiled, not a runtime knob, and gate authority hashes the
-  runner and gate implementation so changed policy invalidates old evidence.
+  runner and gate implementation plus the resolved workspace dependency lock,
+  so changed policy or dependency implementations invalidate old evidence.
   Native evidence and status names never claim
   Guard authority; exact provider readback and Member release remain required.
 - Governance manual delivery is a distinct explicit authority restricted to the

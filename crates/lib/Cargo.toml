@@ -14,17 +14,19 @@ keel.workspace = true
 locus.workspace = true
 plumb.workspace = true
 pulldown-cmark.workspace = true
+radicula-git.workspace = true
 radicula-lock.workspace = true
+radicula-process.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 tempfile.workspace = true
-which.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 rustix.workspace = true
 
 [dev-dependencies]
+which.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
 

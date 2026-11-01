@@ -8,6 +8,12 @@ pub(crate) fn search(
     std::env::join_paths(paths)
 }
 
+pub(crate) fn tools() -> std::result::Result<radicula_process::Search, String> {
+    let root = std::env::current_dir().map_err(|error| error.to_string())?;
+    radicula_process::Search::new(&root, std::env::var_os("PATH"), std::env::var_os("PATHEXT"))
+        .map_err(|error| error.to_string())
+}
+
 #[derive(Clone, Debug)]
 pub struct Root {
     path: PathBuf,

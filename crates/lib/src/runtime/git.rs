@@ -257,18 +257,5 @@ fn native(path: &Path) -> PathBuf {
 }
 
 fn command() -> Command {
-    let mut command = Command::new("git");
-    for name in [
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_COMMON_DIR",
-        "GIT_DIR",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_PREFIX",
-        "GIT_QUARANTINE_PATH",
-        "GIT_WORK_TREE",
-    ] {
-        command.env_remove(name);
-    }
-    command
+    radicula_git::detached("git")
 }

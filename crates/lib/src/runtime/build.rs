@@ -27,6 +27,10 @@ fn main() {
 
 fn bind(manifest: &std::path::Path, name: &str, files: &[&str]) {
     let mut digest = Sha256::new();
+    let lock =
+        std::fs::read(manifest.join("../../Cargo.lock")).expect("read resolved gate dependencies");
+    digest.update((lock.len() as u64).to_be_bytes());
+    digest.update(lock);
     for file in files {
         let file = manifest.join("src/estate/work/delivery").join(file);
         println!("cargo:rerun-if-changed={}", file.display());
