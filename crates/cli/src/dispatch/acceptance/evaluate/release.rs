@@ -51,10 +51,7 @@ pub(super) async fn read(args: &Observe, header: &Header, history: &History) -> 
     let observed = tokio::task::spawn_blocking(move || {
         let first = authority.read(&marker);
         let second = authority.read(&marker);
-        if first != second {
-            return Err("distribution changed during release observation".into());
-        }
-        second
+        reconcile(first, second)
     })
     .await
     .map_err(|error| super::super::fault("provider", error.to_string()))?;
@@ -65,6 +62,19 @@ pub(super) async fn read(args: &Observe, header: &Header, history: &History) -> 
         ));
     }
     Ok(assess(release, *verification, observed))
+}
+
+fn reconcile(
+    first: std::result::Result<Option<Distribution>, String>,
+    second: std::result::Result<Option<Distribution>, String>,
+) -> std::result::Result<Option<Distribution>, String> {
+    match (first, second) {
+        (Err(_), Err(_)) => Err("both distribution reads failed; provider details withheld".into()),
+        (Err(_), _) => Err("first distribution read failed; provider details withheld".into()),
+        (_, Err(_)) => Err("second distribution read failed; provider details withheld".into()),
+        (Ok(first), Ok(second)) if first == second => Ok(second),
+        (Ok(_), Ok(_)) => Err("distribution changed during release observation".into()),
+    }
 }
 
 fn assess(
@@ -180,6 +190,42 @@ mod tests {
                 Verdict::Unknown
             );
         }
+    }
+
+    #[test]
+    fn observations() {
+        let held = || Ok(Some(distribution()));
+        let absent = || Ok(None);
+        let failed = || Err("TOP_SECRET timeout".to_string());
+        let other = || Err("TOP_SECRET connection".to_string());
+        assert_eq!(reconcile(held(), held()), held());
+        assert_eq!(reconcile(absent(), absent()), absent());
+        for (first, second, expected) in [
+            (absent(), held(), "changed"),
+            (held(), absent(), "changed"),
+            (failed(), held(), "first"),
+            (failed(), absent(), "first"),
+            (held(), failed(), "second"),
+            (absent(), failed(), "second"),
+            (failed(), failed(), "both"),
+            (failed(), other(), "both"),
+        ] {
+            let observed = reconcile(first, second);
+            let reason = observed.as_ref().expect_err("unknown observation");
+            assert!(reason.contains(expected));
+            assert!(!reason.contains("TOP_SECRET"));
+            assert_eq!(
+                assess(&release(), Verification::Manual, observed).verdict,
+                Verdict::Unknown
+            );
+        }
+        let mut changed = distribution();
+        changed.commit = "b".repeat(40);
+        assert!(
+            reconcile(held(), Ok(Some(changed)))
+                .expect_err("changed record")
+                .contains("changed")
+        );
     }
 
     #[test]
