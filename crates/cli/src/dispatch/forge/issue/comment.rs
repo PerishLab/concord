@@ -230,12 +230,13 @@ pub(in crate::dispatch) async fn submit(
         "variables": {"subject": subject, "body": body},
     }))
     .map_err(|error| Error::typed("concord.issue.comment.encode", error.to_string()))?;
-    let output = super::super::github::transport::Request::new(command, timeout, REPLY)
-        .args(["api", "graphql", "--input", "-"])
-        .input(&request)
-        .run()
-        .await
-        .map_err(failure)?;
+    let output =
+        super::super::github::transport::Request::new(command, timeout, REPLY + 6 * body.len())
+            .args(["api", "graphql", "--input", "-"])
+            .input(&request)
+            .run()
+            .await
+            .map_err(failure)?;
     let envelope = serde_json::from_slice::<Envelope>(&output.stdout)
         .map_err(|_| disagreement("GitHub comment reply is not valid JSON"))?;
     envelope
@@ -247,19 +248,16 @@ pub(in crate::dispatch) async fn submit(
 }
 
 fn failure(failure: super::super::github::transport::Failure) -> Error {
-    use super::super::github::transport::{Failure, Stream};
+    use super::super::github::transport::Failure;
     match failure {
         Failure::Spawn { .. } => Error::typed("concord.issue.comment.command", failure.to_string()),
         Failure::Refused { .. } => Error::typed(
             "concord.issue.comment.provider",
             format!("GitHub refused Issue comment declaration: {failure}"),
         ),
-        Failure::Oversized(Stream::Stdout) => {
-            disagreement("GitHub comment reply exceeds the reply limit")
-        }
-        Failure::Oversized(Stream::Stderr) => Error::typed(
-            "concord.issue.comment.provider",
-            "GitHub comment refusal exceeds the reply limit",
+        Failure::Oversized(_) => Error::typed(
+            "concord.issue.comment.indeterminate",
+            "GitHub comment reply exceeds the bounded reply budget; completion is unknown; observe the exact Issue before another write",
         ),
         Failure::Exchange(_) | Failure::Timeout => Error::typed(
             "concord.issue.comment.indeterminate",
@@ -288,5 +286,11 @@ pub(in crate::dispatch) fn verify(
 }
 
 fn disagreement(message: impl Into<String>) -> Error {
-    Error::typed("concord.issue.comment.disagreement", message.into())
+    Error::typed(
+        "concord.issue.comment.disagreement",
+        format!(
+            "{}; completion is unknown; observe the exact Issue before another write",
+            message.into()
+        ),
+    )
 }

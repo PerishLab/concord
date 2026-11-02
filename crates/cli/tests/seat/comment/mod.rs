@@ -84,45 +84,20 @@ mod unix {
     #[path = "validation.rs"]
     mod validation;
 
-    #[test]
-    fn outcomes() {
-        for case in [
-            Case::new("refused", Reply::Refused, 10, "comment.provider"),
-            Case::new("malformed", Reply::Malformed, 10, "comment.disagreement"),
-            Case::new("different", Reply::Different, 10, "comment.disagreement"),
-            Case::new("oversized", Reply::Oversized, 10, "comment.disagreement"),
-            Case::new("large-refusal", Reply::Limit, 10, "comment.provider"),
-            Case::new("timeout", Reply::Timeout, 1, "comment.indeterminate"),
-        ] {
-            let fixture = tempfile::tempdir().expect("fixture");
-            bootstrap(fixture.path());
-            let body = render::body("Declaration", "codex", "thread", None);
-            let command = provider(fixture.path(), "OPEN", &body, case.reply);
-            let environment = [("CODEX_THREAD_ID", "thread")];
-            let output = invoke(
-                fixture.path(),
-                Run {
-                    command: &command,
-                    body: "Declaration",
-                    environment: &environment,
-                    timeout: case.timeout,
-                },
-            );
-            assert!(!output.status.success(), "{}", case.name);
-            assert!(
-                String::from_utf8_lossy(&output.stderr).contains(case.code),
-                "{}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-    }
+    #[path = "budget.rs"]
+    mod budget;
+
+    #[path = "outcomes.rs"]
+    mod outcomes;
 
     #[derive(Clone, Copy)]
     enum Reply {
         Exact,
+        Escaped,
         Refused,
         Malformed,
         Different,
+        Foreign,
         Oversized,
         Limit,
         Timeout,
@@ -226,15 +201,29 @@ mod unix {
         };
         let node = json!({
             "id": "IC_comment",
-            "url": "https://github.com/PerishLab/concord/issues/83#issuecomment-1",
+            "url": if matches!(reply, Reply::Foreign) { "https://github.com/PerishLab/concord/issues/84#issuecomment-1" } else { "https://github.com/PerishLab/concord/issues/83#issuecomment-1" },
             "body": declared,
             "createdAt": "2026-09-29T00:00:01Z",
         });
         let edge = json!({"node": node});
         let addition = json!({"commentEdge": edge});
         let answer = json!({"data": {"addComment": addition}});
+        let answer = if matches!(reply, Reply::Escaped) {
+            let escaped: String = declared
+                .encode_utf16()
+                .map(|unit| format!("\\u{unit:04x}"))
+                .collect();
+            answer.to_string().replace(
+                &serde_json::to_string(declared).expect("body"),
+                &format!("\"{escaped}\""),
+            )
+        } else {
+            answer.to_string()
+        };
         let mutation = match reply {
-            Reply::Exact | Reply::Different => format!("printf '%s\\n' '{answer}'"),
+            Reply::Exact | Reply::Escaped | Reply::Different | Reply::Foreign => {
+                format!("printf '%s\\n' '{answer}'")
+            }
             Reply::Refused => "printf refused >&2; exit 1".to_string(),
             Reply::Malformed => "printf broken".to_string(),
             Reply::Oversized => "yes x | head -c 20000".to_string(),
@@ -244,7 +233,8 @@ mod unix {
         tool(
             space,
             &format!(
-                "case \"$*\" in\n*\"--input -\"*) printf '%s' \"$*\" > '{}'; cat > '{}'; {mutation} ;;\n*) printf '%s\\n' '{observation}' ;;\nesac",
+                "case \"$*\" in\n*\"--input -\"*) echo mutation >> '{}'; printf '%s' \"$*\" > '{}'; cat > '{}'; {mutation} ;;\n*) printf '%s\\n' '{observation}' ;;\nesac",
+                space.join("mutations").display(),
                 arguments.display(),
                 request.display(),
             ),
