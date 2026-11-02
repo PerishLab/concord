@@ -35,6 +35,7 @@ struct Receipt<'a> {
 }
 
 impl Gate for Wharf {
+    #[locus::trace(with = plumb::observation::view())]
     fn verify(&self, context: &Context<'_>) -> Result<Evidence, Refusal> {
         let world = World::read(context.root)?;
         process::run(&mut world.command(context.root, CHECK))?;

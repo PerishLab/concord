@@ -16,10 +16,12 @@ impl Drop for Running {
     }
 }
 
+#[locus::trace(with = plumb::observation::view())]
 pub(super) fn run(command: &mut Command) -> Result<String, Refusal> {
     bounded(command, TIMEOUT)
 }
 
+#[locus::trace(with = plumb::observation::view())]
 pub(super) fn suite(command: &mut Command) -> Result<String, Refusal> {
     bounded(command, SUITE)
 }
