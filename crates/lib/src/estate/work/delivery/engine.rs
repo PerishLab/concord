@@ -4,6 +4,7 @@ use super::{
 };
 use crate::Result;
 
+#[locus::trace(with = plumb::observation::view())]
 pub(super) fn prepare<A: Authorities>(
     context: &Context,
     request: &Request,
@@ -53,6 +54,7 @@ pub(super) fn prepare<A: Authorities>(
     }
 }
 
+#[locus::trace(with = plumb::observation::view())]
 pub(super) fn revalidate<A: Authorities>(
     context: &Context,
     plan: &Plan,

@@ -11,6 +11,9 @@ mod native;
 #[cfg(unix)]
 mod needs;
 #[cfg(unix)]
+#[path = "calls/observed.rs"]
+mod observed;
+#[cfg(unix)]
 mod provider;
 #[cfg(unix)]
 mod refresh;
