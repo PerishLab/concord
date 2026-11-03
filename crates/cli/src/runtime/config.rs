@@ -1,7 +1,7 @@
 mod legacy;
 
 use concord_core::{Error, Result, Root};
-use plumb::config::Cascade;
+use radicula_config::Cascade;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
@@ -9,6 +9,7 @@ const RELEASES: &str = "https://releases.concord.perish.uk";
 const DEPOT: &str = "https://depot.concord.perish.uk";
 
 #[derive(Clone, Debug, Cascade)]
+#[plumb::config::prefix]
 pub struct Config {
     pub space: PathBuf,
     pub home: PathBuf,
