@@ -12,6 +12,7 @@ name = "concord"
 path = "src/main.rs"
 
 [dependencies]
+radicula-config.workspace = true
 clap.workspace = true
 concord-core = { path = "../lib" }
 locus.workspace = true

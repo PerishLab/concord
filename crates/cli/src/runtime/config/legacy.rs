@@ -24,7 +24,7 @@ pub(super) fn environment() -> Result<()> {
 
 pub(super) fn load(path: &Path) -> Result<ConfigPartial> {
     let layer =
-        plumb::config::load::<Layer>(path).map_err(|error| Error::new(error.to_string()))?;
+        radicula_config::load::<Layer>(path).map_err(|error| Error::new(error.to_string()))?;
     if layer.legacy.is_some() {
         return Err(Error::typed(
             "concord.config.legacy",
