@@ -73,7 +73,7 @@ impl Config {
             }
             config = config.merge(seen);
         }
-        let environment = <Self as Cascade>::env(&Self::prefix())
+        let environment = <Self as Cascade>::lookup(&Self::prefix(), &plumb::config::value)
             .map_err(|error| Error::new(error.to_string()))?;
         if environment.space.is_some() {
             source = Some(Source::Environment);
