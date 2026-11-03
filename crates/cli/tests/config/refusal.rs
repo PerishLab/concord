@@ -2,6 +2,34 @@ use super::{directory, expected, failure, path, process, run, settings};
 use std::fs;
 
 #[test]
+fn blank() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    let configured = directory(fixture.path(), "configured");
+    let file = fixture.path().join("concord.toml");
+    settings(&file, &configured);
+    for value in ["", " \t\n "] {
+        let output = process(
+            fixture.path(),
+            &[
+                "--config",
+                file.to_str().expect("config"),
+                "--json",
+                "audit",
+            ],
+        )
+        .env("CONCORD_SPACE", value)
+        .output()
+        .expect("blank environment");
+        let error = failure(&output, "concord.estate.absent");
+        assert_eq!(error["error"]["details"]["space"], path(&configured));
+        assert_eq!(
+            error["error"]["details"]["provenance"],
+            serde_json::json!({"kind":"config", "input":"--config", "path":path(&file)})
+        );
+    }
+}
+
+#[test]
 fn environment() {
     let fixture = tempfile::tempdir().expect("fixture");
     let space = directory(fixture.path(), "space");
