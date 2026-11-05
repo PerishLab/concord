@@ -1,18 +1,24 @@
 use locus::{Context, Engine};
-use std::cell::RefCell;
+use radicula_context::Context as Ambient;
+
+#[cfg(test)]
+#[path = "observation/proof.rs"]
+mod proof;
 
 type Seat = (&'static Engine, Context);
 
-thread_local! {
-    static FORK: RefCell<Option<Context>> = const { RefCell::new(None) };
-}
+struct Fork(Option<Context>);
 
 pub(crate) fn view() -> Option<Seat> {
     let (engine, root) = plumb::observation::view()?;
-    let context = FORK
-        .with(|fork| fork.borrow().clone())
-        .unwrap_or_else(|| root.clone());
-    Some((engine, context))
+    Some((engine, select(root)))
+}
+
+fn select(root: &Context) -> Context {
+    Ambient::current()
+        .get::<Fork>()
+        .and_then(|fork| fork.0.clone())
+        .unwrap_or_else(|| root.clone())
 }
 
 pub(crate) fn borrow(seat: &Seat) -> (&'static Engine, &Context) {
@@ -25,8 +31,5 @@ pub(crate) fn fork(frame: Option<&Context>) -> Option<Context> {
 }
 
 pub(crate) fn within<T>(context: Option<Context>, work: impl FnOnce() -> T) -> T {
-    let previous = FORK.with(|fork| fork.replace(context));
-    let result = work();
-    FORK.with(|fork| fork.replace(previous));
-    result
+    Ambient::current().with(Fork(context)).run(work)
 }

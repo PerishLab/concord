@@ -10,6 +10,7 @@ repository = "https://github.com/PerishLab/concord"
 
 [workspace.dependencies]
 radicula-config = { version = "0", registry = "perish" }
+radicula-context = { version = "0", registry = "perish" }
 clap = { version = "4.5", features = ["derive"] }
 fs2 = "0.4"
 flate2 = "1"
