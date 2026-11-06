@@ -215,7 +215,9 @@ fn connection(name: &str, intent: &Intent) -> String {
         "statusUpdates" => "id body createdAt updatedAt",
         _ => unreachable!("fixed native planning surface"),
     };
-    let selection = if name == "items" && matches!(intent.action, Action::Planning { .. }) {
+    let selection = if name == "items" && matches!(intent.action, Action::Value { .. }) {
+        super::value::selection(selection)
+    } else if name == "items" && matches!(intent.action, Action::Planning { .. }) {
         super::super::planning::selection(selection)
     } else if name == "items" && matches!(intent.action, Action::Remove { .. }) {
         values(selection)

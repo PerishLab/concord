@@ -259,7 +259,9 @@ fn contextchanged(before: &Value, current: &Value, intent: &Intent, pending: boo
             expected[key] = value;
         }
     }
-    expected != actual || before["statusUpdates"] != current["statusUpdates"]
+    let schema =
+        matches!(intent.action, Action::Value { .. }) && before["fields"] != current["fields"];
+    expected != actual || before["statusUpdates"] != current["statusUpdates"] || schema
 }
 
 fn interrupted(error: Error, completed: &[Value], step: usize) -> Error {

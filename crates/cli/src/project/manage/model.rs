@@ -12,6 +12,11 @@ pub(in crate::project) struct Intent {
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
 pub(in crate::project) enum Action {
+    Value {
+        field: String,
+        item: String,
+        selection: Cell,
+    },
     Planning {
         change: super::super::planning::Change,
     },
@@ -74,6 +79,14 @@ pub(in crate::project) enum Action {
     Record {
         body: String,
     },
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub(in crate::project) enum Cell {
+    Text { text: String },
+    Select { option: String },
+    Clear,
 }
 
 #[derive(Clone, Deserialize, Serialize)]

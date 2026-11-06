@@ -188,14 +188,17 @@ if q.startswith('mutation'):
                 if period.get('id') is None:period['id']='period-new-'+str(index)
             value['configuration']={'duration':p['iterationConfiguration']['duration'],'startDay':3,'iterations':[x for x in periods if x['startDate']>='2026-10-21'],'completedIterations':[x for x in periods if x['startDate']<'2026-10-21']}
     elif name in ['updateProjectV2ItemFieldValue','clearProjectV2ItemFieldValue']:
+        assert p['projectId']==s['project']['id']
         item=next(i for i in s['items'] if i['id']==p['itemId']);nodes=[v for v in item['fieldValues']['nodes'] if v['field']['id']!=p['fieldId']]
         if s['mode']=='delayed-value':s.update(hidden=item['id'],delay=1,previous=copy.deepcopy(item['fieldValues']))
         if 'value' in p:
             data=p['value'];value={'field':{'id':p['fieldId']}}
             if 'singleSelectOptionId' in data:value.update(__typename='ProjectV2ItemFieldSingleSelectValue',optionId=data['singleSelectOptionId'])
+            elif 'text' in data:value.update(__typename='ProjectV2ItemFieldTextValue',text=data['text'])
             else:value.update(__typename='ProjectV2ItemFieldIterationValue',iterationId=data['iterationId'])
             nodes.append(value)
         item['fieldValues']=page(nodes)
+        if s['mode']=='lost-value':stamp();save();fail()
     elif name=='updateProjectV2ItemPosition':
         item=next(i for i in s['items'] if i['id']==p['itemId']);s['items'].remove(item)
         index=next((i+1 for i,x in enumerate(s['items']) if x['id']==p['afterId']),0)

@@ -25,6 +25,7 @@ impl Builder<'_> {
         qualify::intent(self.state, intent)?;
         let project = &self.state["project"]["id"];
         let (mutation, input) = match &intent.action {
+            Action::Value { .. } => return super::value::steps(self.state, intent),
             Action::Planning { .. } => return super::super::planning::build(self.state, intent),
             Action::Create { title } => (
                 "createProjectV2",

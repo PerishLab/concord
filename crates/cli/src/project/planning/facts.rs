@@ -3,7 +3,7 @@ use super::model::Level;
 use concord_core::Result;
 use serde_json::Value;
 
-pub(super) struct Facts<'a> {
+pub(in crate::project) struct Facts<'a> {
     pub state: &'a Value,
 }
 
@@ -121,7 +121,7 @@ pub(in crate::project) fn periods(field: &Value) -> Result<Vec<&Value>> {
     Ok(current.iter().chain(completed).collect())
 }
 
-pub(super) fn cell<'a>(item: &'a Value, field: &str) -> Result<Option<&'a Value>> {
+pub(in crate::project) fn cell<'a>(item: &'a Value, field: &str) -> Result<Option<&'a Value>> {
     let connection = &item["fieldValues"];
     let values = connection["nodes"]
         .as_array()
