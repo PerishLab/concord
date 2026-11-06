@@ -4,6 +4,8 @@ mod coverage;
 mod paging;
 #[cfg(unix)]
 mod provider;
+#[cfg(unix)]
+mod value;
 
 use super::super::spawn;
 #[cfg(unix)]

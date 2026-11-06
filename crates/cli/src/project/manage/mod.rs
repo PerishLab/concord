@@ -1,3 +1,4 @@
+use super::field::value;
 mod apply;
 mod build;
 mod desired;
@@ -14,7 +15,7 @@ use crate::runtime::input;
 pub(super) use build::Step;
 use concord_core::{Error, Result};
 use model::Plan;
-pub(super) use model::{Action, Intent};
+pub(super) use model::{Action, Cell, Intent};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 

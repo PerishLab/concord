@@ -1,3 +1,5 @@
+pub(super) mod value;
+
 use super::{fault, wire::Client};
 use concord_core::Result;
 use serde::{Deserialize, Serialize};

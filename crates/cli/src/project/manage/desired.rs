@@ -10,6 +10,7 @@ struct Facts<'a> {
 impl<'a> Facts<'a> {
     fn result(&self, intent: &Intent) -> Option<Value> {
         match &intent.action {
+            Action::Value { .. } => super::value::result(self.state, intent).ok().flatten(),
             Action::Planning { change } => super::super::planning::result(self.state, change)
                 .ok()
                 .flatten(),

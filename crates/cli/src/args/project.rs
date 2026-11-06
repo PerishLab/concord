@@ -115,6 +115,8 @@ const INTENT: &str = r#"Prepare a native Project change without writes from:
 The target is OWNER/NUMBER or a canonical organization Project URL. Create selects OWNER and establishes a private Project; default workflows must be explicitly qualified before importing candidates. Credentials remain in the external provider command. A prepared plan is an ephemeral operation intent, not delegation or a planning ledger.
 
 Actions (native IDs, never display-name authority):
+value: field, item, selection ({kind:text,text}, {kind:select,option}, or {kind:clear})
+Local value maintenance supports Project-owned TEXT (1..4096 nonblank UTF-8 bytes) and SINGLE_SELECT with exact native option IDs, on ordinary open nonarchived Issue items with disabled native workflows. Reserved lifecycle/planning names and canonical priority/status option schemas refuse; field labels alone never grant authority. Use dedicated Priority/Cycle/Phase operations. Clear is explicit; missing text/option never means clear. Qualification cannot infer an arbitrarily renamed field's business role: callers must supply the exact relation field inside their entrusted Project scope. No cross-Project write or Issue mutation is requested.
 create: title
 configure: changes {title?, description?, readme?, public?}
 link: repository (node ID), present (boolean)

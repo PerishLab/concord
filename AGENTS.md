@@ -50,6 +50,13 @@ of copying its answer here.
   from the root at most three times on recognized paging/metadata conflicts,
   separated by 250 ms. Other errors retain refusal; no mutation is replayed.
 - Project planning writes qualified Project-owned priority and iteration fields.
+- Local relation values are explicit TEXT/SINGLE_SELECT set or clear operations
+  on exact Project-owned field and ordinary Issue item identities. Reserved
+  lifecycle/planning names and canonical priority/status schemas refuse;
+  arbitrary renamed business roles remain the entrusted operator's judgment.
+  Never use this path to copy Phase or bypass dedicated planning semantics.
+  Preparation retains old values; unknown writes recover read-only without
+  replay, and another Project's values are not part of the mutation.
   Empty priority means unreviewed; empty iteration means unassigned. Native
   iteration IDs and completed history survive configuration updates. Calendar
   dates never prove elapsed work. Ordering requires both anchors in the selected
