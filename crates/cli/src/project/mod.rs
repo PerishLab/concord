@@ -21,6 +21,7 @@ pub(crate) async fn run(
     match command {
         Command::Show(args) => observe::run(args, output).await,
         Command::Next(args) => next::run(args, output, phase).await,
+        Command::Survey(args) => observe::survey::run(args, output).await,
         command => manage::run(command, output).await,
     }
 }

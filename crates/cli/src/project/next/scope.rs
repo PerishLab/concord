@@ -6,7 +6,7 @@ use concord_core::Result;
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 
-pub(super) struct Scope<'a> {
+pub(in crate::project) struct Scope<'a> {
     pub cycle: &'a str,
     pub priority: &'a str,
     pub period: &'a Value,
@@ -14,7 +14,7 @@ pub(super) struct Scope<'a> {
 }
 
 impl<'a> Scope<'a> {
-    pub fn find(fields: &'a Value, day: i64) -> Result<Option<Self>> {
+    pub fn inspect(fields: &'a Value, day: i64) -> Result<(Option<Self>, &'static str)> {
         let fields = fields
             .as_array()
             .ok_or_else(|| fault("schema", "planning fields are unreadable"))?;
@@ -31,7 +31,14 @@ impl<'a> Scope<'a> {
             .filter(|field| priority(field))
             .collect::<Vec<_>>();
         if cycles.len() != 1 || priorities.len() != 1 {
-            return Ok(None);
+            return Ok((
+                None,
+                if cycles.is_empty() || priorities.is_empty() {
+                    "missing-fields"
+                } else {
+                    "ambiguous-fields"
+                },
+            ));
         }
         let field = cycles[0];
         let mut active = Vec::new();
@@ -52,15 +59,25 @@ impl<'a> Scope<'a> {
             }
         }
         if active.len() != 1 {
-            return Ok(None);
+            return Ok((
+                None,
+                if active.is_empty() {
+                    "no-current-cycle"
+                } else {
+                    "ambiguous-cycle"
+                },
+            ));
         }
         let priority = priorities[0];
-        Ok(Some(Self {
-            cycle: text(field, "id")?,
-            priority: text(priority, "id")?,
-            period: active[0],
-            options: priority["options"].as_array().expect("qualified options"),
-        }))
+        Ok((
+            Some(Self {
+                cycle: text(field, "id")?,
+                priority: text(priority, "id")?,
+                period: active[0],
+                options: priority["options"].as_array().expect("qualified options"),
+            }),
+            "ready",
+        ))
     }
 
     pub fn priority(&self, item: &Value) -> Result<Value> {

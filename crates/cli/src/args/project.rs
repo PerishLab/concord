@@ -19,6 +19,11 @@ pub enum Command {
         long_about = "Consume one explicit Project without opening local execution state or writing provider facts. The first-phase policy uses Asia/Shanghai calendar dates, one unambiguous Project-owned iteration field and one Project-owned Urgent/High/Medium/Low priority field. Only the unique current cycle is considered, in native item order; priority never reranks that order. Archived, closed and nonordinary items, open blockers and needs labels are skipped. No backlog or expired-cycle fallback occurs. Missing or ambiguous planning scope returns null in JSON and silent human output. Incomplete necessary facts and provider failures are errors. Phase is carried from the explicit [phase] binding without reranking or treating unset/unavailable as a new selection rule. A result observes planning, not execution readiness or permission; use Issue preflight for local non-exclusive execution observations before starting or continuing work."
     )]
     Next(Observe),
+    #[command(
+        about = "Observe bounded organization Issue coverage across explicit Projects",
+        long_about = "Read provider-visible organization repositories and open Issues, then compare original Issue identities with explicitly selected Projects. Preserve Project-local values and native order, classify ordinary/Auto/unknown Issues separately, and report missing or ambiguous planning scope. Page limits retain incomplete coverage and never establish absence. Provider or identity failures refuse. This is a live interval, not an atomic snapshot, contribution judgment, planning replica, automatic candidate import or execution permission. No local estate is opened."
+    )]
+    Survey(Survey),
     #[command(about = "List the bounded provider-visible organization Project inventory")]
     List {
         owner: String,
@@ -77,11 +82,25 @@ pub struct Remote {
     pub timeout: u64,
 }
 
+#[derive(clap::Args)]
+pub struct Survey {
+    pub owner: String,
+    #[arg(long = "project", required = true, num_args = 1, action = clap::ArgAction::Append)]
+    pub projects: Vec<String>,
+    #[arg(long = "max-repositories", default_value_t = 100, value_parser = clap::value_parser!(u16).range(1..=1000))]
+    pub repositories: u16,
+    #[arg(long = "max-issues", default_value_t = 10000, value_parser = clap::value_parser!(u32).range(1..=100000))]
+    pub issues: u32,
+    #[command(flatten)]
+    pub remote: Remote,
+}
+
 impl Command {
     pub(crate) fn name(&self) -> &'static str {
         match self {
             Self::Show(_) => "project.show",
             Self::Next(_) => "project.next",
+            Self::Survey(_) => "project.survey",
             Self::List { .. } => "project.list",
             Self::Prepare { .. } => "project.prepare",
             Self::Apply { .. } => "project.apply",
