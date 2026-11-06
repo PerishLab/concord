@@ -78,7 +78,9 @@ pub(super) async fn run(command: Command, output: bool) -> Result<()> {
             validate(&envelope)?;
             apply::recover(&client(&remote), &envelope.plan, remote.pages).await?
         }
-        Command::Show(_) | Command::Next(_) => unreachable!("independent observation dispatch"),
+        Command::Show(_) | Command::Next(_) | Command::Survey(_) => {
+            unreachable!("independent observation dispatch")
+        }
     };
     crate::dispatch::emit(json!({"project":value}), output)
 }

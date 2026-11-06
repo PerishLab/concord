@@ -1,6 +1,6 @@
 mod choice;
 mod read;
-mod scope;
+pub(in crate::project) mod scope;
 #[cfg(test)]
 mod tests;
 
@@ -77,15 +77,18 @@ pub(super) async fn run(
 
 fn select(state: &Value, day: i64) -> Result<Value> {
     if state["project"]["closed"] == true {
-        return Ok(empty("Project is closed"));
+        let mut result = empty("Project is closed");
+        result["availability"] = json!("closed");
+        return Ok(result);
     }
-    let Some(scope) = scope::Scope::find(&state["fields"], day)? else {
-        return Ok(empty(
-            "planning fields or current cycle are missing or ambiguous",
-        ));
+    let (scope, availability) = scope::Scope::inspect(&state["fields"], day)?;
+    let Some(scope) = scope else {
+        let mut result = empty("planning fields or current cycle are missing or ambiguous");
+        result["availability"] = json!(availability);
+        return Ok(result);
     };
     let item = choice::select(&state["items"], &scope, &state["project"])?;
-    let mut result = json!({"issue":null,"item":null,"priority":null,"cycle":scope.period,"fields":{"cycle":scope.cycle,"priority":scope.priority},"reason":"no eligible ordinary open Issue in the current cycle"});
+    let mut result = json!({"issue":null,"item":null,"priority":null,"cycle":scope.period,"fields":{"cycle":scope.cycle,"priority":scope.priority},"availability":"ready","reason":"no eligible ordinary open Issue in the current cycle"});
     if let Some(item) = item {
         result["item"] = item["id"].clone();
         result["issue"] = item["content"].clone();

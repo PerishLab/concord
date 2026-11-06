@@ -1,3 +1,5 @@
+pub(super) mod survey;
+
 use super::{
     fault, inspect, issue, query,
     target::Target,

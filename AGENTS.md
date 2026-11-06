@@ -27,6 +27,13 @@ of copying its answer here.
   values from attached Issue fields; display names establish neither. Bounded
   projections preserve cursors, unknown content and read-only Auto classification.
   A successful read grants no planning, Issue or local execution authority.
+- Project survey reads a bounded provider-visible organization inventory and
+  explicit Projects without opening the estate. Stable Issue identity deduplicates
+  shared work while each Project retains its own values and native order.
+  Incomplete inventory or membership cannot establish a complete missing set.
+  Its narrow projection does not read attached Issue values or judge goal
+  contribution. No current cycle, ambiguous scope and no eligible candidate
+  remain distinct observations, never automatic import, rollover or authority.
 - Project preparation binds current native facts without writes; applying a
   prepared intent requires fresh agreement, narrow mutations and independent
   readback. Native requested/confirmed planning updates retain rationale.
