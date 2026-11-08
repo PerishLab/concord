@@ -1,7 +1,10 @@
-use super::{Cutover, Intent, Result, files, refuse};
-use radicula_lock::Mode;
+use super::{Cutover, Error, Intent, Result, files, refuse};
+use radicula_lock::{
+    Policy, Wait,
+    file::{Gate, Permit},
+};
 use serde::{Serialize, de::DeserializeOwned};
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -85,7 +88,7 @@ pub(super) fn artifacts(source: &Path) -> Result<Option<files::Inventory>> {
 }
 
 impl Cutover {
-    pub(super) fn guards(&self) -> Result<Vec<File>> {
+    pub(super) fn guards(&self) -> Result<Vec<Permit>> {
         let source = &self.source;
         files::directory(&source.join(".concord"))?;
         let mut paths = vec![source.join(".concord.lock")];
@@ -107,11 +110,34 @@ impl Cutover {
                 .create(true)
                 .truncate(false)
                 .open(path)?;
-            radicula_lock::attempt(&file, Mode::Exclusive).map_err(|_| {
+            let gate =
+                Gate::new(file, Policy::EXCLUSIVE).map_err(|error| refuse(error.to_string()))?;
+            let permit = gate.acquire(Wait::immediate()).map_err(|_| {
                 refuse("a legacy lock is occupied; stop writers and retry without replacing locks")
             })?;
-            held.push(file);
+            held.push(permit);
         }
         Ok(held)
+    }
+
+    pub(super) fn release(held: Vec<Permit>, outcome: Result<()>) -> Result<()> {
+        let failures = held
+            .into_iter()
+            .filter_map(|permit| permit.release().err().map(|error| error.to_string()))
+            .collect::<Vec<_>>();
+        if failures.is_empty() {
+            return outcome;
+        }
+        let result = match outcome {
+            Ok(()) => serde_json::json!({"state":"completed"}),
+            Err(error) => {
+                serde_json::json!({"code":error.code(),"message":error.message(),"details":error.details()})
+            }
+        };
+        Err(Error::detailed(
+            "concord.cutover.release",
+            "cutover lock release failed; preserve the outcome and stop",
+            serde_json::json!({"outcome":result,"release":failures}),
+        ))
     }
 }

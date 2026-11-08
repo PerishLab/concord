@@ -60,20 +60,21 @@ pub async fn entry(args: Vec<OsString>) -> Result<()> {
         None
     };
     if command == "finish" {
-        drop(guards);
+        if let Some(guards) = guards {
+            Cutover::release(guards, Ok(()))?;
+        }
         return cutover.finish().await;
     }
-    let _guards = guards.ok_or_else(|| refuse("missing legacy controls"))?;
-    match command {
-        "stage" => cutover.stage().await?,
-        "activate" => cutover.activate().await?,
-        "abort" => cutover.abort()?,
-        _ => {
-            return Err(refuse(
-                "unknown operation; use stage, activate, abort or finish",
-            ));
-        }
-    }
+    let guards = guards.ok_or_else(|| refuse("missing legacy controls"))?;
+    let result = match command {
+        "stage" => cutover.stage().await,
+        "activate" => cutover.activate().await,
+        "abort" => cutover.abort(),
+        _ => Err(refuse(
+            "unknown operation; use stage, activate, abort or finish",
+        )),
+    };
+    Cutover::release(guards, result)?;
     println!("{command} complete; no provider operation or Git payload move performed");
     Ok(())
 }

@@ -181,6 +181,21 @@ async fn interrupted() {
 }
 
 #[tokio::test(flavor = "current_thread")]
+async fn aliases() {
+    let fixture = Fixture::new().await;
+    let cutover = super::Cutover {
+        source: fixture.source.clone(),
+        home: fixture.home.clone(),
+    };
+    let held = cutover.guards().unwrap();
+    let inherited = held[0].file().try_clone().unwrap();
+    drop(held);
+    fixture.run("stage").await.unwrap();
+    fixture.run("abort").await.unwrap();
+    drop(inherited);
+}
+
+#[tokio::test(flavor = "current_thread")]
 async fn occupied() {
     let fixture = Fixture::new().await;
     let intent = super::Cutover {
