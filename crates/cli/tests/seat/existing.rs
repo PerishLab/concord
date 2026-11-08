@@ -1,6 +1,7 @@
 #[cfg(unix)]
 #[path = "issue"]
 mod unix {
+    mod rebind;
     mod sections;
     use super::super::execution::unix::{Facts, provider, repository};
     use super::super::spawn;

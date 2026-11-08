@@ -1,3 +1,5 @@
+mod rebind;
+
 use super::emit;
 use crate::args::integration;
 use concord_core::{Error, Estate, Integration, Register, Rename, Repository, Result};
@@ -19,6 +21,7 @@ struct Observed {
 
 pub async fn run(estate: &Estate, command: integration::Command, output: bool) -> Result<()> {
     match command {
+        integration::Command::Rebind { command } => rebind::run(estate, command, output).await,
         integration::Command::List => emit(
             json!({"integrations": estate.integrations().await?}),
             output,

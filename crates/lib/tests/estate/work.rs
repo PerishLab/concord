@@ -1,10 +1,10 @@
 mod anchor;
 mod authority;
 mod completion;
+mod integration;
 mod issue_delivery;
 mod issue_execution;
 mod overlap;
 mod proof;
 mod recovery;
-mod retirement;
 mod start;

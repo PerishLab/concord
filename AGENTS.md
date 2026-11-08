@@ -218,6 +218,11 @@ of copying its answer here.
 - Delivery and landing plans bind the stable Space identity as well as current
   path and proof. Old-schema or foreign-Space plans refuse before provider work.
   Prepared plans never survive relocation by editing their serialized paths.
+- Explicit idle Integration rebind requires the original checkout to be absent and
+  a clean synchronized replacement of the same provider repository without auxiliary
+  worktrees. Its prepared intent binds Space identity, full old registration and
+  canonical target path/common/HEAD. Apply rechecks under locks and changes only
+  path/common; it moves no files and preserves Integration keys and Issue history.
 - Lock the Space, re-read the relevant revision, compare, and commit one Keel
   batch for every mutation.
 - Keep protocol agreement separate from coordination and health observations.
