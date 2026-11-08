@@ -39,3 +39,8 @@ toml.workspace = true
 [[test]]
 name = "estate"
 path = "tests/estate/main.rs"
+
+[[example]]
+name = "cutover"
+path = "tests/maintenance/cutover.rs"
+test = true
