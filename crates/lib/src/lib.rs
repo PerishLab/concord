@@ -27,8 +27,8 @@ pub use estate::{
     CommittedOverlap, Coordinate, Estate, Finding, Finish, Guard, Integration, IntegrationState,
     IssueArtifact, IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange,
     IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval, IssueRetirement,
-    IssueWithdrawal, IssueWorktree, Proof, Reconcile, Recovery, Reference, ReferenceKind, Register,
-    Rename, Repository, Seat, Start, UpstreamState,
+    IssueWithdrawal, IssueWorktree, Proof, Rebind, Reconcile, Recovery, Reference, ReferenceKind,
+    Register, Rename, Repository, Seat, Start, UpstreamState,
 };
 pub use estate::{authority, issue_delivery, landing};
 pub use protocol::PLUMB;

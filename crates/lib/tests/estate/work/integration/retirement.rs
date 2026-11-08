@@ -1,4 +1,4 @@
-use super::start::{admit, world};
+use super::super::start::{admit, world};
 use concord_core::{Register, Repository, Start};
 
 #[tokio::test(flavor = "current_thread")]
@@ -235,7 +235,7 @@ async fn unrelated() {
 #[tokio::test(flavor = "current_thread")]
 async fn foreign() {
     let world = world().await;
-    let peer = super::start::world().await;
+    let peer = super::super::start::world().await;
     let status = std::process::Command::new("git")
         .arg("-C")
         .arg(&peer.source)

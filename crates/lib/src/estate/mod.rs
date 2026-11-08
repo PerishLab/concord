@@ -22,8 +22,8 @@ pub use work::{
     BoundaryState, CheckoutState, ClaimOverlap, CommittedEvidence, CommittedOverlap, Finish, Guard,
     Integration, IntegrationState, IssueArtifact, IssueClaiming, IssueDeclaration, IssueImport,
     IssueMemberChange, IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval,
-    IssueRetirement, IssueWithdrawal, IssueWorktree, Proof, Recovery, Register, Rename, Repository,
-    Start, UpstreamState, authority, issue_delivery, landing,
+    IssueRetirement, IssueWithdrawal, IssueWorktree, Proof, Rebind, Recovery, Register, Rename,
+    Repository, Start, UpstreamState, authority, issue_delivery, landing,
 };
 
 pub struct Estate {

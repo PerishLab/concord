@@ -1,7 +1,10 @@
 mod read;
+mod rebind;
 mod reconcile;
 pub(in crate::estate) mod registration;
 mod retirement;
+
+pub use rebind::Rebind;
 
 use crate::{Error, Result};
 use radicula_lock::Mode;
