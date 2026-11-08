@@ -81,7 +81,7 @@ impl World {
         let provider = world::provider(scratch.path(), &replies);
         let output = world::invoke(scratch.path(), &provider, "evaluate", None);
         let decoded = world::decoded(&output);
-        assert!(!scratch.path().join(".concord").exists());
+        assert!(!scratch.path().join("workspace").exists());
         let request = world::request(&scratch.path().join("request-5"));
         assert_eq!(request["variables"]["declaration"], "IC_decl");
         assert_eq!(request["variables"]["closure"], "IC_close");

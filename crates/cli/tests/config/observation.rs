@@ -222,8 +222,10 @@ fn parity() {
             let output = process(home.0.path(), &arguments)
                 .output()
                 .expect("command");
-            let stdout = String::from_utf8_lossy(&output.stdout)
-                .replace(&home.0.path().display().to_string(), "<home>");
+            let stdout = String::from_utf8_lossy(&output.stdout).replace(
+                &home.0.path().display().to_string().replace('\\', "\\\\"),
+                "<home>",
+            );
             seen.push((output.status.code(), stdout));
         }
         assert!(seen.windows(2).all(|pair| pair[0] == pair[1]), "{seen:?}");

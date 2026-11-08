@@ -4,9 +4,22 @@ use serde_json::{Value, json};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-pub(crate) fn start(command: &'static str, config: Option<&Path>) -> Option<Run> {
+pub(crate) fn start(
+    command: &'static str,
+    config: Option<&Path>,
+    home: Option<&Path>,
+) -> Option<Run> {
     let file = crate::config::Config::path(config).ok()?;
-    let buffer = plumb::config::data("concord")?.join("state").join("locus");
+    let selected = crate::config::Config::load(config, None, home, None).ok();
+    let root = selected
+        .as_ref()
+        .map(|loaded| loaded.config().home.clone())
+        .or_else(|| {
+            home.filter(|path| path.is_absolute())
+                .map(Path::to_path_buf)
+        })
+        .or_else(|| plumb::config::data("concord"))?;
+    let buffer = root.join("state/locus");
     Run::start(
         Declaration {
             producer: "concord",

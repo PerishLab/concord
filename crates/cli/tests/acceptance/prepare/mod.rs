@@ -36,7 +36,7 @@ fn declaration() {
         plan.recover(&["priority:normal".into()], &[]).unwrap().step,
         Step::Publish
     );
-    assert!(!scratch.path().join(".concord").exists());
+    assert!(!scratch.path().join("workspace").exists());
     assert_eq!(
         std::fs::read_to_string(scratch.path().join("calls")).unwrap(),
         "2\n"

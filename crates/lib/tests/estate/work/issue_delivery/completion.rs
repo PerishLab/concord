@@ -102,13 +102,13 @@ pub(super) async fn merged(
     let source = space.join("source");
     let remote = space.join("remote.git");
     let ssh = space.join("ssh");
-    plumb::testing::executable(
+    std::fs::write(
         &ssh,
         format!(
             "#!/bin/sh\nfor last; do :; done\nexec sh -c \"$(printf '%s' \"$last\" | sed \"s|'/PerishLab/probe'|'{}'|\")\"\n",
-            remote.display()
+            remote.display().to_string().replace('\\', "/")
         ),
-    );
+    ).expect("SSH fixture");
     git(
         &source,
         &[
@@ -120,7 +120,11 @@ pub(super) async fn merged(
     );
     git(
         &source,
-        &["config", "core.sshCommand", ssh.to_str().expect("ssh")],
+        &[
+            "config",
+            "core.sshCommand",
+            &format!("sh '{}'", ssh.to_str().expect("ssh").replace('\\', "/")),
+        ],
     );
     git(&source, &["config", "ssh.variant", "simple"]);
     let tree = text(
@@ -160,6 +164,7 @@ pub(super) async fn merged(
     git(&source, &["fetch", "origin", "main"]);
     git(&source, &["merge", "--ff-only", "origin/main"]);
     let settlement = issue_delivery::Settlement {
+        space: plan.space.clone(),
         authority: plan.authority.clone(),
         issue: issue.clone(),
         prepared: plan.revision,
@@ -191,7 +196,7 @@ pub(super) async fn merged(
 }
 
 fn hold(space: &Path, source: &Path) -> JoinHandle<()> {
-    let stray = space.join(".issues/I_stray/worktree");
+    let stray = space.join("workspace/issues/I_stray/worktree");
     let path = stray.to_str().expect("stray path").to_string();
     git(source, &["worktree", "add", "--detach", &path]);
     let lock = std::fs::OpenOptions::new()
@@ -199,7 +204,7 @@ fn hold(space: &Path, source: &Path) -> JoinHandle<()> {
         .write(true)
         .create(true)
         .truncate(false)
-        .open(space.join(".concord.lock"))
+        .open(space.join("workspace/locks/estate.lock"))
         .expect("estate lock");
     lock.lock().expect("writer lock");
     let source = source.to_path_buf();

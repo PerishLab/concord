@@ -43,8 +43,8 @@ fn shared() {
     let calls = std::fs::read_to_string(root.path().join("calls")).unwrap();
     assert!(!calls.contains("mutation"));
     assert!(!calls.contains("comments("));
-    assert!(!root.path().join(".concord").exists());
-    assert!(!root.path().join(".issues").exists());
+    assert!(!root.path().join("workspace").exists());
+    assert!(!root.path().join("workspace/issues").exists());
 }
 
 #[test]

@@ -21,7 +21,7 @@ fn observed() {
     )
     .expect("config");
     let output = spawn::concord(space)
-        .args(["--space", space.to_str().expect("root path"), "--json"])
+        .args(["--home", space.to_str().expect("root path"), "--json"])
         .args([
             "issue",
             "brief",
@@ -46,7 +46,7 @@ fn observed() {
         ],
     );
     success(space, &["audit"]);
-    let atoms = std::fs::read_to_string(config.join("state").join("locus").join("active.jsonl"))
+    let atoms = std::fs::read_to_string(space.join("state").join("locus").join("active.jsonl"))
         .expect("Locus buffer")
         .lines()
         .map(|line| serde_json::from_str::<Value>(line).expect("Locus atom"))

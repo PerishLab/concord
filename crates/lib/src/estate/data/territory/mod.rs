@@ -41,9 +41,9 @@ async fn resources(estate: &Estate, report: &mut Agreement) -> Result<()> {
 
 fn custody(estate: &Estate, report: &mut Agreement) -> Result<()> {
     for (path, mode) in [
-        (estate.space.join(".concord"), 0o700),
-        (estate.space.join(".concord/estate.sqlite3"), 0o600),
-        (estate.space.join(".concord/sudo"), 0o600),
+        (estate.layout.root.clone(), 0o700),
+        (estate.layout.root.join("estate.sqlite3"), 0o600),
+        (estate.layout.root.join("sudo"), 0o600),
     ] {
         if let Some(found) = at(&path).held()?
             && found != mode

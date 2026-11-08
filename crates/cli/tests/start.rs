@@ -1,3 +1,4 @@
+#[cfg(unix)]
 #[path = "seat/spawn.rs"]
 mod spawn;
 #[cfg(unix)]
@@ -40,7 +41,7 @@ mod unix {
         let provider = tool(fixture.path(), "fact", fact());
         let output = spawn::concord(fixture.path())
             .env("PLUMB_HOME", &home)
-            .args(["--space", fixture.path().to_str().expect("Space")])
+            .args(["--home", fixture.path().to_str().expect("Space")])
             .args([
                 "member",
                 "start",
@@ -77,7 +78,7 @@ mod unix {
         let audit = spawn::concord(fixture.path())
             .env("PLUMB_HOME", &home)
             .args([
-                "--space",
+                "--home",
                 fixture.path().to_str().expect("Space"),
                 "--json",
                 "audit",
@@ -223,7 +224,7 @@ mod unix {
 
     fn refusal(space: &Path, provider: &Path) -> Value {
         let output = spawn::concord(space)
-            .args(["--space", space.to_str().expect("Space"), "--json"])
+            .args(["--home", space.to_str().expect("Space"), "--json"])
             .args([
                 "member",
                 "start",

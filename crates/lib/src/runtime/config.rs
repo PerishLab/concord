@@ -1,6 +1,6 @@
 use crate::activity::{Agent, Operator};
 use crate::{Error, Result};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub(crate) fn search(
     paths: &[&Path],
@@ -12,33 +12,6 @@ pub(crate) fn tools() -> std::result::Result<radicula_process::Search, String> {
     let root = std::env::current_dir().map_err(|error| error.to_string())?;
     radicula_process::Search::new(&root, std::env::var_os("PATH"), std::env::var_os("PATHEXT"))
         .map_err(|error| error.to_string())
-}
-
-#[derive(Clone, Debug)]
-pub struct Root {
-    path: PathBuf,
-}
-
-impl Root {
-    pub fn new(path: &Path) -> Result<Self> {
-        if !path.is_absolute() {
-            return Err(Error::new("space must be absolute"));
-        }
-        let path = path.canonicalize().map_err(|error| {
-            Error::new(format!("cannot resolve space {}: {error}", path.display()))
-        })?;
-        if !path.is_dir() {
-            return Err(Error::new(format!(
-                "space is not a directory: {}",
-                path.display()
-            )));
-        }
-        Ok(Self { path })
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
 }
 
 pub(crate) fn operator() -> Option<Operator> {

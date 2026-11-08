@@ -97,7 +97,7 @@ impl World {
         replies.extend([self.source.page.clone(), self.source.page.clone()]);
         let provider = world::provider(scratch.path(), &replies);
         let output = world::invoke(scratch.path(), &provider, "evaluate", None);
-        assert!(!scratch.path().join(".concord").exists());
+        assert!(!scratch.path().join("workspace").exists());
         output
     }
 

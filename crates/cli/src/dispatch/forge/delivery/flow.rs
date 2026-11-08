@@ -163,6 +163,7 @@ impl Flow<'_> {
             .complete(
                 &integration,
                 &issue_delivery::Settlement {
+                    space: self.plan.space.clone(),
                     authority: self.plan.authority.clone(),
                     issue: self.plan.issue.clone(),
                     prepared: self.plan.revision,

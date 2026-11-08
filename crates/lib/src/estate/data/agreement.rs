@@ -53,7 +53,7 @@ impl Estate {
     #[locus::trace(with = plumb::observation::view())]
     pub async fn inspect(&self) -> Result<Agreement> {
         let mut report = Agreement {
-            target: self.space.display().to_string(),
+            target: self.layout.root.display().to_string(),
             revision: 0,
             faults: Vec::new(),
             observations: Vec::new(),

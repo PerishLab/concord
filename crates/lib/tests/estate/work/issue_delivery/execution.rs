@@ -120,7 +120,7 @@ async fn redirected() {
     let path = world
         ._temp
         .path()
-        .join(".concord")
+        .join("workspace/locks")
         .join(format!("land-{}.lock", anchor.key));
     let payload = world._temp.path().join("valuable");
     std::fs::write(&payload, "preserved").expect("payload");
@@ -147,7 +147,7 @@ async fn publication() {
     let path = world
         ._temp
         .path()
-        .join(".concord")
+        .join("workspace/locks")
         .join(format!("land-{}.json", anchor.key));
     std::fs::create_dir(&path).expect("inject occupied diagnostic path");
     assert_eq!(
@@ -165,4 +165,34 @@ async fn publication() {
         .expect("failed publication released kernel admission")
         .release()
         .expect("release");
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn identity() {
+    let authority = released();
+    let world = fixture(authority.producer(), authority.depot()).await;
+    let mut plan = issue_delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
+        .await
+        .unwrap();
+    assert_eq!(plan.space, world.estate.identity());
+    plan.space = "0".repeat(64);
+    let error = execution::acquire(&world.estate, &plan)
+        .await
+        .err()
+        .unwrap();
+    assert_eq!(error.code(), "concord.space.identity");
+    let error = issue_delivery::resume::<Plumb>(&world.estate, &plan, &super::snapshot())
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), "concord.space.identity");
+    plan.space = world.estate.identity().to_string();
+    plan.schema = "concord.issue-member-delivery/v6".into();
+    assert_eq!(
+        execution::acquire(&world.estate, &plan)
+            .await
+            .err()
+            .unwrap()
+            .code(),
+        "concord.delivery.schema"
+    );
 }

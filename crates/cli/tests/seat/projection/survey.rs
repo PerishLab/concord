@@ -112,7 +112,7 @@ fn observe(space: &Path) -> Vec<Value> {
     )
     .expect("config");
     success(space, &["audit"]);
-    std::fs::read_to_string(config.join("state").join("locus").join("active.jsonl"))
+    std::fs::read_to_string(space.join("state").join("locus").join("active.jsonl"))
         .expect("Locus buffer")
         .lines()
         .map(|line| serde_json::from_str::<Value>(line).expect("Locus atom"))
@@ -128,7 +128,7 @@ fn tool(root: &Path, name: &str, body: String) -> PathBuf {
 
 fn success(space: &Path, arguments: &[&str]) -> Value {
     let output = spawn::concord(space)
-        .args(["--space", space.to_str().expect("root path"), "--json"])
+        .args(["--home", space.to_str().expect("root path"), "--json"])
         .args(arguments)
         .output()
         .expect("run Concord");

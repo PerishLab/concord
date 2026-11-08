@@ -1,6 +1,6 @@
 mod legacy;
 
-use concord_core::{Error, Result, Root};
+use concord_core::{Error, Result};
 use radicula_config::Cascade;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
@@ -11,7 +11,6 @@ const DEPOT: &str = "https://depot.concord.perish.uk";
 #[derive(Clone, Debug, Cascade)]
 #[plumb::config::prefix]
 pub struct Config {
-    pub space: PathBuf,
     pub home: PathBuf,
     pub releases: String,
     pub depot: String,
@@ -20,14 +19,7 @@ pub struct Config {
 
 pub struct Loaded {
     config: Config,
-    selected: Selection,
-    alternative: Option<Selection>,
-}
-
-#[derive(Clone)]
-struct Selection {
-    root: PathBuf,
-    source: Source,
+    selected: Source,
 }
 
 #[derive(Clone)]
@@ -47,7 +39,6 @@ struct File {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            space: PathBuf::new(),
             home: plumb::config::data("concord").unwrap_or_default(),
             releases: RELEASES.to_string(),
             depot: DEPOT.to_string(),
@@ -64,49 +55,41 @@ impl Config {
         releases: Option<&str>,
     ) -> Result<Loaded> {
         legacy::environment()?;
+        if root.is_some() {
+            return Err(Error::typed(
+                "concord.config.legacy",
+                "--space no longer selects local execution; migrate to the data home layout and remove --space; inspect concord config show",
+            ));
+        }
         let file = selected(file)?;
         let mut config = Self::default();
-        let mut source = (!config.space.as_os_str().is_empty()).then_some(Source::Default);
+        let mut source = Source::Default;
         if let Some(file) = &file {
             let seen = legacy::load(&file.path)?;
-            if seen.space.is_some() {
-                source = Some(Source::Config(file.clone()));
+            if seen.home.is_some() {
+                source = Source::Config(file.clone());
             }
             config = config.merge(seen);
         }
         let environment = <Self as Cascade>::lookup(&Self::prefix(), &plumb::config::value)
             .map_err(|error| Error::new(error.to_string()))?;
-        if environment.space.is_some() {
-            source = Some(Source::Environment);
+        if environment.home.is_some() {
+            source = Source::Environment;
         }
         config = config.merge(environment);
-        let configured = source.clone().map(|source| Selection {
-            root: config.space.clone(),
-            source,
-        });
-        if root.is_some() {
-            source = Some(Source::Explicit);
+        if home.is_some() {
+            source = Source::Explicit;
         }
         config = config.merge(ConfigPartial {
-            space: root.map(Path::to_path_buf),
             home: home.map(Path::to_path_buf),
             releases: releases.map(str::to_string),
             depot: None,
             phase: None,
         });
         let config = config.validate()?;
-        let selected = Selection {
-            root: config.space.clone(),
-            source: source.unwrap_or(Source::Default),
-        };
-        let alternative = matches!(selected.source, Source::Explicit)
-            .then_some(configured)
-            .flatten()
-            .filter(|alternative| alternative.root != selected.root);
         Ok(Loaded {
             config,
-            selected,
-            alternative,
+            selected: source,
         })
     }
 
@@ -140,93 +123,34 @@ impl Loaded {
     pub fn config(&self) -> &Config {
         &self.config
     }
-
-    pub fn root(&self) -> Result<Root> {
-        if self.selected.root.as_os_str().is_empty() {
-            return Err(Error::detailed(
-                "concord.space.root",
-                "no Space root is configured; inspect `concord config show`, then set --space, CONCORD_SPACE, or space",
-                json!({"space": "", "provenance": self.selected.source.json()}),
-            ));
-        }
-        Root::new(&self.selected.root)
+    pub fn provenance(&self) -> Value {
+        self.selected.json()
     }
-
-    pub fn absent(&self, root: &Root, error: Error) -> Error {
+    pub fn absent(&self, error: Error) -> Error {
         if error.code() != "concord.estate.absent" {
             return error;
         }
-        let estate = root.path().join(".concord");
-        let alternative = self.alternative.as_ref().map(Selection::json);
+        let estate = self.config.home.join("workspace");
         Error::detailed(
             "concord.estate.absent",
-            self.selected
-                .message(root.path(), &estate, alternative.as_ref()),
-            json!({
-                "space": root.path().display().to_string(),
-                "estate": estate.display().to_string(),
-                "provenance": self.selected.source.json(),
-                "configured_alternative": alternative,
-            }),
+            format!(
+                "Concord Space is absent at {}; inspect concord config show; bootstrap only an intentionally new data home, and migrate existing execution explicitly",
+                estate.display()
+            ),
+            json!({"home": self.config.home.display().to_string(), "estate": estate.display().to_string(), "provenance": self.provenance()}),
         )
-    }
-}
-
-impl Selection {
-    fn json(&self) -> Value {
-        json!({
-            "space": resolved(&self.root).display().to_string(),
-            "provenance": self.source.json(),
-        })
-    }
-
-    fn message(&self, root: &Path, estate: &Path, alternative: Option<&Value>) -> String {
-        match (&self.source, alternative) {
-            (Source::Explicit, Some(alternative)) => format!(
-                "Concord estate is absent at {}; --space selected Space {} while the configured alternative is {}; remove or correct --space, then inspect `concord config show`",
-                estate.display(),
-                root.display(),
-                alternative["space"].as_str().unwrap_or("unavailable"),
-            ),
-            (Source::Explicit, None) => format!(
-                "Concord estate is absent at {}; --space selected Space {}; correct --space or inspect `concord config show`, and bootstrap only if this is intentionally a new Space",
-                estate.display(),
-                root.display(),
-            ),
-            (Source::Environment, _) => format!(
-                "Concord estate is absent at {}; CONCORD_SPACE selected Space {}; correct or unset it, then inspect `concord config show`",
-                estate.display(),
-                root.display(),
-            ),
-            (Source::Config(file), _) => format!(
-                "Concord estate is absent at {}; config {} selected Space {}; inspect `concord config show`, and bootstrap only if this is intentionally a new Space",
-                estate.display(),
-                file.path.display(),
-                root.display(),
-            ),
-            (Source::Default, _) => format!(
-                "Concord estate is absent at {}; the built-in default selected Space {}; inspect `concord config show`, and bootstrap only if this is intentionally a new Space",
-                estate.display(),
-                root.display(),
-            ),
-        }
     }
 }
 
 impl Source {
     fn json(&self) -> Value {
         match self {
-            Self::Explicit => json!({"kind": "explicit", "input": "--space"}),
-            Self::Environment => json!({
-                "kind": "environment",
-                "input": "CONCORD_SPACE",
-            }),
-            Self::Config(file) => json!({
-                "kind": "config",
-                "input": if file.explicit { "--config" } else { "platform-default" },
-                "path": file.path.display().to_string(),
-            }),
-            Self::Default => json!({"kind": "built-in-default"}),
+            Self::Explicit => json!({"kind":"explicit", "input":"--home"}),
+            Self::Environment => json!({"kind":"environment", "input":"CONCORD_HOME"}),
+            Self::Config(file) => {
+                json!({"kind":"config", "input": file.input(), "path":file.path.display().to_string()})
+            }
+            Self::Default => json!({"kind":"built-in-default"}),
         }
     }
 }
@@ -247,10 +171,6 @@ fn selected(file: Option<&Path>) -> Result<Option<File>> {
     }))
 }
 
-fn resolved(path: &Path) -> PathBuf {
-    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
-}
-
 fn default() -> Result<PathBuf> {
     plumb::config::data("concord")
         .map(|home| home.join("concord.toml"))
@@ -262,4 +182,14 @@ fn absolute(path: &Path) -> Result<PathBuf> {
         return Ok(path.to_path_buf());
     }
     Err(Error::new("--config must be an absolute path"))
+}
+
+impl File {
+    fn input(&self) -> &str {
+        if self.explicit {
+            "--config"
+        } else {
+            "platform-default"
+        }
+    }
 }

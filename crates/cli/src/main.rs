@@ -18,7 +18,11 @@ async fn main() {
     }
     let cli = Cli::parse();
     let json = cli.json;
-    let observation = observation::start(cli.command.name(), cli.config.as_deref());
+    let observation = observation::start(
+        cli.command.name(),
+        cli.config.as_deref(),
+        cli.home.as_deref(),
+    );
     let result = match plumb::identity::ready() {
         Ok(()) => dispatch::run(cli).await,
         Err(error) => Err(concord_core::Error::new(error)),

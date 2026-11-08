@@ -19,10 +19,10 @@ fn settled() {
         .write(true)
         .create(true)
         .truncate(false)
-        .open(space.join(".concord.lock"))
+        .open(space.join("workspace/locks/estate.lock"))
         .expect("estate lock");
     lock.lock().expect("writer lock");
-    let stray = space.join(".issues/I_stray/worktree");
+    let stray = space.join("workspace/issues/I_stray/worktree");
     let path = stray.to_str().expect("stray path");
     git(&source, &["worktree", "add", "--detach", path]);
     let revision = revision(space);
@@ -163,7 +163,7 @@ impl<'a> Probe<'a> {
     }
 
     fn integration(&self) -> std::fs::File {
-        let path = std::fs::read_dir(self.space.join(".concord"))
+        let path = std::fs::read_dir(self.space.join("workspace/locks"))
             .expect("estate directory")
             .map(|entry| entry.expect("entry").path())
             .find(|path| {
@@ -182,7 +182,7 @@ impl<'a> Probe<'a> {
 
 fn inspect(space: &Path) -> Child {
     spawn::concord(space)
-        .args(["--space", space.to_str().expect("root"), "--json", "audit"])
+        .args(["--home", space.to_str().expect("root"), "--json", "audit"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -256,7 +256,7 @@ pub(super) fn open(space: &Path) -> String {
         &["config", "core.sshCommand", ssh.to_str().expect("ssh")],
     );
     git(&source, &["config", "ssh.variant", "simple"]);
-    let member = space.join(".issues/I_delivery/worktree");
+    let member = space.join("workspace/issues/I_delivery/worktree");
     std::fs::write(member.join("topic.md"), "settled\n").expect("member delta");
     git(&member, &["add", "topic.md"]);
     git(&member, &["commit", "-m", "delivery"]);

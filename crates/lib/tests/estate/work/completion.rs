@@ -21,7 +21,10 @@ async fn member(world: &World) -> (Finish, PathBuf) {
         .expect("Member");
     (
         Finish { issue, revision: 1 },
-        world.temp.path().join(".issues/I_complete/worktree"),
+        world
+            .temp
+            .path()
+            .join("workspace/issues/I_complete/worktree"),
     )
 }
 
@@ -169,7 +172,7 @@ async fn foreign() {
         !world
             .temp
             .path()
-            .join(".issues/I_foreign/worktree")
+            .join("workspace/issues/I_foreign/worktree")
             .exists()
     );
 }

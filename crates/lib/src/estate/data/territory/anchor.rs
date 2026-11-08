@@ -26,10 +26,10 @@ pub(super) async fn inspect(plane: &Estate, report: &mut Agreement) -> Result<()
     }
     survey.relations(report).await?;
     overlaps(&mut survey, &members, report)?;
-    if let Err(error) = crate::occupancy::readable(&plane.space) {
+    if let Err(error) = crate::occupancy::readable(&plane.layout.root) {
         report.observe(
             "occupancy.read",
-            plane.space.display().to_string(),
+            plane.layout.root.display().to_string(),
             error.to_string(),
         );
     }
@@ -43,7 +43,7 @@ struct Survey<'a> {
 
 impl Survey<'_> {
     fn seat(&self, anchor: &Anchor, held: &[&IssueWorktree], report: &mut Agreement) -> Result<()> {
-        let root = self.estate.space.join(".issues").join(&anchor.node);
+        let root = self.estate.layout.root.join("issues").join(&anchor.node);
         if !root.exists() {
             if !held.is_empty() {
                 report.fault(
@@ -54,8 +54,7 @@ impl Survey<'_> {
             }
             return Ok(());
         }
-        let metadata = std::fs::symlink_metadata(&root)?;
-        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        if super::super::layout::direct(&root, true).is_err() {
             report.fault(
                 "territory.issue",
                 root.display().to_string(),
@@ -124,7 +123,7 @@ impl Survey<'_> {
 
     async fn integrations(&self, members: &[IssueWorktree], report: &mut Agreement) -> Result<()> {
         let integrations = self.estate.integrations().await?;
-        super::integration::survey(&self.estate.space, members, &integrations, report)
+        super::integration::survey(&self.estate.layout.root, members, &integrations, report)
     }
 }
 
@@ -165,8 +164,9 @@ fn agreement(
     let subject = anchor.coordinate.identity();
     let path = survey
         .estate
-        .space
-        .join(".issues")
+        .layout
+        .root
+        .join("issues")
         .join(&anchor.node)
         .join("worktree");
     if !survey.valid(member, &path) {

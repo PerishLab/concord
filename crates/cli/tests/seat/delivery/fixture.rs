@@ -133,7 +133,7 @@ impl<'a> Native<'a> {
             &["config", "core.sshCommand", ssh.to_str().expect("ssh")],
         );
         git(&source, &["config", "ssh.variant", "simple"]);
-        let member = space.join(".issues/I_delivery/worktree");
+        let member = space.join("workspace/issues/I_delivery/worktree");
         std::fs::write(member.join("topic.md"), "native\n").expect("change");
         git(&member, &["add", "topic.md"]);
         git(&member, &["commit", "-m", "native delivery"]);
@@ -202,7 +202,7 @@ impl<'a> Native<'a> {
         }
         command
             .args([
-                "--space",
+                "--home",
                 self.space.to_str().expect("space"),
                 "--json",
                 "issue",

@@ -33,6 +33,7 @@ pub struct Integration {
 }
 
 pub struct Guard {
+    pub(in crate::estate) space: String,
     pub(in crate::estate) integration: Integration,
     _file: File,
 }
@@ -51,10 +52,14 @@ pub struct Rename {
 }
 
 pub(in crate::estate) fn guard(estate: &crate::estate::Estate, held: &Integration) -> Result<File> {
+    estate.identify(estate.identity())?;
     let path = estate
-        .space
-        .join(".concord")
+        .layout
+        .locks()
         .join(format!("integration-{}.lock", held.key));
+    if path.symlink_metadata().is_ok() {
+        super::super::layout::direct(&path, false)?;
+    }
     let file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -71,6 +76,7 @@ impl Integration {
         let integration = self.clone();
         let file = guard(estate, &integration)?;
         Ok(Guard {
+            space: estate.identity().to_string(),
             integration,
             _file: file,
         })

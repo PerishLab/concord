@@ -6,8 +6,8 @@ use plumb::guard::{Authority, Expected};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA: &str = "concord.issue-member-landing/v3";
-pub const READY: &str = "concord.issue-member-ready/v2";
+pub const SCHEMA: &str = "concord.issue-member-landing/v4";
+pub const READY: &str = "concord.issue-member-ready/v3";
 const AUTHORITY: &str = "concord.landing.authority";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -33,6 +33,7 @@ pub struct Request {
 #[serde(deny_unknown_fields)]
 pub struct Plan {
     pub schema: String,
+    pub space: String,
     pub issue: super::super::super::Coordinate,
     pub node: String,
     pub revision: i64,
@@ -88,6 +89,7 @@ pub async fn prepare<A: Authorities>(estate: &Estate, request: &Request) -> Resu
     let landing = inspected.prepare(verified).map_err(refused)?;
     Ok(Plan {
         schema: SCHEMA.to_string(),
+        space: estate.identity().to_string(),
         issue: context.issue,
         node: context.node,
         revision: context.revision,
@@ -106,6 +108,7 @@ pub async fn revalidate<A: Authorities>(estate: &Estate, plan: &Plan) -> Result<
             format!("landing plan schema {} is not {SCHEMA}", plan.schema),
         ));
     }
+    estate.identify(&plan.space)?;
     let context = context(estate, &plan.issue, plan.revision).await?;
     if context.node != plan.node
         || member(&context.member) != plan.member

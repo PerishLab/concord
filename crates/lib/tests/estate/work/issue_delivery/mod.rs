@@ -128,7 +128,7 @@ pub(super) async fn fixture(producer: &str, depot: &str) -> Fixture {
             &format!("url.{}.insteadOf", remote.display()),
         ],
     );
-    let member = temp.path().join(".issues/I_delivery/worktree");
+    let member = temp.path().join("workspace/issues/I_delivery/worktree");
     std::fs::write(member.join("topic.md"), "delivery\n").expect("change");
     git(&member, &["add", "topic.md"]);
     git(&member, &["commit", "-m", "Issue delivery"]);
@@ -214,7 +214,7 @@ async fn exact() {
         .expect_err("Issue drift");
     assert_eq!(error.code(), "concord.delivery.stale");
 
-    let member = _temp.path().join(".issues/I_delivery/worktree");
+    let member = _temp.path().join("workspace/issues/I_delivery/worktree");
     std::fs::rename(&member, _temp.path().join("displaced")).expect("displace Member");
     let error = issue_delivery::revalidate::<Plumb>(&estate, &plan, (&snapshot, 3), execute)
         .await

@@ -46,7 +46,7 @@ fn refusal() {
     ]);
     assert!(!refused.status.success());
     assert!(String::from_utf8_lossy(&refused.stderr).contains("concord.issue.automation"));
-    assert!(!space.join(".issues/I_human/worktree").exists());
+    assert!(!space.join("workspace/issues/I_human/worktree").exists());
     assert_eq!(
         seat.success(&["issue", "show", "PerishLab/concord#1"])["anchor"]["revision"],
         0

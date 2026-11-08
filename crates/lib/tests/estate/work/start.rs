@@ -65,7 +65,10 @@ async fn provisioning() {
         member
     );
     assert_eq!(world.estate.issue(&issue).await.expect("Issue").revision, 1);
-    let path = world.temp.path().join(".issues/I_execution/worktree");
+    let path = world
+        .temp
+        .path()
+        .join("workspace/issues/I_execution/worktree");
     std::fs::create_dir(path.join("crates")).expect("claim directory");
     std::fs::write(path.join("crates/note.md"), "changed\n").expect("member change");
     git(&path, &["add", "crates/note.md"]);
@@ -118,7 +121,7 @@ async fn unchanged() {
         !world
             .temp
             .path()
-            .join(".issues/I_research/worktree")
+            .join("workspace/issues/I_research/worktree")
             .exists()
     );
     let restarted = world

@@ -49,7 +49,7 @@ fn detached() {
     let reply = json!({"node": "R_concord", "coordinate": "PerishLab/concord", "branch": "main"});
     plumb::testing::executable(&provider, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
     let output = spawn::concord(root)
-        .args(["--space", root.to_str().expect("root"), "--json"])
+        .args(["--home", root.to_str().expect("root"), "--json"])
         .args(["integration", "register", "PerishLab/concord", "--path"])
         .arg(&source)
         .args(["--github-command"])

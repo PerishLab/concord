@@ -92,7 +92,7 @@ of copying its answer here.
 - Git owns Member payload. Concord owns the Member seat and verifies source
   identity, branch, registered worktree, and derived path agreement. New
   Member, Claim, Boundary and pull-reference state relates directly to one
-  Anchor and uses its stable node identity beneath `.issues`; Issue title and
+  Anchor and uses its stable node identity beneath the data home’s `workspace/issues`; Issue title and
   coordinate changes cannot move local payload.
 - Auto Issues remain automation-held and read-only. Plumb owns their operation,
   branches, pull requests, verification and lifecycle. Concord observes their
@@ -208,8 +208,16 @@ of copying its answer here.
   Unchanged completion retires only its exact topic head before estate settlement;
   rollback recreates a deleted branch only while that ref remains absent. A moved
   or newly occupied ref is preserved and reported as failed restoration.
-- Keep `.concord`, `.issues`, execution seats, and Artifacts private.
+- One resolved data home owns one Space. Keep its `workspace` identity, estate,
+  locks, execution seats and Artifacts private; no Concord control state belongs
+  in user repository roots. Data home contains durable source payload, not cache.
   Never edit or infer managed state by hand.
+- Ordinary open accepts only the exact home layout and retained stable Space
+  identity. Missing identity is not permission to bootstrap or repair. Old Space
+  path selectors refuse; an explicit offline cutover is separate from opening.
+- Delivery and landing plans bind the stable Space identity as well as current
+  path and proof. Old-schema or foreign-Space plans refuse before provider work.
+  Prepared plans never survive relocation by editing their serialized paths.
 - Lock the Space, re-read the relevant revision, compare, and commit one Keel
   batch for every mutation.
 - Keep protocol agreement separate from coordination and health observations.

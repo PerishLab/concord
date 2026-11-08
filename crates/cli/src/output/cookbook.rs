@@ -34,6 +34,15 @@ pub(crate) fn reference(code: &str) -> Option<String> {
 fn book() -> Cookbook {
     Cookbook::new([
         entry(
+            "concord.space.identity",
+            "The selected data home's Space identity is missing, malformed, redirected, changed, or different from a prepared plan.",
+            "Stop local execution writes. Read concord config show and its home provenance. Preserve the complete workspace, retained identity, estate and payload; never mint an identity over existing state or edit a plan to make it match. For an intentionally different healthy Space, prepare a new plan only after resolving any unknown provider writes through their original exact context. For incomplete initialization or old layouts, use the reviewed offline cutover procedure, never ordinary bootstrap as repair.",
+            (
+                "Compare the exact resolved home, workspace identity and plan Space; inspect Git worktree registration and all payload before any recovery. A copied home is not permission for concurrent operation.",
+                "One intended home has one exact readable Space and agrees with its payload; newly prepared plans bind that identity, and old or foreign plans still refuse.",
+            ),
+        ),
+        entry(
             "concord.acceptance.target",
             "The Issue's managed `acceptance:` label and its current acceptance declaration disagree: a label is present with no declaration, a declaration is present with no label, or the label names another target. Every acceptance read refuses, and the refusal's details name the label, the declared target and the declaration comment.",
             "The declaration comment is the authority; the label only projects its target. A label with no declaration: run concord acceptance declare for that same target, which adopts the label (apply publishes the declaration and needs no relabel); to declare another target, first remove the label on GitHub. A declaration with no label: re-run concord acceptance apply with the plan that published it, which restores the label; without that plan, add the declared label on GitHub. A label naming another target: replace it on GitHub with the declared label, then change the target only through concord acceptance amend. Never edit or delete a declaration comment, and never treat a hand-applied label that disagrees with a declaration as the target.",

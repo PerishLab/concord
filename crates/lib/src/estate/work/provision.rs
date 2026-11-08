@@ -34,8 +34,9 @@ impl Estate {
             .filter(|member| member.integration.key == request.integration.key)
         {
             expected.insert(
-                self.space
-                    .join(".issues")
+                self.layout
+                    .root
+                    .join("issues")
                     .join(&member.node)
                     .join("worktree"),
                 member.base.clone(),

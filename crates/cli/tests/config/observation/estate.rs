@@ -45,7 +45,7 @@ fn estate(config: &str) -> Vec<(Option<i32>, String)> {
     ] {
         let output = process(
             home.0.path(),
-            &["--space", root.to_str().expect("root"), "--json"],
+            &["--home", root.to_str().expect("root"), "--json"],
         )
         .args(&arguments)
         .output()
@@ -56,13 +56,21 @@ fn estate(config: &str) -> Vec<(Option<i32>, String)> {
             "{arguments:?}: {}",
             String::from_utf8_lossy(&output.stderr)
         );
-        let stdout = String::from_utf8_lossy(&output.stdout)
-            .replace(&home.0.path().display().to_string(), "<home>");
+        let mut value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        if let Some(estate) = value.get_mut("estate") {
+            estate["space"] = "<space>".into();
+        }
+        if value.get("space").is_some() {
+            value["space"] = "<space>".into();
+        }
+        let encoded = serde_json::to_string(&value).unwrap();
+        let stdout = encoded.replace(&home.0.path().display().to_string(), "<home>");
         seen.push((output.status.code(), stdout));
     }
-    seen.push((None, inventory(&root, &root).join("\n")));
+    let workspace = root.join("workspace");
+    seen.push((None, inventory(&workspace, &workspace).join("\n")));
     assert_eq!(
-        home.buffer().join("active.jsonl").is_file(),
+        root.join("state/locus/active.jsonl").is_file(),
         config.contains("enabled = true")
     );
     seen

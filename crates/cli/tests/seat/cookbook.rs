@@ -50,6 +50,7 @@ fn inventory() {
             "concord.issue.needs",
             "concord.issue.projection.provider",
             "concord.member.cleanup",
+            "concord.space.identity",
         ]
     );
 

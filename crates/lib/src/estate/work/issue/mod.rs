@@ -103,11 +103,7 @@ impl Estate {
 
     pub(in crate::estate) fn issue_path(&self, anchor: &Anchor) -> Result<PathBuf> {
         component("issue node", &anchor.node)?;
-        Ok(self
-            .space
-            .join(".issues")
-            .join(&anchor.node)
-            .join("worktree"))
+        Ok(self.layout.issue(&anchor.node).join("worktree"))
     }
 
     pub(in crate::estate) fn issue_source(&self, member: &IssueWorktree) -> Result<PathBuf> {

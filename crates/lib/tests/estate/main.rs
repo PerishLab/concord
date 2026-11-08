@@ -93,7 +93,12 @@ async fn drift() {
 async fn legacy() {
     let temp = tempfile::tempdir().expect("temporary Space");
     let seat = Seat::new(temp.path());
-    std::fs::create_dir_all(temp.path().join(".concord")).expect("estate root");
+    std::fs::create_dir_all(temp.path().join("workspace/locks")).expect("estate root");
+    std::fs::write(
+        temp.path().join("workspace/identity.json"),
+        serde_json::json!({"schema":"concord.space/v1","id":"a".repeat(64)}).to_string(),
+    )
+    .unwrap();
     let wire = Sqlite::file(seat.database()).await.expect("open database");
     let mut held = keel::bootstrap(legacy::graph(), wire).expect("bootstrap previous graph");
     let sudo = held.mint().await.expect("mint possession");
@@ -116,5 +121,77 @@ async fn absence() {
         Err(error) => error,
     };
     assert_eq!(error.code(), "concord.estate.absent");
-    assert!(!temp.path().join(".concord").exists());
+    assert!(!temp.path().join("workspace").exists());
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn identity() {
+    let temp = tempfile::tempdir().unwrap();
+    let original = temp.path().join("original");
+    let moved = temp.path().join("moved");
+    let first = Seat::new(&original).bootstrap().await.unwrap();
+    let id = first.identity().to_string();
+    assert_eq!(id.len(), 64);
+    drop(first);
+    assert_eq!(
+        Seat::new(&original).bootstrap().await.unwrap().identity(),
+        id
+    );
+    std::fs::rename(&original, &moved).unwrap();
+    assert_eq!(Seat::new(&moved).open().await.unwrap().identity(), id);
+    let other = Seat::new(temp.path().join("other"))
+        .bootstrap()
+        .await
+        .unwrap();
+    assert_ne!(other.identity(), id);
+    assert!(!temp.path().join(".concord.lock").exists());
+    assert!(!temp.path().join(".issues").exists());
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn incomplete() {
+    let temp = tempfile::tempdir().unwrap();
+    let seat = Seat::new(temp.path());
+    let estate = seat.bootstrap().await.unwrap();
+    let id = estate.identity().to_string();
+    let stale = estate;
+    let identity = temp.path().join("workspace/identity.json");
+    let bytes = std::fs::read(&identity).unwrap();
+    std::fs::remove_file(&identity).unwrap();
+    assert_eq!(
+        stale.settled().await.unwrap_err().code(),
+        "concord.space.identity"
+    );
+    let error = seat
+        .bootstrap()
+        .await
+        .err()
+        .expect("incomplete bootstrap must not repair");
+    assert_eq!(error.code(), "concord.space.identity");
+    assert!(!identity.exists());
+    std::fs::write(&identity, bytes).unwrap();
+    assert_eq!(seat.open().await.unwrap().identity(), id);
+    std::fs::write(
+        &identity,
+        serde_json::json!({"schema":"foreign/v1","id":id}).to_string(),
+    )
+    .unwrap();
+    assert_eq!(
+        seat.open().await.err().unwrap().code(),
+        "concord.space.identity"
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "current_thread")]
+async fn redirected() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path().join("home");
+    let foreign = temp.path().join("foreign");
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::create_dir_all(&foreign).unwrap();
+    std::os::unix::fs::symlink(&foreign, home.join("workspace")).unwrap();
+    let error = Seat::new(&home).bootstrap().await.err().unwrap();
+    assert_eq!(error.code(), "concord.space.identity");
+    assert_eq!(std::fs::read_dir(&foreign).unwrap().count(), 0);
 }

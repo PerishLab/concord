@@ -58,7 +58,7 @@ pub(super) fn version(value: u64) -> Result<()> {
     ))
 }
 
-pub(super) const SHAPE: &str = r#"{"version":2,"forge":{"kind":"github","host":"github.com","repository":"OWNER/REPOSITORY","node":"R_node"},"plan":{"schema":"concord.issue-member-delivery/v6","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"authority":{"kind":"plumb"},"delivery":{},"acceptance":null}}"#;
+pub(super) const SHAPE: &str = r#"{"version":2,"forge":{"kind":"github","host":"github.com","repository":"OWNER/REPOSITORY","node":"R_node"},"plan":{"schema":"concord.issue-member-delivery/v7","space":"64-lowercase-hex-Space-ID","issue":{"owner":"OWNER","repository":"REPOSITORY","number":1},"node":"I_node","revision":1,"member":{},"boundary":{},"authority":{"kind":"plumb"},"delivery":{},"acceptance":null}}"#;
 
 #[cfg(test)]
 mod tests {

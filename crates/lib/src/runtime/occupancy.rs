@@ -89,7 +89,7 @@ pub(crate) fn record(
 
 fn persist(space: &Path, entry: Entry<'_>) -> Result<Occupancy> {
     validate(entry.operator, entry.operation, entry.subjects)?;
-    let root = space.join(".concord/occupancy");
+    let root = space.join("occupancy");
     at(&root).directory()?;
     let guard = guard(&root)?;
     let path = root.join("ledger.json");
@@ -247,7 +247,7 @@ fn read(path: &Path) -> Result<Ledger> {
 }
 
 pub(crate) fn readable(space: &Path) -> Result<()> {
-    let path = space.join(".concord/occupancy/ledger.json");
+    let path = space.join("occupancy/ledger.json");
     let ledger = read(&path)?;
     for holder in &ledger.holders {
         validate(&holder.operator(), &holder.operation, &holder.subjects)?;

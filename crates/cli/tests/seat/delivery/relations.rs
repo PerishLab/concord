@@ -86,7 +86,7 @@ fn pending() {
             );
             assert!(!space.join("gate-marks").exists());
             assert!(!space.join("merge-attempts").exists());
-            assert!(space.join(".issues/I_delivery/worktree").is_dir());
+            assert!(space.join("workspace/issues/I_delivery/worktree").is_dir());
             if machine {
                 let result: Value =
                     serde_json::from_slice(&pending.stdout).expect("pending result");
@@ -111,7 +111,7 @@ fn pending() {
             result["candidate"],
             prepared["plan"]["delivery"]["candidate"]
         );
-        assert!(!space.join(".issues/I_delivery/worktree").exists());
+        assert!(!space.join("workspace/issues/I_delivery/worktree").exists());
     }
 }
 
@@ -160,7 +160,7 @@ fn drift() {
         assert_eq!(seat.poll(&plan, true).status.code(), Some(3));
         match change {
             "source" => {
-                let member = space.join(".issues/I_delivery/worktree");
+                let member = space.join("workspace/issues/I_delivery/worktree");
                 std::fs::write(member.join("topic.md"), "changed").expect("source drift");
                 git(&member, &["commit", "-am", "changed source"]);
             }
@@ -177,7 +177,7 @@ fn drift() {
         refuses(&refused, code);
         assert!(!space.join("gate-marks").exists());
         assert!(!space.join("merge-attempts").exists());
-        assert!(space.join(".issues/I_delivery/worktree").is_dir());
+        assert!(space.join("workspace/issues/I_delivery/worktree").is_dir());
     }
 }
 
@@ -229,7 +229,7 @@ impl<'a> Probe<'a> {
         let mut command = super::super::spawn::concord(space);
         command
             .args([
-                "--space",
+                "--home",
                 space.to_str().expect("root"),
                 "issue",
                 "delivery",

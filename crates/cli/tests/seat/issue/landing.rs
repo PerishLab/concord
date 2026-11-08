@@ -6,14 +6,14 @@ fn retired() {
     let scratch = tempfile::tempdir().expect("scratch");
     let root = scratch.path().join("unopened");
     let plan = scratch.path().join("old-plan.json");
-    let payload = r#"{"version":1,"plan":{"schema":"concord.issue-member-landing/v3"}}"#;
+    let payload = r#"{"version":1,"plan":{"schema":"concord.issue-member-landing/v4"}}"#;
     std::fs::write(&plan, payload).expect("old plan");
     for json in [false, true] {
         for verb in ["prepare", "ready"] {
             let mut command = spawn::concord(scratch.path());
             command
                 .env("PATH", scratch.path().join("no-tools"))
-                .arg("--space")
+                .arg("--home")
                 .arg(&root)
                 .arg("--config")
                 .arg(scratch.path().join("unreadable.toml"));

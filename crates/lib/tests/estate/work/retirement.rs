@@ -8,7 +8,7 @@ async fn idle() {
     let artifact = world
         .temp
         .path()
-        .join(".issues/I_retained/artifacts/history");
+        .join("workspace/issues/I_retained/artifacts/history");
     std::fs::create_dir_all(&artifact).expect("historical Artifact");
     std::fs::write(artifact.join("evidence"), "retained").expect("retained payload");
     let held = world
@@ -213,7 +213,7 @@ async fn unrelated() {
     let root = world
         .temp
         .path()
-        .join(".issues")
+        .join("workspace/issues")
         .join(anchor.node)
         .join("worktree");
     std::fs::create_dir_all(&root).expect("unknown Member payload");

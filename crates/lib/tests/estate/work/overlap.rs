@@ -178,7 +178,11 @@ impl World {
     }
 
     fn path(&self, node: &str) -> PathBuf {
-        self.temp.path().join(".issues").join(node).join("worktree")
+        self.temp
+            .path()
+            .join("workspace/issues")
+            .join(node)
+            .join("worktree")
     }
 }
 

@@ -98,7 +98,7 @@ impl Fixture {
         let mut command = spawn::concord(self.root.path());
         command
             .args([
-                "--space",
+                "--home",
                 "/deliberately-unavailable-estate",
                 "project",
                 operation,
@@ -122,7 +122,7 @@ impl Fixture {
             "{}",
             String::from_utf8_lossy(&output.stderr)
         );
-        assert!(!self.root.path().join(".concord").exists());
+        assert!(!self.root.path().join("workspace").exists());
         serde_json::from_slice(&output.stdout).unwrap()
     }
 
