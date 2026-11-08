@@ -43,7 +43,7 @@ fn refs() {
     assert_eq!(report["closing"]["passed"], true);
     assert_eq!(report["closing"]["pull"]["head"], HEAD);
     assert_eq!(report["closing"]["issues"], json!([]));
-    assert!(!scratch.path().join(".concord").exists());
+    assert!(!scratch.path().join("workspace").exists());
     assert_eq!(report["closing"]["digest"].as_str().unwrap().len(), 64);
     let mut bound = report["closing"].clone();
     let digest = bound.as_object_mut().unwrap().remove("digest").unwrap();
@@ -170,7 +170,7 @@ fn satisfied() {
         report["closing"]["issues"][0]["evaluation"]["verification"],
         "manual"
     );
-    assert!(!scratch.path().join(".concord").exists());
+    assert!(!scratch.path().join("workspace").exists());
 }
 
 #[test]

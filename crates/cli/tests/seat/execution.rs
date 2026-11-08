@@ -1,14 +1,12 @@
 #[cfg(unix)]
 #[path = "issue/recovery.rs"]
 mod recovery;
-
 #[cfg(unix)]
 pub(super) mod unix {
     use super::super::spawn;
     use serde_json::{Value, json};
     use std::path::Path;
     use std::process::{Command, Output};
-
     #[test]
     fn execution() {
         let fixture = tempfile::tempdir().expect("fixture");
@@ -63,7 +61,7 @@ pub(super) mod unix {
                 number: 26,
             },
         );
-        let pending = fixture.path().join(".issues/I_execution/worktree");
+        let pending = fixture.path().join("workspace/issues/I_execution/worktree");
         std::fs::create_dir_all(pending.parent().expect("Issue seat")).expect("Issue seat");
         let branch = "feature/26".to_string();
         git(
@@ -98,7 +96,7 @@ pub(super) mod unix {
         assert!(
             fixture
                 .path()
-                .join(".issues/I_execution/worktree/.git")
+                .join("workspace/issues/I_execution/worktree/.git")
                 .is_file()
         );
         let replay = operator(fixture.path(), &arguments, "CODEX_THREAD_ID", "codex-one");
@@ -107,7 +105,6 @@ pub(super) mod unix {
             success(fixture.path(), &["issue", "show", "PerishLab/concord#26"])["anchor"]["revision"],
             1
         );
-
         let claimed = operator(
             fixture.path(),
             &[
@@ -158,7 +155,12 @@ pub(super) mod unix {
             ],
         );
         assert_eq!(completed["revision"], 3);
-        assert!(!fixture.path().join(".issues/I_execution/worktree").exists());
+        assert!(
+            !fixture
+                .path()
+                .join("workspace/issues/I_execution/worktree")
+                .exists()
+        );
         let mut arguments = arguments;
         arguments[6] = "3";
         let restarted = success(fixture.path(), &arguments);
@@ -268,7 +270,7 @@ pub(super) mod unix {
         session: &str,
     ) -> Output {
         spawn::concord(space)
-            .args(["--space", space.to_str().expect("root path"), "--json"])
+            .args(["--home", space.to_str().expect("root path"), "--json"])
             .args(arguments)
             .env(variable, session)
             .output()

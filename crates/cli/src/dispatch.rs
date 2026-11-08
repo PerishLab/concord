@@ -88,12 +88,11 @@ pub async fn run(cli: args::Cli) -> Result<Completion> {
             return skill::run(config, skill.command, cli.json).map(|()| Completion::Done);
         }
         Command::Config(args) => {
-            return configuration::run(config, args.command, cli.json).map(|()| Completion::Done);
+            return configuration::run(&loaded, args.command, cli.json).map(|()| Completion::Done);
         }
         command => command,
     };
-    let root = loaded.root()?;
-    let seat = Seat::new(root.path());
+    let seat = Seat::new(&config.home);
     match command {
         Command::Issue(args) if matches!(args.command, crate::args::issue::Command::Bootstrap) => {
             bootstrap(&seat, cli.json).await.map(|()| Completion::Done)
@@ -101,10 +100,7 @@ pub async fn run(cli: args::Cli) -> Result<Completion> {
         command => {
             Dispatch {
                 activity: activity::Run::new(cli.json),
-                estate: seat
-                    .open()
-                    .await
-                    .map_err(|error| loaded.absent(&root, error))?,
+                estate: seat.open().await.map_err(|error| loaded.absent(error))?,
                 json: cli.json,
                 occupancy: occupancy::Run::new(cli.json),
                 phase: config.phase.as_ref(),
@@ -116,8 +112,11 @@ pub async fn run(cli: args::Cli) -> Result<Completion> {
 }
 
 async fn bootstrap(seat: &Seat, output: bool) -> Result<()> {
-    drop(seat.bootstrap().await?);
-    emit(json!({"estate": {"kind": "issue"}}), output)
+    let estate = seat.bootstrap().await?;
+    emit(
+        json!({"estate": {"kind": "issue", "space": estate.identity()}}),
+        output,
+    )
 }
 
 struct Dispatch<'a> {
@@ -171,7 +170,10 @@ impl Dispatch<'_> {
             Command::Audit(_) => {
                 let report = self.estate.settled().await?;
                 let agrees = report.agrees();
-                emit(json!({"agreement": report}), self.json)?;
+                emit(
+                    json!({"agreement": report, "space": self.estate.identity()}),
+                    self.json,
+                )?;
                 if agrees {
                     Ok(())
                 } else {

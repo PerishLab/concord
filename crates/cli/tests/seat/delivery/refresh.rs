@@ -49,7 +49,7 @@ fn refresh() {
 fn moved() {
     let fixture = tempfile::tempdir().expect("fixture");
     let seat = Fixture::open(fixture.path());
-    let member = fixture.path().join(".issues/I_delivery/worktree");
+    let member = fixture.path().join("workspace/issues/I_delivery/worktree");
     seat.change("moved\n");
     let plan = seat.plan();
     let moved = unnamed(&plan);
@@ -151,7 +151,7 @@ impl<'a> Fixture<'a> {
     }
 
     fn change(&self, content: &str) {
-        let member = self.space.join(".issues/I_delivery/worktree");
+        let member = self.space.join("workspace/issues/I_delivery/worktree");
         std::fs::write(member.join("topic.md"), content).expect("member delta");
         git(&member, &["add", "topic.md"]);
         git(&member, &["commit", "-m", "delivery"]);

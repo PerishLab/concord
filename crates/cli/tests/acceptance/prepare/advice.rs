@@ -33,7 +33,7 @@ fn prepared(replies: [Value; 2], operation: &str) -> Value {
     assert_eq!(value["plan"]["schema"], "concord.acceptance-plan/v2");
     assert_eq!(value["plan"]["intent"]["marker"]["target"], "release");
     assert_eq!(value["plan"]["authority"]["repository"], "R_concord");
-    assert!(!scratch.path().join(".concord").exists());
+    assert!(!scratch.path().join("workspace").exists());
     assert_eq!(
         std::fs::read_to_string(scratch.path().join("calls")).unwrap(),
         "4\n"

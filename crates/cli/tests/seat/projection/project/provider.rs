@@ -12,7 +12,7 @@ pub(super) fn run(root: &Path, mode: &str, extra: &[&str]) -> Output {
     plumb::testing::executable(&provider, source);
     spawn::concord(root)
         .args([
-            "--space",
+            "--home",
             "/missing-estate",
             "--json",
             "project",

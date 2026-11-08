@@ -108,6 +108,7 @@ pub(super) mod delivery {
 
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct Settlement {
+        pub space: String,
         pub authority: Authority,
         pub issue: crate::estate::Coordinate,
         pub prepared: i64,
@@ -131,6 +132,8 @@ pub(super) mod delivery {
 
     impl Estate {
         pub async fn complete(&self, guard: &Guard, request: &Settlement) -> Result<Completion> {
+            self.identify(&request.space)?;
+            self.identify(&guard.space)?;
             self.agreed().await?;
             let anchor = self.issue(&request.issue).await?;
             issue_stale(anchor.revision, request.revision)?;

@@ -60,3 +60,25 @@ fn verify(atoms: &[Value], operation: &str) {
     let times = [start, enter, returned, finish].map(|atom| atom["at"].as_u64().unwrap());
     assert!(times.windows(2).all(|pair| pair[0] <= pair[1]));
 }
+
+#[test]
+fn relocated() {
+    let home = Observed::new(&format!(
+        "[locus]\nenabled = true\nendpoint = '{}'\n",
+        closed()
+    ));
+    let data = home.0.path().join("selected-data");
+    let output = process(
+        home.0.path(),
+        &["--home", data.to_str().unwrap(), "config", "path"],
+    )
+    .output()
+    .unwrap();
+    assert!(output.status.success());
+    let buffer = data.join("state/locus/active.jsonl");
+    assert!(buffer.is_file());
+    assert!(!home.buffer().exists());
+    let text = std::fs::read_to_string(buffer).unwrap();
+    assert!(text.contains("cli.finish"));
+    assert!(!data.join("workspace").exists());
+}

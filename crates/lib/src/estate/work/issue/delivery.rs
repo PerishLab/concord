@@ -24,8 +24,8 @@ pub use model::{Authority, Candidate, Check, Mode, Preparation};
 pub use super::authority::delivery::{Resume, recall, resume};
 pub use super::proof::delivery::{Completion, Settlement};
 
-pub const SCHEMA: &str = "concord.issue-member-delivery/v6";
-pub const READY: &str = "concord.issue-member-delivery-ready/v5";
+pub const SCHEMA: &str = "concord.issue-member-delivery/v7";
+pub const READY: &str = "concord.issue-member-delivery-ready/v6";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -46,6 +46,7 @@ pub struct Request {
 #[serde(deny_unknown_fields)]
 pub struct Plan {
     pub schema: String,
+    pub space: String,
     pub issue: super::super::super::Coordinate,
     pub node: String,
     pub revision: i64,
@@ -100,6 +101,7 @@ pub async fn prepare<A: Authorities>(estate: &Estate, request: &Request) -> Resu
     let (authority, delivery) = engine::prepare::<A>(&context, request, &pull)?;
     Ok(Plan {
         schema: SCHEMA.to_string(),
+        space: estate.identity().to_string(),
         issue: context.issue,
         node: context.node,
         revision: context.revision,

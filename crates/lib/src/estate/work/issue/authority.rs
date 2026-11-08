@@ -159,6 +159,7 @@ pub(super) mod delivery {
         authority: impl FnOnce(&Integration) -> Result<()>,
     ) -> Result<Resume> {
         schema(plan)?;
+        estate.identify(&plan.space)?;
         estate.agreed().await?;
         let anchor = estate.issue(&plan.issue).await?;
         let integration = estate.integration(&plan.issue).await?;

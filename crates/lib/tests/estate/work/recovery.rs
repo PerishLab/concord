@@ -2,7 +2,6 @@ use super::start::{World, admit, world};
 use concord_core::{Finish, Recovery, Start};
 use std::path::Path;
 use std::process::Command;
-
 async fn member(world: &World, number: i64, node: &str) -> Recovery {
     let issue = admit(world, number, node).await;
     let held = world
@@ -24,12 +23,14 @@ async fn member(world: &World, number: i64, node: &str) -> Recovery {
         head: held.base,
     }
 }
-
 #[tokio::test(flavor = "current_thread")]
 async fn unchanged() {
     let world = world().await;
     let request = member(&world, 1, "I_recovery").await;
-    let path = world.temp.path().join(".issues/I_recovery/worktree");
+    let path = world
+        .temp
+        .path()
+        .join("workspace/issues/I_recovery/worktree");
     git(
         &world.source,
         &["worktree", "remove", path.to_str().expect("path")],
@@ -86,7 +87,10 @@ async fn unchanged() {
 async fn payload() {
     let world = world().await;
     let request = member(&world, 1, "I_recovery").await;
-    let path = world.temp.path().join(".issues/I_recovery/worktree");
+    let path = world
+        .temp
+        .path()
+        .join("workspace/issues/I_recovery/worktree");
     git(
         &world.source,
         &["worktree", "remove", path.to_str().expect("path")],
@@ -158,7 +162,10 @@ async fn payload() {
 async fn branch() {
     let world = world().await;
     let request = member(&world, 1, "I_recovery").await;
-    let path = world.temp.path().join(".issues/I_recovery/worktree");
+    let path = world
+        .temp
+        .path()
+        .join("workspace/issues/I_recovery/worktree");
     std::fs::write(path.join("README.md"), "changed").expect("changed");
     git(&path, &["add", "README.md"]);
     git(&path, &["commit", "-m", "changed"]);
@@ -185,8 +192,11 @@ async fn unrelated() {
     let world = world().await;
     let request = member(&world, 1, "I_recovery").await;
     member(&world, 2, "I_other").await;
-    let path = world.temp.path().join(".issues/I_recovery/worktree");
-    let other = world.temp.path().join(".issues/I_other/worktree");
+    let path = world
+        .temp
+        .path()
+        .join("workspace/issues/I_recovery/worktree");
+    let other = world.temp.path().join("workspace/issues/I_other/worktree");
     git(
         &world.source,
         &["worktree", "remove", path.to_str().expect("path")],
@@ -213,7 +223,10 @@ async fn unrelated() {
 async fn symlink() {
     let world = world().await;
     let request = member(&world, 1, "I_recovery").await;
-    let path = world.temp.path().join(".issues/I_recovery/worktree");
+    let path = world
+        .temp
+        .path()
+        .join("workspace/issues/I_recovery/worktree");
     git(
         &world.source,
         &["worktree", "remove", path.to_str().expect("path")],
@@ -235,7 +248,10 @@ async fn symlink() {
 async fn locking() {
     let world = world().await;
     let request = member(&world, 1, "I_recovery").await;
-    let path = world.temp.path().join(".issues/I_recovery/worktree");
+    let path = world
+        .temp
+        .path()
+        .join("workspace/issues/I_recovery/worktree");
     git(
         &world.source,
         &["worktree", "remove", path.to_str().expect("path")],
@@ -243,7 +259,7 @@ async fn locking() {
     let lock = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
-        .open(world.temp.path().join(".concord.lock"))
+        .open(world.temp.path().join("workspace/locks/estate.lock"))
         .expect("lock");
     lock.lock().expect("writer");
     let held = std::thread::spawn(move || {

@@ -8,15 +8,18 @@ use std::path::Path;
 struct Layer {
     #[serde(rename = "domain_space_root")]
     legacy: Option<IgnoredAny>,
+    space: Option<IgnoredAny>,
     #[serde(flatten)]
     partial: ConfigPartial,
 }
 
 pub(super) fn environment() -> Result<()> {
-    if std::env::var_os("CONCORD_DOMAIN_SPACE_ROOT").is_some() {
+    if std::env::var_os("CONCORD_DOMAIN_SPACE_ROOT").is_some()
+        || std::env::var_os("CONCORD_SPACE").is_some()
+    {
         return Err(Error::typed(
             "concord.config.legacy",
-            "CONCORD_DOMAIN_SPACE_ROOT is no longer supported; rename it to CONCORD_SPACE",
+            "CONCORD_SPACE and CONCORD_DOMAIN_SPACE_ROOT are retired; migrate local execution to the data home layout, remove the old selector, and use CONCORD_HOME to choose data home",
         ));
     }
     Ok(())
@@ -25,11 +28,11 @@ pub(super) fn environment() -> Result<()> {
 pub(super) fn load(path: &Path) -> Result<ConfigPartial> {
     let layer =
         radicula_config::load::<Layer>(path).map_err(|error| Error::new(error.to_string()))?;
-    if layer.legacy.is_some() {
+    if layer.legacy.is_some() || layer.space.is_some() {
         return Err(Error::typed(
             "concord.config.legacy",
             format!(
-                "config {} sets domain_space_root; rename that key to space",
+                "config {} sets a retired Space path selector (space or domain_space_root); migrate local execution to data home and remove the old key",
                 path.display(),
             ),
         ));

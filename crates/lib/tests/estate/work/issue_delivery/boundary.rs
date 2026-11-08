@@ -11,7 +11,7 @@ async fn moved() {
         issue,
         _temp,
     } = fixture(compiled.producer(), compiled.depot()).await;
-    let member = _temp.path().join(".issues/I_delivery/worktree");
+    let member = _temp.path().join("workspace/issues/I_delivery/worktree");
     let status = Command::new("git")
         .arg("-C")
         .arg(&member)

@@ -1,160 +1,76 @@
-use super::{directory, expected, failure, path, process, run, settings};
+use super::{directory, expected, failure, process, run};
 use std::fs;
 
 #[test]
-fn blank() {
-    let fixture = tempfile::tempdir().expect("fixture");
-    let configured = directory(fixture.path(), "configured");
-    let file = fixture.path().join("concord.toml");
-    settings(&file, &configured);
-    for value in ["", " \t\n "] {
-        let output = process(
-            fixture.path(),
-            &[
-                "--config",
-                file.to_str().expect("config"),
-                "--json",
-                "audit",
-            ],
-        )
-        .env("CONCORD_SPACE", value)
-        .output()
-        .expect("blank environment");
-        let error = failure(&output, "concord.estate.absent");
-        assert_eq!(error["error"]["details"]["space"], path(&configured));
-        assert_eq!(
-            error["error"]["details"]["provenance"],
-            serde_json::json!({"kind":"config", "input":"--config", "path":path(&file)})
-        );
-    }
-}
-
-#[test]
 fn environment() {
-    let fixture = tempfile::tempdir().expect("fixture");
-    let space = directory(fixture.path(), "space");
-    for legacy in ["", "missing", space.to_str().expect("space")] {
-        let output = process(
-            fixture.path(),
-            &[
-                "--space",
-                space.to_str().expect("space"),
-                "--json",
-                "config",
-                "show",
-            ],
-        )
-        .env("CONCORD_SPACE", &space)
-        .env("CONCORD_DOMAIN_SPACE_ROOT", legacy)
-        .output()
-        .expect("legacy environment");
-        let error = failure(&output, "concord.config.legacy");
-        assert!(
-            error["error"]["message"]
-                .as_str()
-                .expect("message")
-                .contains("CONCORD_SPACE")
-        );
+    let fixture = tempfile::tempdir().unwrap();
+    let home = directory(fixture.path(), "data");
+    for variable in ["CONCORD_SPACE", "CONCORD_DOMAIN_SPACE_ROOT"] {
+        for value in ["", "missing", home.to_str().unwrap()] {
+            let output = process(
+                fixture.path(),
+                &["--home", home.to_str().unwrap(), "--json", "config", "show"],
+            )
+            .env(variable, value)
+            .output()
+            .unwrap();
+            let error = failure(&output, "concord.config.legacy");
+            assert!(
+                error["error"]["message"]
+                    .as_str()
+                    .unwrap()
+                    .contains("data home")
+            );
+        }
     }
 }
 
 #[test]
 fn file() {
-    let fixture = tempfile::tempdir().expect("fixture");
-    let space = directory(fixture.path(), "space");
+    let fixture = tempfile::tempdir().unwrap();
     let file = fixture.path().join("concord.toml");
-    for value in ["\"\"", "\"/legacy\"", "42", "false", "{ path = \"old\" }"] {
-        fs::write(
-            &file,
-            format!("space = {space:?}\ndomain_space_root = {value}\n"),
-        )
-        .expect("legacy config");
-        let output = process(
-            fixture.path(),
-            &[
-                "--config",
-                file.to_str().expect("file"),
-                "--json",
-                "config",
-                "show",
-            ],
-        )
-        .env("CONCORD_SPACE", &space)
-        .output()
-        .expect("legacy config");
-        let error = failure(&output, "concord.config.legacy");
-        let message = error["error"]["message"].as_str().expect("message");
-        assert!(message.contains("rename that key to space"), "{message}");
-        assert!(message.contains(file.to_str().expect("file")), "{message}");
+    for key in ["space", "domain_space_root"] {
+        for value in ["\"\"", "\"/legacy\"", "42", "false", "{ path = \"old\" }"] {
+            fs::write(&file, format!("{key} = {value}\n")).unwrap();
+            let output = run(
+                fixture.path(),
+                &[
+                    "--config",
+                    file.to_str().unwrap(),
+                    "--json",
+                    "config",
+                    "show",
+                ],
+            );
+            failure(&output, "concord.config.legacy");
+        }
     }
     let file = expected(fixture.path());
-    fs::create_dir_all(file.parent().expect("parent")).expect("parent");
-    fs::write(file, "domain_space_root = \"/legacy\"\n").expect("default legacy");
-    failure(
-        &run(fixture.path(), &["--json", "config", "show"]),
-        "concord.config.legacy",
-    );
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, "space = \"/legacy\"\n").unwrap();
     assert!(run(fixture.path(), &["config", "path"]).status.success());
 }
 
 #[test]
 fn grammar() {
-    let fixture = tempfile::tempdir().expect("fixture");
-    let help = run(fixture.path(), &["--help"]);
-    assert!(help.status.success());
-    let help = String::from_utf8(help.stdout).expect("help");
-    assert!(help.contains("--space <SPACE>"), "{help}");
-    assert!(!help.contains("--root"), "{help}");
+    let fixture = tempfile::tempdir().unwrap();
+    let output = run(fixture.path(), &["--help"]);
+    let help = String::from_utf8(output.stdout).unwrap();
+    assert!(!help.contains("--space"));
+    assert!(!help.contains("--root"));
+    let output = run(
+        fixture.path(),
+        &[
+            "--space",
+            fixture.path().to_str().unwrap(),
+            "--json",
+            "audit",
+        ],
+    );
+    failure(&output, "concord.config.legacy");
     assert!(
-        !run(fixture.path(), &["--root", "/legacy", "config", "show"])
+        !run(fixture.path(), &["--root", ".", "audit"])
             .status
             .success()
     );
-}
-
-#[test]
-fn precedence() {
-    let fixture = tempfile::tempdir().expect("fixture");
-    let configured = directory(fixture.path(), "configured");
-    let environment = directory(fixture.path(), "environment");
-    let explicit = directory(fixture.path(), "explicit");
-    let file = fixture.path().join("concord.toml");
-    settings(&file, &configured);
-    for (arguments, selected) in [
-        (
-            vec![
-                "--config",
-                file.to_str().expect("file"),
-                "--json",
-                "config",
-                "show",
-            ],
-            &environment,
-        ),
-        (
-            vec![
-                "--config",
-                file.to_str().expect("file"),
-                "--space",
-                explicit.to_str().expect("explicit"),
-                "--json",
-                "config",
-                "show",
-            ],
-            &explicit,
-        ),
-    ] {
-        let output = process(fixture.path(), &arguments)
-            .env("CONCORD_SPACE", &environment)
-            .output()
-            .expect("config");
-        assert!(
-            output.status.success(),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        let shown: serde_json::Value = serde_json::from_slice(&output.stdout).expect("config JSON");
-        assert_eq!(shown["space"], path(selected));
-        assert!(shown.get("domain_space_root").is_none());
-    }
 }

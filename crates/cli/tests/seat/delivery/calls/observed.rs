@@ -34,14 +34,15 @@ fn observed() {
     let result: Value = serde_json::from_slice(&landed.stdout).expect("land result");
     assert_eq!(result["merged"], true);
     assert_eq!(result["released"], true);
-    inspect(&home.join("state/locus"));
+    inspect(&seat.space.join("state/locus"));
 }
 
 #[test]
 fn unavailable() {
     let temp = tempfile::tempdir().expect("fixture");
     let seat = Native::open(temp.path(), "R_kgDOUesM0Q");
-    let home = configure(seat.space);
+    configure(seat.space);
+    let home = seat.space;
     std::fs::create_dir_all(home.join("state")).expect("state");
     std::fs::write(home.join("state/locus"), "blocked").expect("blocked buffer");
     let prepared = seat.prepare("wharf-native");

@@ -89,7 +89,7 @@ impl World {
         let mut command = crate::spawn::concord(self.root.path());
         command
             .args([
-                "--space",
+                "--home",
                 "/deliberately-unavailable-estate",
                 "issue",
                 "close",
@@ -108,8 +108,8 @@ impl World {
             command.arg("--apply");
         }
         let output = output(command, input);
-        assert!(!self.root.path().join(".concord").exists());
-        assert!(!self.root.path().join(".issues").exists());
+        assert!(!self.root.path().join("workspace").exists());
+        assert!(!self.root.path().join("workspace/issues").exists());
         output
     }
 

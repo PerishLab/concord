@@ -117,7 +117,7 @@ fn persist(
         .duration_since(UNIX_EPOCH)
         .map_err(|error| Error::typed("concord.activity.clock", error.to_string()))?
         .as_secs();
-    let root = space.join(".concord/activity");
+    let root = space.join("activity");
     at(&root).directory()?;
     let guard = guard(&root, key)?;
     let path = root.join(format!("{key}.json"));
@@ -186,7 +186,7 @@ pub(crate) fn record_issue(
 
 pub(crate) fn snapshot(space: &Path, issue: &Anchor) -> Result<Snapshot> {
     let observed_at = now()?;
-    let ledger = read(&space.join(format!(".concord/activity/issue-{}.json", issue.key)))?;
+    let ledger = read(&space.join(format!("activity/issue-{}.json", issue.key)))?;
     let earliest = observed_at.saturating_sub(WINDOW);
     Ok(Snapshot {
         observations: ledger

@@ -10,6 +10,7 @@ build = "src/runtime/build.rs"
 
 [dependencies]
 fs2.workspace = true
+getrandom.workspace = true
 keel.workspace = true
 locus.workspace = true
 plumb.workspace = true

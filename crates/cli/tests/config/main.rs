@@ -53,164 +53,110 @@ fn legacy(home: &Path) -> PathBuf {
 fn default() {
     let fixture = tempfile::tempdir().expect("fixture");
     let old = legacy(fixture.path());
-    fs::create_dir_all(old.parent().expect("legacy parent")).expect("legacy parent");
-    fs::write(&old, "space = \"/legacy\"\n").expect("legacy config");
-
-    let path = run(fixture.path(), &["config", "path"]);
-    assert!(
-        path.status.success(),
-        "{}",
-        String::from_utf8_lossy(&path.stderr)
-    );
+    fs::create_dir_all(old.parent().unwrap()).unwrap();
+    fs::write(old, "space = \"/legacy\"\n").unwrap();
+    let output = run(fixture.path(), &["config", "path"]);
+    assert!(output.status.success());
     assert_eq!(
-        String::from_utf8(path.stdout).expect("config path").trim(),
+        String::from_utf8(output.stdout).unwrap().trim(),
         expected(fixture.path()).display().to_string()
     );
-
-    let shown = run(fixture.path(), &["--json", "config", "show"]);
+    let output = run(fixture.path(), &["--json", "config", "show"]);
     assert!(
-        shown.status.success(),
+        output.status.success(),
         "{}",
-        String::from_utf8_lossy(&shown.stderr)
+        String::from_utf8_lossy(&output.stderr)
     );
-    let config: Value = serde_json::from_slice(&shown.stdout).expect("config json");
-    assert_eq!(config["space"], "");
-    assert_eq!(config["depot"], "https://depot.concord.perish.uk");
-
-    let missing = run(fixture.path(), &["--json", "audit"]);
-    let missing = failure(&missing, "concord.space.root");
-    assert_eq!(missing["error"]["details"]["space"], "");
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(value.get("space").is_none());
     assert_eq!(
-        missing["error"]["details"]["provenance"]["kind"],
+        value["workspace"],
+        expected(fixture.path())
+            .parent()
+            .unwrap()
+            .join("workspace")
+            .display()
+            .to_string()
+    );
+    let error = failure(
+        &run(fixture.path(), &["--json", "audit"]),
+        "concord.estate.absent",
+    );
+    assert_eq!(
+        error["error"]["details"]["provenance"]["kind"],
         "built-in-default"
+    );
+    assert!(
+        !expected(fixture.path())
+            .parent()
+            .unwrap()
+            .join("workspace")
+            .exists()
     );
 }
 
 #[test]
-fn space() {
-    let fixture = tempfile::tempdir().expect("fixture");
-    let configured = directory(fixture.path(), "configured");
-    let explicit = directory(fixture.path(), "explicit");
-    let environment = directory(fixture.path(), "environment");
+fn home() {
+    let fixture = tempfile::tempdir().unwrap();
+    let configured = fixture.path().join("configured");
+    let explicit = fixture.path().join("explicit");
+    let environment = fixture.path().join("environment");
     let file = fixture.path().join("concord.toml");
     settings(&file, &configured);
-    let bootstrapped = run(
+    let output = run(
+        fixture.path(),
+        &["--config", file.to_str().unwrap(), "issue", "bootstrap"],
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(configured.join("workspace/identity.json").is_file());
+    let output = process(
         fixture.path(),
         &[
             "--config",
-            file.to_str().expect("config"),
-            "issue",
-            "bootstrap",
-        ],
-    );
-    assert!(bootstrapped.status.success());
-
-    let absent = run(
-        fixture.path(),
-        &[
-            "--config",
-            file.to_str().expect("config"),
-            "--space",
-            explicit.to_str().expect("explicit root"),
-            "--json",
-            "audit",
-        ],
-    );
-    let absent = failure(&absent, "concord.estate.absent");
-    assert_eq!(absent["error"]["details"]["space"], path(&explicit));
-    assert_eq!(
-        absent["error"]["details"]["estate"],
-        path(&explicit.join(".concord"))
-    );
-    assert_eq!(
-        absent["error"]["details"]["provenance"],
-        serde_json::json!({"kind": "explicit", "input": "--space"})
-    );
-    assert_eq!(
-        absent["error"]["details"]["configured_alternative"]["space"],
-        path(&configured)
-    );
-    assert_eq!(
-        absent["error"]["details"]["configured_alternative"]["provenance"]["path"],
-        path(&file)
-    );
-
-    let human = run(
-        fixture.path(),
-        &[
-            "--config",
-            file.to_str().expect("config"),
-            "--space",
-            explicit.to_str().expect("explicit root"),
-            "audit",
-        ],
-    );
-    let prose = String::from_utf8_lossy(&human.stderr);
-    assert!(prose.contains("remove or correct --space"), "{prose}");
-    assert!(prose.contains("concord config show"), "{prose}");
-
-    let missing = directory(fixture.path(), "configured-absent");
-    settings(&file, &missing);
-    let report = run(
-        fixture.path(),
-        &[
-            "--config",
-            file.to_str().expect("config"),
-            "--json",
-            "audit",
-        ],
-    );
-    let report = failure(&report, "concord.estate.absent");
-    assert_eq!(report["error"]["details"]["provenance"]["kind"], "config");
-    assert_eq!(
-        report["error"]["details"]["provenance"]["input"],
-        "--config"
-    );
-
-    let environmental = process(fixture.path(), &["--json", "audit"])
-        .env("CONCORD_SPACE", &environment)
-        .output()
-        .expect("environment root");
-    let environmental = failure(&environmental, "concord.estate.absent");
-    assert_eq!(
-        environmental["error"]["details"]["provenance"]["input"],
-        "CONCORD_SPACE"
-    );
-
-    let conflict = process(
-        fixture.path(),
-        &[
-            "--config",
-            file.to_str().expect("config"),
-            "--space",
-            explicit.to_str().expect("explicit root"),
+            file.to_str().unwrap(),
+            "--home",
+            explicit.to_str().unwrap(),
             "--json",
             "audit",
         ],
     )
-    .env("CONCORD_SPACE", &environment)
+    .env("CONCORD_HOME", &environment)
     .output()
-    .expect("conflicting roots");
-    let conflict = failure(&conflict, "concord.estate.absent");
+    .unwrap();
+    let error = failure(&output, "concord.estate.absent");
+    assert_eq!(error["error"]["details"]["home"], path(&explicit));
+    assert_eq!(error["error"]["details"]["provenance"]["input"], "--home");
+    let output = process(
+        fixture.path(),
+        &["--config", file.to_str().unwrap(), "--json", "audit"],
+    )
+    .env("CONCORD_HOME", &environment)
+    .output()
+    .unwrap();
+    let error = failure(&output, "concord.estate.absent");
+    assert_eq!(error["error"]["details"]["home"], path(&environment));
     assert_eq!(
-        conflict["error"]["details"]["configured_alternative"]["provenance"]["kind"],
-        "environment"
+        error["error"]["details"]["provenance"]["input"],
+        "CONCORD_HOME"
     );
-
-    let default = expected(fixture.path());
-    fs::create_dir_all(default.parent().expect("default config parent"))
-        .expect("default config parent");
-    settings(&default, &missing);
-    let report = run(fixture.path(), &["--json", "audit"]);
-    let report = failure(&report, "concord.estate.absent");
-    assert_eq!(
-        report["error"]["details"]["provenance"]["input"],
-        "platform-default"
+    let output = run(
+        fixture.path(),
+        &[
+            "--config",
+            file.to_str().unwrap(),
+            "--json",
+            "config",
+            "show",
+        ],
     );
-    assert_eq!(
-        report["error"]["details"]["provenance"]["path"],
-        path(&default)
-    );
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["provenance"]["kind"], "config");
+    assert!(!fixture.path().join(".concord.lock").exists());
+    assert!(!fixture.path().join(".issues").exists());
 }
 
 fn failure(output: &Output, code: &str) -> Value {
@@ -227,7 +173,7 @@ fn directory(root: &Path, name: &str) -> PathBuf {
 }
 
 fn settings(file: &Path, root: &Path) {
-    fs::write(file, format!("space = {root:?}\n")).expect("config");
+    fs::write(file, format!("home = {root:?}\n")).expect("config");
 }
 
 fn path(path: &Path) -> String {
@@ -235,4 +181,42 @@ fn path(path: &Path) -> String {
         .unwrap_or_else(|_| path.to_path_buf())
         .display()
         .to_string()
+}
+
+#[test]
+fn isolated() {
+    let fixture = tempfile::tempdir().unwrap();
+    let projects = directory(fixture.path(), "Projects");
+    let home = fixture.path().join("data");
+    let output = process(
+        fixture.path(),
+        &["--home", home.to_str().unwrap(), "issue", "bootstrap"],
+    )
+    .current_dir(&projects)
+    .output()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(fs::read_dir(&projects).unwrap().count(), 0);
+    let before = fs::read(home.join("workspace/identity.json")).unwrap();
+    let output = process(
+        fixture.path(),
+        &["--home", home.to_str().unwrap(), "--json", "audit"],
+    )
+    .current_dir(&projects)
+    .output()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::read(home.join("workspace/identity.json")).unwrap(),
+        before
+    );
+    assert_eq!(fs::read_dir(&projects).unwrap().count(), 0);
 }

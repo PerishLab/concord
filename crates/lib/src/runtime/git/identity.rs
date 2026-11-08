@@ -79,7 +79,14 @@ mod tests {
     fn point(checkout: &Path, repository: &Path) {
         std::fs::write(
             checkout.join(".git"),
-            format!("gitdir: {}\n", repository.display()),
+            format!(
+                "gitdir: {}\n",
+                repository
+                    .display()
+                    .to_string()
+                    .trim_start_matches("\\\\?\\")
+                    .replace('\\', "/")
+            ),
         )
         .expect("checkout identity");
     }

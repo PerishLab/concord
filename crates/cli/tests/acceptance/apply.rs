@@ -37,7 +37,7 @@ fn declaration() {
         value["acceptance"]["snapshot"]["labels"],
         json!(["acceptance:source", "priority:urgent"])
     );
-    assert!(!scratch.path().join(".concord").exists());
+    assert!(!scratch.path().join("workspace").exists());
     let publication = world::request(&scratch.path().join("request-3"));
     assert!(
         publication["query"]

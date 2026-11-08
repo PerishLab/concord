@@ -77,7 +77,7 @@ fn assess(space: &Path, members: &[IssueWorktree], integration: &Integration) ->
         .iter()
         .filter(|member| member.integration.key == integration.key)
     {
-        expected.insert(space.join(".issues").join(&member.node).join("worktree"));
+        expected.insert(space.join("issues").join(&member.node).join("worktree"));
     }
     let mut found = BTreeSet::new();
     for worktree in observed.worktrees.iter().filter(|worktree| {

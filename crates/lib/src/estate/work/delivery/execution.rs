@@ -17,6 +17,13 @@ struct Holder {
 }
 
 pub async fn acquire(estate: &Estate, plan: &Plan) -> Result<Permit> {
+    estate.identify(&plan.space)?;
+    if plan.schema != super::SCHEMA {
+        return Err(Error::typed(
+            "concord.delivery.schema",
+            "delivery plan belongs to an unsupported schema; prepare again",
+        ));
+    }
     let anchor = {
         let _guard = estate.share()?;
         estate.issue(&plan.issue).await?
@@ -39,8 +46,8 @@ pub async fn acquire(estate: &Estate, plan: &Plan) -> Result<Permit> {
         ),
     };
     let path = estate
-        .space
-        .join(".concord")
+        .layout
+        .locks()
         .join(format!("land-{}.lock", anchor.key));
     let file = open(&path)?;
     let gate = Factory::file(file, Policy::EXCLUSIVE).map_err(refused)?;

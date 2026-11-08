@@ -89,7 +89,7 @@ async fn lifecycle() {
     assert_eq!(member.issue, issue);
     assert_eq!(member.node, "I_execution");
     assert_eq!(member.branch, "task/26");
-    let path = temp.path().join(".issues/I_execution/worktree");
+    let path = temp.path().join("workspace/issues/I_execution/worktree");
     assert!(path.join(".git").is_file());
     let duplicate = estate
         .start(&Start {
@@ -203,7 +203,10 @@ async fn lifecycle() {
         .expect("import Issue Artifact");
     assert_eq!(
         imported.path,
-        temp.path().join(".issues/I_execution/artifacts/evidence")
+        temp.path()
+            .join("workspace/issues/I_execution/artifacts/evidence")
+            .canonicalize()
+            .unwrap()
     );
     assert!(imported.path.join("evidence.txt").is_file());
     assert_eq!(
@@ -258,7 +261,10 @@ async fn lifecycle() {
     );
     let audit = estate.inspect().await.expect("audit estate");
     assert_eq!(audit.faults[0].code, "integration.worktree.unknown");
-    assert_eq!(audit.faults[0].subject, foreign.display().to_string());
+    assert_eq!(
+        audit.faults[0].subject,
+        foreign.canonicalize().unwrap().display().to_string()
+    );
     assert!(audit.faults[0].message.contains(" at head "));
     git(
         &source,

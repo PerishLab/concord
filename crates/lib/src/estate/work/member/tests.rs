@@ -117,17 +117,35 @@ fn occupied() {
     repo.run(&["commit", "-m", "base"]).expect("commit");
     repo.add(&path, "task/1", false).expect("Member");
     let head = git::at(&path).head().expect("head");
-    let output = std::process::Command::new("git")
+    use std::io::BufRead;
+    use std::os::windows::process::CommandExt;
+    use std::process::{Command, Stdio};
+    let mut occupant = Command::new("cmd.exe")
+        .args(["/d", "/q", "/c", "echo ready & set /p hold="])
+        .creation_flags(0x08000000)
         .current_dir(&path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("directory occupant");
+    let mut ready = String::new();
+    let observed = std::io::BufReader::new(occupant.stdout.take().expect("occupant output"))
+        .read_line(&mut ready);
+    let removal = Command::new("git")
         .arg("-C")
         .arg(&source)
         .args(["worktree", "remove"])
         .arg(&path)
-        .output()
-        .expect("occupied removal");
+        .output();
+    occupant.kill().expect("stop occupant");
+    occupant.wait().expect("reap occupant");
+    observed.expect("occupant handshake");
+    assert_eq!(ready.trim(), "ready");
+    let output = removal.expect("occupied removal");
     assert!(
         !output.status.success(),
-        "Windows must refuse deleting the child's cwd"
+        "Windows must refuse deleting the confirmed occupant's cwd"
     );
     assert!(
         !repo

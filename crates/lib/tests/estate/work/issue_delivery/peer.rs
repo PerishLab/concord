@@ -60,7 +60,7 @@ async fn peer() {
     let late = Seat::new(temp.path()).open().await.expect("third handle");
     agrees(&late.settled().await.expect("late read"));
 
-    let path = temp.path().join(".issues/I_peer/worktree");
+    let path = temp.path().join("workspace/issues/I_peer/worktree");
     std::fs::create_dir(path.join("crates")).expect("claimed directory");
     std::fs::write(path.join("crates/note.md"), "peer\n").expect("peer delta");
     git(&path, &["add", "crates/note.md"]);
@@ -80,7 +80,7 @@ async fn peer() {
     agrees(&near.settled().await.expect("after peer release"));
 
     start(&far, "PerishLab/concord#42", "I_lost").await;
-    let lost = temp.path().join(".issues/I_lost/worktree");
+    let lost = temp.path().join("workspace/issues/I_lost/worktree");
     git(
         &source,
         &[

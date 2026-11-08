@@ -33,8 +33,8 @@ fn independent() {
         "High"
     );
     assert!(issue["body"].as_str().unwrap().contains("Acceptance"));
-    assert!(!root.path().join(".concord").exists());
-    assert!(!root.path().join(".issues").exists());
+    assert!(!root.path().join("workspace").exists());
+    assert!(!root.path().join("workspace/issues").exists());
     let builtin = fixture::decoded(&fixture::run(root.path(), "builtin", "20"));
     assert_eq!(
         builtin["collections"]["fields"]["nodes"][0]["authority"],
@@ -135,7 +135,7 @@ fn grammar() {
     let help = String::from_utf8_lossy(&output.stdout);
     assert!(help.contains("without opening local execution state"));
     assert!(help.contains("never an atomic snapshot"));
-    assert!(!scratch.path().join(".concord").exists());
+    assert!(!scratch.path().join("workspace").exists());
 }
 
 #[cfg(unix)]
@@ -146,7 +146,7 @@ fn next() {
         let provider = fixture::provider(scratch.path(), mode);
         let output = spawn::concord(scratch.path())
             .args([
-                "--space",
+                "--home",
                 "/deliberately-unavailable-estate",
                 "project",
                 "next",
@@ -168,7 +168,7 @@ fn next() {
             assert!(result["next"]["issue"].is_null());
             let human = spawn::concord(scratch.path())
                 .args([
-                    "--space",
+                    "--home",
                     "/deliberately-unavailable-estate",
                     "project",
                     "next",
@@ -185,6 +185,6 @@ fn next() {
             assert!(output.stdout.is_empty());
         }
     }
-    assert!(!scratch.path().join(".concord").exists());
-    assert!(!scratch.path().join(".issues").exists());
+    assert!(!scratch.path().join("workspace").exists());
+    assert!(!scratch.path().join("workspace/issues").exists());
 }

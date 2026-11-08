@@ -244,7 +244,7 @@ impl<'a> Seat<'a> {
     }
 
     fn change(&self) {
-        let member = self.space.join(".issues/I_delivery/worktree");
+        let member = self.space.join("workspace/issues/I_delivery/worktree");
         std::fs::write(member.join("topic.md"), "needs\n").expect("member delta");
         git(&member, &["add", "topic.md"]);
         git(&member, &["commit", "-m", "delivery"]);

@@ -25,7 +25,7 @@ pub use member::Args as Member;
 pub struct Cli {
     #[arg(long, global = true)]
     pub config: Option<PathBuf>,
-    #[arg(long, global = true, help = "Directory containing the Concord Space")]
+    #[arg(long, global = true, hide = true)]
     pub space: Option<PathBuf>,
     #[arg(long, global = true)]
     pub home: Option<PathBuf>,

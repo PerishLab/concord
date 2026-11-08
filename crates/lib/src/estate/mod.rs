@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 #[path = "data/agreement.rs"]
 mod agreement;
 mod forge;
+mod layout;
 mod model;
 #[path = "data/territory/mod.rs"]
 mod territory;
@@ -27,62 +28,78 @@ pub use work::{
 
 pub struct Estate {
     core: Core<Sqlite>,
-    space: PathBuf,
+    layout: layout::Layout,
+    identity: String,
 }
 
 #[derive(Clone, Debug)]
 pub struct Seat {
-    space: PathBuf,
-    root: PathBuf,
+    layout: layout::Layout,
 }
 
 impl Seat {
-    pub fn new(space: impl AsRef<Path>) -> Self {
-        let space = space.as_ref().to_path_buf();
+    pub fn new(home: impl AsRef<Path>) -> Self {
         Self {
-            root: space.join(".concord"),
-            space,
+            layout: layout::Layout::new(home.as_ref()),
         }
     }
 
     pub fn database(&self) -> PathBuf {
-        self.root.join("estate.sqlite3")
+        self.layout.database()
     }
 
     pub fn sudo(&self) -> PathBuf {
-        self.root.join("sudo")
+        self.layout.sudo()
     }
 
     pub async fn bootstrap(&self) -> Result<Estate> {
-        at(&self.root).directory()?;
+        if !self.layout.root.is_absolute() {
+            return Err(Error::new("Concord data home must be absolute"));
+        }
+        if let Some(parent) = self.layout.root.parent() {
+            at(parent).directory()?;
+        }
+        match std::fs::create_dir(&self.layout.root) {
+            Ok(()) => (),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                return self.open().await;
+            }
+            Err(error) => return Err(error.into()),
+        }
+        at(&self.layout.root).mode(0o700)?;
+        at(&self.layout.locks()).directory()?;
         let wire = Sqlite::file(self.database()).await.map_err(fault)?;
         let mut held = keel::bootstrap(model::graph(), wire).map_err(fault)?;
         let status = held.status().await.map_err(fault)?;
         let sudo = self.possession(&mut held, status).await?;
         let core = held.seal(&sudo).await.map_err(fault)?;
         at(&self.database()).mode(0o600)?;
+        let identity = self.layout.publish()?;
         let estate = Estate {
             core,
-            space: self.space.clone(),
+            layout: self.layout.resolved()?,
+            identity,
         };
         Ok(estate)
     }
 
     pub async fn open(&self) -> Result<Estate> {
-        if !self.database().is_file() || !self.sudo().is_file() {
+        if !self.layout.root.exists() {
             return Err(Error::typed(
                 "concord.estate.absent",
                 format!(
                     "Concord estate is absent at {}; bootstrap a fresh Issue estate",
-                    self.root.display()
+                    self.layout.root.display()
                 ),
             ));
         }
+        let identity = self.layout.read()?;
         let sudo = std::fs::read_to_string(self.sudo())?;
         let core = self.bind(model::graph, &sudo).await?;
         Ok(Estate {
             core,
-            space: self.space.clone(),
+            layout: self.layout.resolved()?,
+            identity,
         })
     }
 
@@ -113,13 +130,27 @@ impl Seat {
 }
 
 impl Estate {
+    pub fn identity(&self) -> &str {
+        &self.identity
+    }
+
+    pub(crate) fn identify(&self, expected: &str) -> Result<()> {
+        if expected != self.identity || self.layout.read()? != self.identity {
+            return Err(Error::typed(
+                "concord.space.identity",
+                "Space identity changed or belongs to another data home; prepare a fresh plan",
+            ));
+        }
+        Ok(())
+    }
     pub fn occupy(
         &self,
         operator: &crate::activity::Operator,
         operation: &str,
         subjects: &[crate::occupancy::Subject],
     ) -> Result<crate::occupancy::Occupancy> {
-        crate::occupancy::record(&self.space, operator, operation, subjects)
+        self.identify(&self.identity)?;
+        crate::occupancy::record(&self.layout.root, operator, operation, subjects)
     }
 
     pub fn write_surfaces(
@@ -149,15 +180,16 @@ impl Estate {
         operator: Option<&crate::activity::Operator>,
         operation: &str,
     ) -> Result<crate::activity::IssueActivity> {
-        crate::activity::record_issue(&self.space, issue, operator, operation)
+        self.identify(&self.identity)?;
+        crate::activity::record_issue(&self.layout.root, issue, operator, operation)
     }
 
     pub fn activity(&self, issue: &Anchor) -> Result<crate::activity::Snapshot> {
-        crate::activity::snapshot(&self.space, issue)
+        crate::activity::snapshot(&self.layout.root, issue)
     }
 
     pub fn occupancy(&self) -> Result<crate::occupancy::Snapshot> {
-        crate::occupancy::inspect(&self.space.join(".concord/occupancy/ledger.json"))
+        crate::occupancy::inspect(&self.layout.root.join("occupancy/ledger.json"))
     }
 
     fn guard(&self) -> Result<File> {
@@ -173,7 +205,11 @@ impl Estate {
     }
 
     fn latch(&self) -> Result<File> {
-        let path = self.space.join(".concord.lock");
+        self.identify(&self.identity)?;
+        let path = self.layout.locks().join("estate.lock");
+        if path.symlink_metadata().is_ok() {
+            layout::direct(&path, false)?;
+        }
         let file = std::fs::OpenOptions::new()
             .read(true)
             .write(true)

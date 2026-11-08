@@ -12,7 +12,10 @@ async fn recovery() {
         .await
         .expect("Member");
     let source = fixture._temp.path().join("source");
-    let path = fixture._temp.path().join(".issues/I_delivery/worktree");
+    let path = fixture
+        ._temp
+        .path()
+        .join("workspace/issues/I_delivery/worktree");
     let before = fixture
         .estate
         .issue_member_status(&fixture.issue)

@@ -21,7 +21,7 @@ mod unix {
         );
         let activity = spawn::concord(fixture.path())
             .args([
-                "--space",
+                "--home",
                 fixture.path().to_str().expect("fixture path"),
                 "member",
                 "list",
@@ -138,7 +138,7 @@ mod unix {
     }
 
     fn stale(space: &Path) {
-        let path = space.join(".concord/activity/issue-1.json");
+        let path = space.join("workspace/activity/issue-1.json");
         let mut ledger: Value = serde_json::from_slice(&std::fs::read(&path).expect("activity"))
             .expect("activity JSON");
         ledger["touches"][0]["time"] = 1.into();
@@ -194,7 +194,7 @@ mod unix {
 
     fn success(space: &Path, arguments: &[&str]) -> Value {
         let output = spawn::concord(space)
-            .args(["--space", space.to_str().expect("root path"), "--json"])
+            .args(["--home", space.to_str().expect("root path"), "--json"])
             .args(arguments)
             .output()
             .expect("run Concord");

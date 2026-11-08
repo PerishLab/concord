@@ -129,7 +129,7 @@ mod unix {
             &["config", "core.sshCommand", ssh.to_str().expect("ssh")],
         );
         git(&source, &["config", "ssh.variant", "simple"]);
-        let member = fixture.path().join(".issues/I_delivery/worktree");
+        let member = fixture.path().join("workspace/issues/I_delivery/worktree");
         std::fs::write(member.join("topic.md"), "delivery\n").expect("member delta");
         git(&member, &["add", "topic.md"]);
         git(&member, &["commit", "-m", "delivery"]);
@@ -203,7 +203,7 @@ mod unix {
     pub(super) fn prepare(space: &Path, provider: &str, revision: &str, handoff: bool) -> Command {
         let mut command = spawn::concord(space);
         command
-            .args(["--space", space.to_str().expect("root"), "--json"])
+            .args(["--home", space.to_str().expect("root"), "--json"])
             .args([
                 "issue",
                 "delivery",
@@ -274,7 +274,7 @@ mod unix {
 
     pub(super) fn success(space: &Path, arguments: &[&str]) -> Value {
         let output = spawn::concord(space)
-            .args(["--space", space.to_str().expect("root"), "--json"])
+            .args(["--home", space.to_str().expect("root"), "--json"])
             .args(arguments)
             .output()
             .expect("run Concord");

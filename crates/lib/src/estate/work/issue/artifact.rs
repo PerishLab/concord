@@ -90,7 +90,7 @@ impl Estate {
         issue_stale(anchor.revision, request.revision)?;
         let target = self.issue_artifact_root(&anchor)?.join(&request.name);
         vacant(&target)?;
-        preflight::inspect(&request.source, &target, &self.space)
+        preflight::inspect(&request.source, &target, &self.layout.root)
     }
 
     pub async fn import_issue(&self, request: &IssueImport) -> Result<IssueArtifact> {
@@ -102,7 +102,7 @@ impl Estate {
         let root = self.issue_artifact_root(&anchor)?;
         let target = root.join(&request.name);
         vacant(&target)?;
-        let checked = preflight::inspect(&request.source, &target, &self.space)?;
+        let checked = preflight::inspect(&request.source, &target, &self.layout.root)?;
         let source = PathBuf::from(checked.source);
         at(&root).directory()?;
         at(&target).directory()?;
@@ -170,11 +170,7 @@ impl Estate {
         anchor: &super::super::super::Anchor,
     ) -> Result<PathBuf> {
         component("issue node", &anchor.node)?;
-        Ok(self
-            .space
-            .join(".issues")
-            .join(&anchor.node)
-            .join("artifacts"))
+        Ok(self.layout.issue(&anchor.node).join("artifacts"))
     }
 }
 
