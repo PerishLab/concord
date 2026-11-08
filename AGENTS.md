@@ -215,6 +215,13 @@ of copying its answer here.
 - Ordinary open accepts only the exact home layout and retained stable Space
   identity. Missing identity is not permission to bootstrap or repair. Old Space
   path selectors refuse; an explicit offline cutover is separate from opening.
+- The source-only `cutover` Cargo example is a one-time offline maintenance tool,
+  separate from the installed CLI. Require stopped writers and drained Members;
+  freeze old possession before staging an exact-model snapshot. Activation is
+  the rename into `home/workspace`; abort is forbidden afterwards. Hash-checked
+  cleanup retains only receipt metadata, never a second raw control archive.
+  Concord #452 owns the bounded support matrix and recovery runbook; #453 owns
+  actual stable consumption. This tool supplies no normal-open compatibility.
 - Delivery and landing plans bind the stable Space identity as well as current
   path and proof. Old-schema or foreign-Space plans refuse before provider work.
   Prepared plans never survive relocation by editing their serialized paths.
