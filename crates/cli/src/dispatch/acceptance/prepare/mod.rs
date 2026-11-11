@@ -9,7 +9,17 @@ use crate::args::acceptance::Prepare;
 
 mod advice;
 
-const SHAPE: &str = r#"{"prose":"Concrete acceptance promise","marker":{"purpose":"declaration","target":"source","promise":"Merge the bounded verified source change."}}"#;
+const DECLARATION: &str = r#"{"prose":"Concrete acceptance promise","marker":{"purpose":"declaration","target":"source","promise":"Merge the bounded verified source change."}}"#;
+const AMENDMENT: &str = r#"{"prose":"Explain why the acceptance promise changed","marker":{"purpose":"amendment","target":"source","promise":"REPLACE_WITH_THE_AMENDED_ACCEPTANCE_PROMISE","predecessor":{"node":"REPLACE_WITH_PROVIDER_COMMENT_NODE_OF_THE_CURRENT_DECLARATION","digest":"REPLACE_WITH_LOWERCASE_SHA256_OF_THE_DECLARATION_COMMENT_BODY"},"reason":"REPLACE_WITH_THE_REASON_FOR_THIS_AMENDMENT"}}"#;
+const CLOSURE: &str = r#"{"prose":"Record the reviewed acceptance judgment; see judge --help for release shape and reviewer-choice rules","marker":{"purpose":"closure","target":"source","declaration":{"node":"REPLACE_WITH_PROVIDER_COMMENT_NODE_OF_THE_CURRENT_DECLARATION","digest":"REPLACE_WITH_LOWERCASE_SHA256_OF_THE_DECLARATION_COMMENT_BODY"},"judgment":"unmet","verification":"manual","review":"REPLACE_WITH_LOWERCASE_SHA256_OF_THE_EXACT_CURRENT_ISSUE_BODY","evidence":["REPLACE_WITH_EXACT_EVIDENCE_REFERENCE_FOR_A_SETTLED_CONDITION"],"remaining":["REPLACE_WITH_ACCEPTANCE_OBLIGATION_STILL_OUTSTANDING"],"release":null}}"#;
+
+fn shape(purpose: &Purpose) -> &'static str {
+    match purpose {
+        Purpose::Declaration => DECLARATION,
+        Purpose::Amendment => AMENDMENT,
+        Purpose::Closure => CLOSURE,
+    }
+}
 
 pub(super) enum Purpose {
     Declaration,
@@ -25,7 +35,7 @@ struct Intent {
 }
 
 pub(super) async fn run(args: Prepare, purpose: Purpose) -> Result<Value> {
-    let intent: Intent = crate::dispatch::input::read(&args.input, SHAPE)?;
+    let intent: Intent = crate::dispatch::input::read(&args.input, shape(&purpose))?;
     let execution = forge::execution()?;
     let advisory = matches!(&purpose, Purpose::Declaration | Purpose::Amendment)
         && intent.marker.target() == concord_core::acceptance::Target::Release;
