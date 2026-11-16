@@ -53,8 +53,8 @@ fn book() -> Cookbook {
         ),
         entry(
             "concord.audit.refused",
-            "Estate agreement faults prevent an ordinary mutation; activity and Claim overlap observations are not faults.",
-            "Read concord audit and preserve the named payload. Only a declared missing Member can use member recover: read concord cookbook concord.member.cleanup and bind its exact Issue revision and retained head. Recovery refuses unrelated faults and cannot force release or erase files. Other disagreements require diagnosis of their owning source or seat; never reset the estate, fabricate proof or hand-edit control data to pass audit.",
+            "Agreement faults in the operation's required scope prevent mutation; full audit still reports independent faults. Activity and Claim overlap observations are not faults.",
+            "Read concord audit and preserve the named payload. Only a declared missing Member can use member recover: read concord cookbook concord.member.cleanup and bind its exact Issue revision and retained head. Recovery refuses other faults in its required scope and cannot force release or erase files. Other relevant disagreements require diagnosis of their owning source or seat. Independent repository faults do not deny scoped work; never reset the estate, fabricate proof or hand-edit control data to pass audit.",
             (
                 "Retain the complete fault list and exact Issue/Integration identities; distinguish missing registration from a changed branch, source or occupied path.",
                 "Agreement is restored through the bounded owning operation and the original command passes its unchanged gates.",
@@ -63,7 +63,7 @@ fn book() -> Cookbook {
         entry(
             "concord.member.cleanup",
             "Member removal or estate settlement failed after Git cleanup started. Concord attempted to restore the original clean checkout; no estate revision was advanced by the refused settlement.",
-            "Run outside the Member directory, especially on Windows. Read the exact Issue revision, retained branch and Boundary head (or unchanged base), and audit. If the original Member was restored, retry the original lifecycle command. Otherwise run concord member recover <Issue> --revision <revision> --head <retained-head> --apply. Recovery only restores the declared original branch at an absent or empty derived path, refuses changed or unrelated payload and all unrelated audit faults, and preserves estate, Claims, Boundary and references. Then retry normal release or unchanged completion. Never reset the estate or hand-edit managed seats.",
+            "Run outside the Member directory, especially on Windows. Read the exact Issue revision, retained branch and Boundary head (or unchanged base), and audit. If the original Member was restored, retry the original lifecycle command. Otherwise run concord member recover <Issue> --revision <revision> --head <retained-head> --apply. Recovery only restores the declared original branch at an absent or empty derived path, refuses changed or unrelated payload and other audit faults in its required scope, and preserves estate, Claims, Boundary and references. Then retry normal release or unchanged completion. Never reset the estate or hand-edit managed seats.",
             (
                 "Preserve the error, exact source commit and merged facts; inspect member list, issue show, Git branch heads and concord audit. Unchanged completion retires its exact branch; rollback recreates it only if still absent. A newly occupied ref, nonempty path or changed branch needs preservation and diagnosis, not deletion or a forced restore.",
                 "Audit agrees and the original normal lifecycle completes at its exact current revision; repeated recovery never removes payload or advances estate state.",

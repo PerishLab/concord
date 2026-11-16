@@ -1,6 +1,7 @@
 use super::super::{Estate, Proof};
 use super::authority::Authorities;
 use super::{IssueWorktree, issue_stale};
+use crate::estate::Scope;
 use crate::{Error, Reference, Result, claim, git};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -142,7 +143,7 @@ async fn context(
     issue: &super::super::super::Coordinate,
     revision: i64,
 ) -> Result<Context> {
-    estate.agreed().await?;
+    estate.agreed(Scope::Issue(issue)).await?;
     let anchor = estate.issue(issue).await?;
     issue_stale(anchor.revision, revision)?;
     let member = estate.issue_member(issue).await?;

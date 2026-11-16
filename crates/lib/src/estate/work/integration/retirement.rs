@@ -1,4 +1,5 @@
 use super::{Integration, guard};
+use crate::estate::Scope;
 use crate::estate::{Estate, fault};
 use crate::{Error, Result};
 
@@ -23,14 +24,14 @@ impl Estate {
                 "Integration has live Members; settle their execution resources before retirement",
             ));
         }
-        let mut report = self.inspect().await?;
+        let mut report = self.survey(Scope::Repository(&held)).await?;
         report.faults.retain(|finding| {
             finding.code != "integration.agreement" || finding.subject != held.repository.identity()
         });
         if !report.agrees() {
             return Err(Error::detailed(
                 "concord.audit.refused",
-                "Integration retirement refuses unrelated agreement faults",
+                "Integration retirement refuses other faults in its required scope",
                 serde_json::json!({"agreement": report}),
             ));
         }

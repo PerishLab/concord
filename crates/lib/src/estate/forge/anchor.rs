@@ -1,4 +1,5 @@
 use super::super::{Estate, fault};
+use crate::estate::Scope;
 use crate::{Error, Result, component};
 use keel::Row;
 use serde::{Deserialize, Serialize};
@@ -54,7 +55,7 @@ impl Estate {
         node(&request.node)?;
         request.coordinate.validate()?;
         let _guard = self.guard()?;
-        self.ensure().await?;
+        self.ensure(Scope::Control).await?;
         let anchors = self.core.live("Anchor").await.map_err(fault)?;
         if anchors
             .iter()
@@ -119,7 +120,7 @@ impl Estate {
         request.anchor.validate()?;
         request.coordinate.validate()?;
         let _guard = self.guard()?;
-        self.ensure().await?;
+        self.ensure(Scope::Control).await?;
         let anchors = self.core.live("Anchor").await.map_err(fault)?;
         let row = anchors
             .iter()

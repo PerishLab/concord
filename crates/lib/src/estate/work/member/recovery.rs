@@ -1,5 +1,6 @@
 use super::cleanup::Cleanup;
 use super::{Estate, issue_stale};
+use crate::estate::Scope;
 use crate::{Coordinate, Error, Result};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -35,7 +36,7 @@ impl Estate {
                 "head must equal the retained Boundary head or unchanged Member base",
             ));
         }
-        let report = self.inspect().await?;
+        let report = self.survey(Scope::Issue(&request.issue)).await?;
         let allowed = report.faults.iter().all(|fault| match fault.code.as_str() {
             "member.agreement" | "member.missing" => fault.subject == request.issue.identity(),
             "integration.worktree.missing" => fault.subject == path.display().to_string(),
@@ -44,7 +45,7 @@ impl Estate {
         if !allowed {
             return Err(Error::detailed(
                 "concord.audit.refused",
-                "recovery refuses unrelated agreement faults",
+                "recovery refuses other faults in its required scope",
                 serde_json::json!({"agreement": report}),
             ));
         }
@@ -62,7 +63,7 @@ impl Estate {
             head: &request.head,
         }
         .restore()?;
-        self.ensure().await?;
+        self.ensure(Scope::Issue(&request.issue)).await?;
         Ok(anchor.revision)
     }
 }

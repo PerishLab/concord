@@ -15,6 +15,7 @@ mod model;
 mod territory;
 mod work;
 
+pub(in crate::estate) use agreement::Scope;
 pub use agreement::{Agreement, Finding};
 pub use forge::{Admission, Anchor, Coordinate, Reconcile};
 pub use forge::{Reference, ReferenceKind};

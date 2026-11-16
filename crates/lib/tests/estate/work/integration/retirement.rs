@@ -266,19 +266,19 @@ async fn foreign() {
         .find(|held| held.node == "R_concord")
         .expect("target");
     std::fs::rename(&peer.source, peer.temp.path().join("removed")).expect("missing peer");
-    for apply in [false, true] {
-        assert_eq!(
-            world
-                .estate
-                .retire(&held, apply)
-                .await
-                .expect_err("foreign fault")
-                .code(),
-            "concord.audit.refused"
-        );
-    }
-    assert_eq!(
-        world.estate.integrations().await.expect("preserved").len(),
-        2
-    );
+    world
+        .estate
+        .retire(&held, false)
+        .await
+        .expect("independent preflight");
+    assert_eq!(world.estate.integrations().await.unwrap().len(), 2);
+    world
+        .estate
+        .retire(&held, true)
+        .await
+        .expect("independent retirement");
+    let remaining = world.estate.integrations().await.unwrap();
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].node, "R_foreign");
+    assert!(peer.temp.path().join("removed/README.md").is_file());
 }

@@ -1,4 +1,5 @@
 use super::super::{BoundaryState, CheckoutState, Estate, IntegrationState, UpstreamState};
+use crate::estate::Scope;
 mod cleanup;
 mod recovery;
 
@@ -30,7 +31,7 @@ pub struct IssueRetirement {
 impl Estate {
     pub async fn finish(&self, request: &Finish) -> Result<i64> {
         let _guard = self.guard()?;
-        self.ensure().await?;
+        self.ensure(Scope::Issue(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
         issue_stale(anchor.revision, request.revision)?;
         let member = self.issue_member(&request.issue).await?;
@@ -115,7 +116,7 @@ impl Estate {
         artifacts: Option<&[String]>,
     ) -> Result<i64> {
         let _guard = self.guard()?;
-        self.ensure().await?;
+        self.ensure(Scope::Issue(issue)).await?;
         let anchor = self.issue(issue).await?;
         issue_stale(anchor.revision, revision)?;
         let member = self.issue_member(issue).await?;

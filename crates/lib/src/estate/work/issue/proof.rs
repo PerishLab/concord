@@ -1,5 +1,6 @@
 use super::super::{Estate, Proof};
 use super::{IssueWorktree, issue_stale};
+use crate::estate::Scope;
 use crate::{Error, Result, git};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -11,7 +12,7 @@ pub struct IssueProving {
 impl Estate {
     pub async fn prove_issue(&self, request: &IssueProving) -> Result<IssueWorktree> {
         let _guard = self.guard()?;
-        self.ensure().await?;
+        self.ensure(Scope::Issue(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
         issue_stale(anchor.revision, request.revision)?;
         let member = self.issue_member(&request.issue).await?;
@@ -100,6 +101,7 @@ pub(super) mod delivery {
     use super::super::super::integration::{self, TRACKING};
     use super::super::delivery::{Authority, Member, member};
     use super::super::{IssueRelease, issue_stale};
+    use crate::estate::Scope;
     use crate::estate::{Estate, Guard, Proof};
     use crate::{Error, Reference, Result, git};
     use plumb::integration::{Expectation, Relation};
@@ -134,7 +136,7 @@ pub(super) mod delivery {
         pub async fn complete(&self, guard: &Guard, request: &Settlement) -> Result<Completion> {
             self.identify(&request.space)?;
             self.identify(&guard.space)?;
-            self.agreed().await?;
+            self.agreed(Scope::Issue(&request.issue)).await?;
             let anchor = self.issue(&request.issue).await?;
             issue_stale(anchor.revision, request.revision)?;
             let held = self.integration(&request.issue).await?;

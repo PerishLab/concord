@@ -1,4 +1,5 @@
 use super::{Integration, guard, registration};
+use crate::estate::Scope;
 use crate::estate::{Estate, fault};
 use crate::{Error, Result};
 use plumb::integration::Relation;
@@ -97,7 +98,7 @@ impl Estate {
             ));
         }
         absent(&expected.path)?;
-        let mut report = self.inspect().await?;
+        let mut report = self.survey(Scope::Repository(expected)).await?;
         report.faults.retain(|finding| {
             finding.code != "integration.agreement"
                 || finding.subject != expected.repository.identity()
@@ -105,7 +106,7 @@ impl Estate {
         if !report.agrees() {
             return Err(Error::detailed(
                 "concord.audit.refused",
-                "Integration rebind refuses unrelated agreement faults",
+                "Integration rebind refuses other faults in its required scope",
                 serde_json::json!({"agreement": report}),
             ));
         }

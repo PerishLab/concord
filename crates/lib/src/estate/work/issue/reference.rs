@@ -1,5 +1,6 @@
 use super::super::Estate;
 use super::issue_stale;
+use crate::estate::Scope;
 use crate::{Error, Result, component};
 use crate::{Reference, ReferenceKind};
 
@@ -31,7 +32,7 @@ impl Estate {
             request.number,
         )?;
         let _guard = self.guard()?;
-        self.ensure().await?;
+        self.ensure(Scope::Issue(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
         issue_stale(anchor.revision, request.revision)?;
         let member = self.issue_member(&request.issue).await?;
@@ -76,7 +77,7 @@ impl Estate {
 
     pub async fn unrefer_issue(&self, request: &IssueWithdrawal) -> Result<i64> {
         let _guard = self.guard()?;
-        self.ensure().await?;
+        self.ensure(Scope::Issue(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
         issue_stale(anchor.revision, request.revision)?;
         let member = self.issue_member(&request.issue).await?;

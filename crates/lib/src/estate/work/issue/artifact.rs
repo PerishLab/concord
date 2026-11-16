@@ -1,6 +1,7 @@
 use super::super::Estate;
 use super::super::artifact::preflight;
 use super::issue_stale;
+use crate::estate::Scope;
 use crate::path::at;
 use crate::{Error, Result, component};
 use serde::Serialize;
@@ -85,7 +86,7 @@ impl Estate {
     pub async fn preflight_issue(&self, request: &IssueImport) -> Result<preflight::Survey> {
         component("artifact name", &request.name)?;
         let _guard = self.guard()?;
-        self.ensure().await?;
+        self.ensure(Scope::Seat(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
         issue_stale(anchor.revision, request.revision)?;
         let target = self.issue_artifact_root(&anchor)?.join(&request.name);
@@ -96,7 +97,7 @@ impl Estate {
     pub async fn import_issue(&self, request: &IssueImport) -> Result<IssueArtifact> {
         component("artifact name", &request.name)?;
         let _guard = self.guard()?;
-        self.ensure().await?;
+        self.ensure(Scope::Seat(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
         issue_stale(anchor.revision, request.revision)?;
         let root = self.issue_artifact_root(&anchor)?;
@@ -140,7 +141,7 @@ impl Estate {
     pub async fn remove_issue(&self, request: &IssueRemoval) -> Result<i64> {
         component("artifact name", &request.name)?;
         let _guard = self.guard()?;
-        self.ensure().await?;
+        self.ensure(Scope::Seat(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
         issue_stale(anchor.revision, request.revision)?;
         let root = self.issue_artifact_root(&anchor)?;

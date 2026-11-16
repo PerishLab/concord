@@ -205,16 +205,12 @@ async fn unrelated() {
         &world.source,
         &["worktree", "remove", other.to_str().expect("other")],
     );
-    assert_eq!(
-        world
-            .estate
-            .recover(&request)
-            .await
-            .expect_err("unrelated fault")
-            .code(),
-        "concord.audit.refused"
-    );
-    assert!(!path.exists());
+    world
+        .estate
+        .recover(&request)
+        .await
+        .expect("recover independent Member");
+    assert!(path.is_dir());
     assert!(!other.exists());
 }
 
