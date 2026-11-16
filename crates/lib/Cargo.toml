@@ -44,3 +44,8 @@ path = "tests/estate/main.rs"
 name = "cutover"
 path = "tests/maintenance/cutover.rs"
 test = true
+
+[[example]]
+name = "relocate"
+path = "tests/maintenance/relocate.rs"
+test = true
