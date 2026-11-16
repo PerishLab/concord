@@ -1,4 +1,5 @@
 use super::{BRANCH, Integration, REMOTE, Register, Repository, TRACKING, node};
+use crate::estate::Scope;
 use crate::estate::{Estate, fault};
 use crate::{Error, Result, git};
 use plumb::integration::{Expectation, Relation};
@@ -9,7 +10,7 @@ impl Estate {
         node(&request.node)?;
         request.repository.validate()?;
         let _guard = self.guard()?;
-        self.ensure().await?;
+        self.ensure(Scope::Control).await?;
         let remote = origin(&request.path)?;
         if remote != request.repository {
             return Err(Error::typed(

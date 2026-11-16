@@ -1,6 +1,7 @@
 use super::super::overlap::{OverlapMember, committed_overlap, same_repository};
-use super::super::{ClaimOverlap, Estate};
+use super::super::{ClaimOverlap, CommittedEvidence, CommittedOverlap, Estate};
 use super::{IssueWorktree, issue_stale};
+use crate::estate::Scope;
 use crate::{Error, Result, git};
 use serde::Serialize;
 use std::path::Path;
@@ -68,7 +69,7 @@ impl Estate {
 
     async fn change_issue_claim(&self, change: Change<'_>) -> Result<IssueMemberChange> {
         let _guard = self.guard()?;
-        self.ensure().await?;
+        self.ensure(Scope::Issue(change.issue)).await?;
         let anchor = self.issue(change.issue).await?;
         issue_stale(anchor.revision, change.revision)?;
         let member = self.issue_member(change.issue).await?;
@@ -176,31 +177,45 @@ impl Estate {
     ) -> Result<Vec<ClaimOverlap>> {
         let mut observations = Vec::new();
         let mut identities = git::Identities::default();
+        let common = git::at(source).identity()?;
         for member in self.issue_worktrees().await? {
-            if subject.key == Some(member.key) {
+            if subject.key == Some(member.key)
+                || std::path::Path::new(&member.integration.common) != common
+            {
                 continue;
             }
             let held = self.issue_source(&member)?;
-            if same_repository(&mut identities, source, &held)? {
-                let paths = crate::claim::intersections(&subject.claims, &member.claims);
-                if !paths.is_empty() {
-                    let anchor = self.issue(&member.issue).await?;
-                    let peer = OverlapMember {
-                        key: Some(member.key),
-                        identity: member.issue.identity(),
-                        path: self.issue_path(&anchor)?,
-                        base: member.base.clone(),
-                        claims: member.claims.clone(),
-                        proof: member.proof.clone(),
-                    };
-                    observations.push(ClaimOverlap {
-                        code: "claim.overlap".to_string(),
-                        peer: peer.identity.clone(),
-                        paths,
-                        committed: committed_overlap(subject, &peer),
-                    });
-                }
+            if !same_repository(&mut identities, source, &held)? {
+                continue;
             }
+            let paths = crate::claim::intersections(&subject.claims, &member.claims);
+            if paths.is_empty() {
+                continue;
+            }
+            let anchor = self.issue(&member.issue).await?;
+            let peer = OverlapMember {
+                key: Some(member.key),
+                identity: member.issue.identity(),
+                path: self.issue_path(&anchor)?,
+                base: member.base.clone(),
+                claims: member.claims.clone(),
+                proof: member.proof.clone(),
+            };
+            let committed =
+                if git::at(&peer.path).branch().ok().as_deref() == Some(member.branch.as_str()) {
+                    committed_overlap(subject, &peer)
+                } else {
+                    CommittedOverlap::Unavailable {
+                        member: peer.identity.clone(),
+                        reason: CommittedEvidence::Unavailable,
+                    }
+                };
+            observations.push(ClaimOverlap {
+                code: "claim.overlap".to_string(),
+                peer: peer.identity.clone(),
+                paths,
+                committed,
+            });
         }
         observations.sort_by_key(|observation| observation.peer.clone());
         Ok(observations)

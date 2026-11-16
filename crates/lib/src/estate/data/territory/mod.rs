@@ -1,14 +1,18 @@
-use super::{Agreement, Estate};
+use super::{Agreement, Estate, Scope};
 use crate::Result;
 use crate::path::at;
 
 mod anchor;
 mod integration;
 
-pub(super) async fn inspect(estate: &Estate, report: &mut Agreement) -> Result<()> {
+pub(super) async fn inspect(
+    estate: &Estate,
+    report: &mut Agreement,
+    scope: Scope<'_>,
+) -> Result<()> {
     custody(estate, report)?;
     resources(estate, report).await?;
-    anchor::inspect(estate, report).await?;
+    anchor::inspect(estate, report, scope).await?;
     Ok(())
 }
 

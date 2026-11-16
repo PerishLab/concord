@@ -1,25 +1,31 @@
 use super::super::work::Integration;
-use super::super::{Agreement, IssueWorktree};
+use super::super::{Agreement, Estate, IssueWorktree, Scope};
 use crate::Result;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 #[locus::trace(with = crate::observation::view().as_ref().map(crate::observation::borrow), frame = frame)]
-pub(super) fn survey(
-    space: &Path,
+pub(super) async fn survey(
+    estate: &Estate,
     members: &[IssueWorktree],
-    integrations: &[Integration],
     report: &mut Agreement,
+    scope: Scope<'_>,
 ) -> Result<()> {
     let frame = frame.as_ref();
-    let parts = std::thread::scope(|scope| {
+    let space = &estate.layout.root;
+    let integrations = estate
+        .integrations()
+        .await?
+        .into_iter()
+        .filter(|integration| scope.integration(integration))
+        .collect::<Vec<_>>();
+    let parts = std::thread::scope(|threads| {
         let tasks = integrations
             .iter()
             .map(|integration| {
                 let context = crate::observation::fork(frame);
-                scope.spawn(move || {
-                    crate::observation::within(context, || assess(space, members, integration))
-                })
+                let run = move || assess(space, members, integration, scope);
+                threads.spawn(move || crate::observation::within(context, run))
             })
             .collect::<Vec<_>>();
         tasks
@@ -38,7 +44,12 @@ pub(super) fn survey(
     Ok(())
 }
 
-fn assess(space: &Path, members: &[IssueWorktree], integration: &Integration) -> Result<Agreement> {
+fn assess(
+    space: &Path,
+    members: &[IssueWorktree],
+    integration: &Integration,
+    scope: Scope<'_>,
+) -> Result<Agreement> {
     let mut report = Agreement {
         target: String::new(),
         revision: 0,
@@ -79,6 +90,12 @@ fn assess(space: &Path, members: &[IssueWorktree], integration: &Integration) ->
     {
         expected.insert(space.join("issues").join(&member.node).join("worktree"));
     }
+    let required = members
+        .iter()
+        .filter(|member| member.integration.key == integration.key && scope.member(member))
+        .map(|member| space.join("issues").join(&member.node).join("worktree"))
+        .chain([observed.checkout.path])
+        .collect::<BTreeSet<_>>();
     let mut found = BTreeSet::new();
     for worktree in observed.worktrees.iter().filter(|worktree| {
         !worktree.staging
@@ -93,17 +110,40 @@ fn assess(space: &Path, members: &[IssueWorktree], integration: &Integration) ->
         };
         found.insert(path.clone());
         if !expected.contains(&path) {
-            report.fault(
-                "integration.worktree.unknown",
-                path.display().to_string(),
-                format!(
-                    "unmanaged worktree belongs to {subject} at head {}",
-                    worktree.head.as_deref().unwrap_or("unknown")
-                ),
+            let occupied = path.starts_with(space)
+                || space.starts_with(&path)
+                || required
+                    .iter()
+                    .any(|owned| path.starts_with(owned) || owned.starts_with(&path));
+            let conflict = occupied
+                || worktree.branch.as_deref() == Some(integration.branch.as_str())
+                || members
+                    .iter()
+                    .filter(|member| scope.member(member))
+                    .any(|member| {
+                        member.integration.key == integration.key
+                            && worktree.branch.as_deref() == Some(member.branch.as_str())
+                    });
+            let message = format!(
+                "unmanaged worktree belongs to {subject} at head {}",
+                worktree.head.as_deref().unwrap_or("unknown")
             );
+            if scope.complete() || conflict {
+                report.fault(
+                    "integration.worktree.unknown",
+                    path.display().to_string(),
+                    message,
+                );
+            } else {
+                report.observe(
+                    "integration.worktree.unknown",
+                    path.display().to_string(),
+                    message,
+                );
+            }
         }
     }
-    for path in expected.difference(&found) {
+    for path in required.difference(&found) {
         report.fault(
             "integration.worktree.missing",
             path.display().to_string(),

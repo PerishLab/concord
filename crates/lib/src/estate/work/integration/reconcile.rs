@@ -1,4 +1,5 @@
 use super::{Integration, Rename, decode, node};
+use crate::estate::Scope;
 use crate::estate::{Estate, fault};
 use crate::{Error, Result};
 
@@ -7,7 +8,6 @@ impl Estate {
         node(&request.node)?;
         request.repository.validate()?;
         let _guard = self.guard()?;
-        self.ensure().await?;
         let integrations = self.core.live("Integration").await.map_err(fault)?;
         let row = integrations
             .iter()
@@ -19,6 +19,7 @@ impl Estate {
                 )
             })?;
         let held = decode(row)?;
+        self.ensure(Scope::Repository(&held)).await?;
         if held.repository == request.repository {
             return Ok(held);
         }

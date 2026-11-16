@@ -4,6 +4,7 @@ mod execution;
 mod moved;
 mod peer;
 mod recovery;
+mod scope;
 
 use concord_core::authority::Plumb;
 use concord_core::{

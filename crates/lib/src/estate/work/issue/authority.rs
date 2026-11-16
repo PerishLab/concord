@@ -160,7 +160,9 @@ pub(super) mod delivery {
     ) -> Result<Resume> {
         schema(plan)?;
         estate.identify(&plan.space)?;
-        estate.agreed().await?;
+        estate
+            .agreed(crate::estate::Scope::Issue(&plan.issue))
+            .await?;
         let anchor = estate.issue(&plan.issue).await?;
         let integration = estate.integration(&plan.issue).await?;
         Contract {

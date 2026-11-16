@@ -13,7 +13,7 @@ mod unix {
     use std::path::{Path, PathBuf};
 
     #[test]
-    fn faults() {
+    fn auxiliary() {
         let fixture = tempfile::tempdir().expect("fixture");
         let source = estate(fixture.path());
         let foreign = fixture.path().join("foreign");
@@ -53,19 +53,36 @@ mod unix {
             .arg(&provider)
             .output()
             .expect("run Concord");
-        assert!(!output.status.success());
-        let text = String::from_utf8_lossy(&output.stderr);
-        assert!(text.contains("agreement fault"), "{text}");
-        let subject = foreign.canonicalize().expect("foreign path");
         assert!(
-            text.contains(&format!(
-                "concord:   integration.worktree.unknown {}",
-                subject.display()
-            )),
-            "{text}"
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
         );
-        let staged = staging.canonicalize().expect("staging path");
-        assert!(!text.contains(&staged.display().to_string()), "{text}");
+        let audit = spawn::concord(fixture.path())
+            .env("PLUMB_HOME", &home)
+            .args([
+                "--home",
+                fixture.path().to_str().unwrap(),
+                "--json",
+                "audit",
+            ])
+            .output()
+            .unwrap();
+        assert!(!audit.status.success());
+        let report: Value = serde_json::from_slice(&audit.stdout).unwrap();
+        let faults = report["agreement"]["faults"].as_array().unwrap();
+        assert_eq!(faults.len(), 1);
+        assert_eq!(faults[0]["code"], "integration.worktree.unknown");
+        assert_eq!(
+            faults[0]["subject"],
+            foreign.canonicalize().unwrap().display().to_string()
+        );
+        assert!(foreign.join("README.md").is_file());
+        assert!(
+            !report
+                .to_string()
+                .contains(&staging.canonicalize().unwrap().display().to_string())
+        );
         git(
             &source,
             &[

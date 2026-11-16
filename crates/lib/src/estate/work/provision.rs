@@ -1,17 +1,7 @@
-use super::issue::IssueWorktree;
-use super::{Estate, Integration};
 use crate::path::at;
 use crate::{Error, Result, git};
 use plumb::integration::{Inspection, Worktree};
-use std::collections::BTreeMap;
 use std::path::Path;
-
-pub(super) struct Inventory<'a> {
-    pub inspection: &'a Inspection,
-    pub members: &'a [IssueWorktree],
-    pub integration: &'a Integration,
-    pub pending: &'a Path,
-}
 
 pub(super) struct Provision<'a> {
     pub source: &'a Path,
@@ -19,71 +9,6 @@ pub(super) struct Provision<'a> {
     pub branch: &'a str,
     pub target: &'a str,
     pub inspection: &'a Inspection,
-}
-
-impl Estate {
-    pub(super) fn inventory(&self, request: Inventory<'_>) -> Result<()> {
-        let mut expected = BTreeMap::new();
-        expected.insert(
-            request.inspection.checkout.path.clone(),
-            request.inspection.checkout.head.clone(),
-        );
-        for member in request
-            .members
-            .iter()
-            .filter(|member| member.integration.key == request.integration.key)
-        {
-            expected.insert(
-                self.layout
-                    .root
-                    .join("issues")
-                    .join(&member.node)
-                    .join("worktree"),
-                member.base.clone(),
-            );
-        }
-        for worktree in request.inspection.worktrees.iter().filter(|worktree| {
-            !worktree.staging
-                && worktree
-                    .branch
-                    .as_deref()
-                    .and_then(crate::automation::branch)
-                    .is_none()
-        }) {
-            let path = worktree
-                .path
-                .canonicalize()
-                .unwrap_or_else(|_| worktree.path.clone());
-            let pending = request
-                .pending
-                .canonicalize()
-                .unwrap_or_else(|_| request.pending.to_path_buf());
-            if path == pending {
-                continue;
-            }
-            if !expected.contains_key(&path) {
-                return Err(Error::typed(
-                    "concord.integration.worktree_unknown",
-                    format!(
-                        "unmanaged worktree {} is at head {}",
-                        path.display(),
-                        worktree.head.as_deref().unwrap_or("unknown")
-                    ),
-                ));
-            }
-        }
-        for path in expected.keys() {
-            if !request.inspection.worktrees.iter().any(|worktree| {
-                worktree.path.canonicalize().ok().as_ref() == path.canonicalize().ok().as_ref()
-            }) {
-                return Err(Error::typed(
-                    "concord.integration.worktree_missing",
-                    format!("registered worktree is missing: {}", path.display()),
-                ));
-            }
-        }
-        Ok(())
-    }
 }
 
 impl Provision<'_> {

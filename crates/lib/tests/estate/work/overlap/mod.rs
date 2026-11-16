@@ -1,3 +1,5 @@
+mod scope;
+
 use concord_core::{
     Admission, CommittedEvidence, CommittedOverlap, Coordinate, IssueClaiming, IssueProving,
     Register, Repository, Seat, Start,

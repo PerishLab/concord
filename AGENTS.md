@@ -197,13 +197,23 @@ of copying its answer here.
 
 ## Boundaries
 
-- Fail closed when the estate, coordinates, external seats, source identity,
-  branch, or Git worktree metadata disagree. Read-only diagnosis remains
-  available.
+- Admission derives its required scope internally from the current operation.
+  Shared control custody, exact model and resource relations remain mandatory.
+  Issue attachment checks control identity and uniqueness without external Git.
+  Artifact operations check their Issue seat. Member and delivery operations
+  check their exact Issue seat, Member and Integration; repository-wide changes
+  check the affected Integration and its seats. Independent repository or sibling
+  Member faults do not deny unrelated work. Full audit still reports all faults.
+  Relevant source, branch, registration, path, revision and proof disagreement
+  refuses; unreadable required facts remain unknown. No caller exemption exists.
+- Auxiliary worktrees with independent paths and branches remain audit findings
+  and scoped observations. An extra worktree sharing a required branch or
+  overlapping managed or required payload paths refuses scoped admission.
+  Concord preserves foreign payload and performs no automatic repair.
 - Member cleanup restores the original clean branch/head if external removal or
   estate settlement fails. Exact `member recover` restores only a declared
   missing Member at its retained Boundary head or unchanged base, under the
-  estate lock, with no unrelated agreement faults and no overwritten payload.
+  estate lock, with no other faults in its required scope and no overwritten payload.
   Recovery preserves revision and proof; normal lifecycle gates still own release.
   Unchanged completion retires only its exact topic head before estate settlement;
   rollback recreates a deleted branch only while that ref remains absent. A moved
@@ -234,10 +244,10 @@ of copying its answer here.
   batch for every mutation.
 - Keep protocol agreement separate from coordination and health observations.
   An observation may guide an operator but cannot authorize or block work.
-- Every agreement-guarded step inspects current facts under its own lock; an
-  inspection is never reused across a lock boundary. One inspection assesses
-  registered Integrations concurrently, and its sorted findings do not depend
-  on that order.
+- Every agreement-guarded step inspects current required facts under its own
+  lock; an inspection is never reused across a lock boundary. Selected
+  Integrations are assessed concurrently; complete audit selects all of them.
+  Sorted findings do not depend on that order.
 - Tests spawn Concord only through the shared test seat, which clears inherited
   `CONCORD_` configuration, `LOCUS_API`, the caller's `LOCUS_PARENT` link and
   agent session variables and points the home at the fixture, so no test reads

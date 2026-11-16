@@ -1,8 +1,9 @@
 use super::super::Estate;
 use super::super::integration::{self, TRACKING};
 use super::super::overlap::OverlapMember;
-use super::super::provision::{Inventory, Provision};
+use super::super::provision::Provision;
 use super::{IssueMemberChange, IssueWorktree, branch, issue_stale, legacy};
+use crate::estate::Scope;
 use crate::{Error, Result, component, git};
 use plumb::integration::{Expectation, Relation};
 use std::path::{Path, PathBuf};
@@ -38,7 +39,7 @@ impl Estate {
         let integration = self.integration(&anchor.coordinate).await?;
         observed(&integration.node, &request.stable, "repository")?;
         let path = self.issue_path(&anchor)?;
-        self.allow(&path).await?;
+        self.allow(&request.issue, &path).await?;
         let _integration = integration::guard(self, &integration)?;
         let source = PathBuf::from(&integration.path);
         let remote = integration::registration::origin(&source)?;
@@ -64,7 +65,7 @@ impl Estate {
             ));
         }
         let _estate = self.guard()?;
-        self.allow(&path).await?;
+        self.allow(&request.issue, &path).await?;
         let anchor = self.issue(&request.issue).await?;
         observed(&anchor.node, &request.node, "Issue")?;
         let held = self.integration(&anchor.coordinate).await?;
@@ -75,12 +76,6 @@ impl Estate {
             ));
         }
         let members = self.issue_worktrees().await?;
-        self.inventory(Inventory {
-            inspection: &inspection,
-            members: &members,
-            integration: &integration,
-            pending: &path,
-        })?;
         if let Some(member) = members.iter().find(|member| member.node == anchor.node) {
             return self
                 .resume(Replay {
@@ -195,8 +190,8 @@ impl Estate {
         })
     }
 
-    async fn allow(&self, pending: &Path) -> Result<()> {
-        let report = self.inspect().await?;
+    async fn allow(&self, issue: &super::super::super::Coordinate, pending: &Path) -> Result<()> {
+        let report = self.survey(Scope::Issue(issue)).await?;
         let subject = pending.display().to_string();
         let retained = report
             .faults
@@ -214,7 +209,7 @@ impl Estate {
         }
         Err(Error::detailed(
             "concord.audit.refused",
-            format!("estate has {retained} unrelated agreement fault(s)"),
+            format!("operation has {retained} relevant agreement fault(s)"),
             serde_json::json!({"agreement": report}),
         ))
     }
