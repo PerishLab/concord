@@ -105,6 +105,7 @@ impl Fixture {
         let artifacts = parent.join("artifacts");
         std::fs::create_dir_all(artifacts.join("evidence")).unwrap();
         std::fs::write(artifacts.join("evidence/source"), "private evidence").unwrap();
+        archive(&artifacts);
         Self {
             temp,
             task: Relocate { source, home },
@@ -153,4 +154,22 @@ pub(super) fn git(root: &Path, args: &[&str]) -> String {
         String::from_utf8_lossy(&output.stderr)
     );
     String::from_utf8(output.stdout).unwrap().trim().into()
+}
+
+fn archive(artifacts: &Path) {
+    let source = artifacts.join("archive/source");
+    std::fs::create_dir_all(&source).unwrap();
+    git(&source, &["init", "-b", "main"]);
+    git(&source, &["config", "user.name", "Archived Fixture"]);
+    git(
+        &source,
+        &["config", "user.email", "fixture@example.invalid"],
+    );
+    git(&source, &["config", "commit.gpgsign", "false"]);
+    git(&source, &["commit", "--allow-empty", "-m", "archived"]);
+    let writer = artifacts.join("archive/writer");
+    git(
+        &source,
+        &["worktree", "add", "-b", "writer", writer.to_str().unwrap()],
+    );
 }

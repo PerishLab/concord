@@ -20,9 +20,11 @@ file modes and inode/mtime relationships survive without recreation. Regular
 files/directories and qualified Member symlinks are supported. Relative links
 must stay within the moved tree; parent traversal after a normal target segment
 is refused. Absolute links into the old Issue/control tree, Artifact links,
-nested filesystems, nested Git repositories/submodules, special files, orphan
+nested filesystems, Member nested Git repositories/submodules, special files, orphan
 seats, explicit `core.worktree`, relative Git pointers and active Git locks
-refuse. A payload inventory over one million entries refuses. Windows/macOS and
+refuse. Archived Git fixture directories inside Artifacts remain opaque regular
+data: preserve their bytes without opening, executing or repairing their Git
+metadata. A payload inventory over one million entries refuses. Windows/macOS and
 cross-filesystem Member relocation have no qualification here. Process
 interruption recovery is qualified; sudden host/filesystem loss is not. Keep using the
 separately qualified drained tool for its supported matrix.
