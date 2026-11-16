@@ -128,6 +128,21 @@ impl Estate {
         Ok(report)
     }
 
+    pub async fn structure(&self) -> Result<Agreement> {
+        let _shared = self.share()?;
+        let mut report = self.survey(Scope::Control).await?;
+        for member in self.issue_worktrees().await? {
+            if crate::claim::normalize(&member.claims).ok().as_ref() != Some(&member.claims) {
+                report.fault(
+                    "claim.shape",
+                    member.issue.identity(),
+                    "Member Claims are not normalized",
+                );
+            }
+        }
+        Ok(report)
+    }
+
     pub async fn settled(&self) -> Result<Agreement> {
         let _shared = self.share()?;
         self.inspect().await

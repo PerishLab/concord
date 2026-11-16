@@ -232,6 +232,15 @@ of copying its answer here.
   cleanup retains only receipt metadata, never a second raw control archive.
   Concord #452 owns the bounded support matrix and recovery runbook; #453 owns
   actual stable consumption. This tool supplies no normal-open compatibility.
+- The distinct Linux-only source example `relocate` preserves existing Members
+  during a same-filesystem offline cutover. Concord #466 owns its qualification
+  and `crates/lib/tests/maintenance/RELOCATE.md` its recovery procedure. Require
+  stopped writers, exact original controls and supported Git/payload metadata;
+  never drain unfinished work to satisfy `cutover`. Keep target possession
+  quarantined until the entire Issue tree moves and owned Git backlinks agree.
+  Before workspace activation abort restores the old authority; afterwards only
+  forward recovery is supported. No normal-open fallback, provider write or
+  automatic writer stop exists. Completion keeps metadata, not raw controls.
 - Delivery and landing plans bind the stable Space identity as well as current
   path and proof. Old-schema or foreign-Space plans refuse before provider work.
   Prepared plans never survive relocation by editing their serialized paths.
