@@ -188,3 +188,12 @@ async fn backlink() {
     fixture.run("abort").await.unwrap();
     assert!(fixture.repository.exists());
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn nested() {
+    let fixture = Fixture::new().await;
+    fs::create_dir_all(fixture.old().join("vendor/.git")).unwrap();
+    assert!(fixture.run("stage").await.is_err());
+    fixture.run("abort").await.unwrap();
+    assert!(fixture.old().join("vendor/.git").is_dir());
+}

@@ -96,7 +96,7 @@ impl Payload {
             {
                 return Err(refuse("unregistered worktree payload refuses"));
             }
-            if parts.len() > 3 && parts.last().is_some_and(|part| *part == ".git") {
+            if worktree && parts.len() > 3 && parts.last().is_some_and(|part| *part == ".git") {
                 return Err(refuse(
                     "nested Git repositories require separate qualification",
                 ));
