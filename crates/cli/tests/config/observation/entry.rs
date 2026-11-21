@@ -82,3 +82,29 @@ fn relocated() {
     assert!(text.contains("cli.finish"));
     assert!(!data.join("workspace").exists());
 }
+
+#[test]
+fn https() {
+    let home = Observed::new("");
+    let file = expected(home.0.path());
+    let key = home.0.path().join("writer");
+    std::fs::write(&key, "fixture\n").unwrap();
+    std::fs::write(
+        &file,
+        format!(
+            "[locus]\nenabled=true\nendpoint='https://127.0.0.1:0'\nkey_file={}\n",
+            serde_json::to_string(&key).unwrap()
+        ),
+    )
+    .unwrap();
+    let output = home.run(&[]);
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let queue = file.parent().unwrap().join("state/locus.https/concord");
+    let binding: Value =
+        serde_json::from_slice(&std::fs::read(queue.join("delivery.json")).unwrap()).unwrap();
+    assert_eq!(binding["producer"], "concord");
+    assert_eq!(binding["format"], "sqlite-wal/v1");
+    assert!(queue.join("queue.db").is_file());
+    assert!(!home.buffer().exists());
+}

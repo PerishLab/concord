@@ -173,12 +173,14 @@ of copying its answer here.
 - Optional Locus facts and the private activity ledger are observations only.
   They never establish authorship, ownership, presence, authorization, or
   lifecycle state and never replace a command result.
-- Locus observation is configured only in the `[locus]` section of
-  `concord.toml`: `enabled = true` turns it on, and an optional `endpoint`
-  names the `locus-api` (otherwise the unified `LOCUS_API` value, otherwise
-  `http://127.0.0.1:43308`). No other Locus setting is read from the
-  environment. Concord reports as producer `concord` through the Locus `api`
-  reporter into a buffer under its data home (`state/locus`), and its trace is
+- Enable CLI observations with `[locus] enabled = true` in `concord.toml`.
+  To use HTTPS, set `endpoint` and the absolute writer `key_file` together.
+  On Unix, `sender` may name a trusted absolute Locus executable.
+  When the local transport fields are absent, `LOCUS_API`,
+  `LOCUS_API_KEY_FILE` and `LOCUS_SENDER` supply them together.
+  The default loopback API uses `state/locus` under the selected data home.
+  HTTPS retains pending Concord events under `state/locus.https/concord`;
+  retry them with `locus deliver --buffer <queue>`. Its trace is
   the single agent session it recognises. Every record of one invocation,
   traced function frames included, carries its `concord.command`; each frame
   keeps its own `locus.span`.
