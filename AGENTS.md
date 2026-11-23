@@ -13,11 +13,14 @@ remain external payload and must agree with that estate. GitHub Issues and PRs
 own work narrative and delivery; Project descriptions and status updates own
 planning decisions. Project operations never create a local planning ledger.
 
-Five surfaces answer different questions. The source says what Concord does,
+Six surfaces answer different questions. The organization-wide division of
+authority in GOVERNANCE.md is the canonical list; this is its local view, naming
+only the surfaces this repository has. The source says what Concord does,
 `--help` says how to invoke it, the Concord skill says how to operate its
-objects, `concord cookbook CODE` owns bounded recovery, and this file records
-repository constraints those surfaces cannot. Ask the owning surface instead
-of copying its answer here.
+objects, `concord cookbook CODE` owns bounded recovery, errors, status and audit
+output own current operational evidence, and this file records repository
+constraints those surfaces cannot. Ask the owning surface instead of copying its
+answer here.
 
 ## Authority
 
