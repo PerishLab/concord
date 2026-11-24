@@ -38,6 +38,11 @@ mod unix {
                 vec![("SANTI_SOUL_ID", "soul-1"), ("SANTI_STRAND_ID", "strand-1")],
                 "soul-1:strand-1",
             ),
+            (
+                "agy",
+                vec![("ANTIGRAVITY_CONVERSATION_ID", "agy-session")],
+                "agy-session",
+            ),
         ] {
             let fixture = tempfile::tempdir().expect("fixture");
             bootstrap(fixture.path());

@@ -20,6 +20,7 @@ pub(crate) fn operator() -> Option<Operator> {
         (Agent::Grok, "GROK_SESSION_ID"),
         (Agent::Codex, "CODEX_THREAD_ID"),
         (Agent::GrokBot, "GROK_BOT_IDENTITY"),
+        (Agent::Agy, "ANTIGRAVITY_CONVERSATION_ID"),
     ];
     let mut found = Vec::new();
     for (agent, variable) in variables {
@@ -92,4 +93,31 @@ pub fn host() -> Result<Option<String>> {
         ));
     }
     Ok(Some(value))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn agy() {
+        assert_eq!(Agent::Agy.name(), "agy");
+        assert_eq!(serde_json::to_string(&Agent::Agy).unwrap(), "\"agy\"");
+        assert_eq!(
+            serde_json::from_str::<Agent>("\"agy\"").unwrap(),
+            Agent::Agy
+        );
+        let valid = Operator {
+            agent: Agent::Agy,
+            session: "3ebe8ee9-9dbb-407c-ab51-1427050fde0e".into(),
+        };
+        assert!(valid.valid());
+        for bad in ["", "bad session", "agy!id", "ägy", &"a".repeat(513)] {
+            let operator = Operator {
+                agent: Agent::Agy,
+                session: bad.into(),
+            };
+            assert!(!operator.valid(), "{bad}");
+        }
+    }
 }

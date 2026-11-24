@@ -24,6 +24,7 @@ pub(super) fn image(scratch: &Path, binary: &Path) -> Command {
         .env_remove("GROK_BOT_IDENTITY")
         .env_remove("CODEX_THREAD_ID")
         .env_remove("SANTI_SOUL_ID")
-        .env_remove("SANTI_STRAND_ID");
+        .env_remove("SANTI_STRAND_ID")
+        .env_remove("ANTIGRAVITY_CONVERSATION_ID");
     command
 }

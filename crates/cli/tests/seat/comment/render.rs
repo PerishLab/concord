@@ -8,6 +8,7 @@ pub(super) fn body(prose: &str, agent: &str, session: &str, host: Option<&str>) 
         .unwrap_or_default();
     let title = match agent {
         "grok-bot" => format!("**🫧 {session}** · Grok Bot"),
+        "agy" => "**Agy**".to_string(),
         "claude" => "**Claude**".to_string(),
         "codex" => "**Codex**".to_string(),
         "grok" => "**Grok**".to_string(),

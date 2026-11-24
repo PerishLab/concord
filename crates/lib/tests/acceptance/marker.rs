@@ -26,11 +26,15 @@ fn roundtrip() {
 
 #[test]
 fn ordinary() {
-    let execution = "Ordinary progress\n\n<!-- concord.issue-comment/v1\n{\"agent\":\"codex\",\"session\":\"session\",\"host\":null}\n-->";
-    assert_eq!(Marker::parse(execution).unwrap(), None);
-    let marker = declaration(Target::Source);
-    let combined = format!("{}\n\n{execution}", marker.render().unwrap());
-    assert_eq!(Marker::parse(&combined).unwrap(), Some(marker));
+    for execution in [
+        "Ordinary progress\n\n<!-- concord.issue-comment/v1\n{\"agent\":\"codex\",\"session\":\"session\",\"host\":null}\n-->",
+        "Ordinary progress\n\n> **Agy**\n> concord session `agy-session`\n\n<!-- concord.issue-comment/v1\n{\"agent\":\"agy\",\"session\":\"agy-session\",\"host\":null}\n-->",
+    ] {
+        assert_eq!(Marker::parse(execution).unwrap(), None);
+        let marker = declaration(Target::Source);
+        let combined = format!("{}\n\n{execution}", marker.render().unwrap());
+        assert_eq!(Marker::parse(&combined).unwrap(), Some(marker));
+    }
 }
 
 #[test]

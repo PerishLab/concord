@@ -174,6 +174,12 @@ fn invalid() {
             ("SANTI_STRAND_ID", "ss"),
             ("GROK_SESSION_ID", "grok"),
         ],
+        vec![("ANTIGRAVITY_CONVERSATION_ID", "")],
+        vec![("ANTIGRAVITY_CONVERSATION_ID", "invalid session!")],
+        vec![
+            ("ANTIGRAVITY_CONVERSATION_ID", "agy-session"),
+            ("CODEX_THREAD_ID", "thread"),
+        ],
     ] {
         let scratch = tempfile::tempdir().unwrap();
         let provider = world::provider(scratch.path(), &[]);
@@ -187,6 +193,26 @@ fn invalid() {
         world::refused(&command.output().unwrap(), "concord.issue.comment.operator");
         assert!(!scratch.path().join("calls").exists());
     }
+}
+
+#[test]
+fn agy() {
+    let scratch = tempfile::tempdir().unwrap();
+    let page = world::page();
+    let provider = world::provider(scratch.path(), &[page.clone(), page]);
+    let input = scratch.path().join("input.json");
+    std::fs::write(&input, serde_json::to_vec(&world::intent()).unwrap()).unwrap();
+    let mut command = world::command(scratch.path(), &provider, "declare");
+    command
+        .args(["--input", input.to_str().unwrap()])
+        .env("ANTIGRAVITY_CONVERSATION_ID", "agy-session");
+    let value = world::decoded(&command.output().unwrap());
+    assert_eq!(value["plan"]["execution"]["agent"], "agy");
+    assert_eq!(value["plan"]["execution"]["session"], "agy-session");
+    let plan: Plan = serde_json::from_value(value["plan"]["intent"].clone()).unwrap();
+    let body = plan.body().unwrap();
+    assert!(body.contains("> **Agy**\n> concord session `agy-session`"));
+    assert!(body.contains("{\"agent\":\"agy\",\"session\":\"agy-session\",\"host\":null}"));
 }
 
 mod phase;
