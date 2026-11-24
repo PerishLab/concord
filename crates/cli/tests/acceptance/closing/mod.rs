@@ -28,6 +28,7 @@ fn invoke(scratch: &Path, provider: &Path) -> Output {
     command.args(["--head", HEAD]);
     command.env_remove("CODEX_THREAD_ID");
     command.env_remove("CLAUDE_SESSION_ID");
+    command.env_remove("ANTIGRAVITY_CONVERSATION_ID");
     command.output().unwrap()
 }
 

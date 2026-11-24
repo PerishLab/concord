@@ -19,6 +19,7 @@ pub enum Agent {
     Codex,
     Santi,
     GrokBot,
+    Agy,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -82,6 +83,7 @@ impl Agent {
             Self::Codex => "codex",
             Self::Santi => "santi",
             Self::GrokBot => "grok-bot",
+            Self::Agy => "agy",
         }
     }
 }

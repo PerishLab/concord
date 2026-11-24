@@ -146,6 +146,7 @@ fn card(execution: &Execution) -> String {
         .unwrap_or_default();
     let title = match execution.agent.as_str() {
         "grok-bot" => format!("**🫧 {session}** · Grok Bot"),
+        "agy" => "**Agy**".to_string(),
         "claude" => "**Claude**".to_string(),
         "codex" => "**Codex**".to_string(),
         "grok" => "**Grok**".to_string(),

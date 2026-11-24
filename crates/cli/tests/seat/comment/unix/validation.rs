@@ -67,6 +67,7 @@ fn prose() {
 #[test]
 fn validation() {
     let long = "a".repeat(129);
+    let over = "a".repeat(513);
     for (name, environment, code) in [
         ("missing", vec![], "concord.issue.comment.operator"),
         (
@@ -74,6 +75,14 @@ fn validation() {
             vec![
                 ("CODEX_THREAD_ID", "thread"),
                 ("GROK_SESSION_ID", "session"),
+            ],
+            "concord.issue.comment.operator",
+        ),
+        (
+            "agy",
+            vec![
+                ("ANTIGRAVITY_CONVERSATION_ID", "agy-session"),
+                ("CODEX_THREAD_ID", "thread"),
             ],
             "concord.issue.comment.operator",
         ),
@@ -105,6 +114,7 @@ fn validation() {
     ]
     .into_iter()
     .chain(identities(&long))
+    .chain(sessions(&over))
     {
         let fixture = tempfile::tempdir().expect("fixture");
         bootstrap(fixture.path());
@@ -148,4 +158,18 @@ fn identities(long: &str) -> Vec<Refusal<'_>> {
         )
     })
     .collect()
+}
+
+fn sessions(over: &str) -> Vec<Refusal<'_>> {
+    ["", "bad session", "agy!invalid", "agy`session", "ägy"]
+        .into_iter()
+        .chain([over])
+        .map(|session| {
+            (
+                "session",
+                vec![("ANTIGRAVITY_CONVERSATION_ID", session)],
+                "concord.issue.comment.operator",
+            )
+        })
+        .collect()
 }
