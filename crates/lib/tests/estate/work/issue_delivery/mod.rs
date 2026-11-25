@@ -239,8 +239,8 @@ pub(super) fn snapshot() -> plumb::delivery::Snapshot {
         kind: "Feature".into(),
         updated: "2026-09-28T00:00:00Z".into(),
         parent: None,
-        sub_issues: Vec::new(),
-        blocked_by: Vec::new(),
+        children: Vec::new(),
+        blockers: Vec::new(),
         blocking: Vec::new(),
     }
 }
