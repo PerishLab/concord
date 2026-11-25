@@ -9,18 +9,18 @@ use super::{
 use concord_core::{Error, Result};
 use serde_json::{Value, json};
 
-pub(super) async fn run(client: &Client<'_>, plan: &Plan, pages: u16) -> Result<Value> {
+pub(super) async fn run(client: &Client, plan: &Plan, pages: u16) -> Result<Value> {
     Runner { client, pages }.run(plan).await
 }
-pub(super) async fn recover(client: &Client<'_>, plan: &Plan, pages: u16) -> Result<Value> {
+pub(super) async fn recover(client: &Client, plan: &Plan, pages: u16) -> Result<Value> {
     Runner { client, pages }.recover(plan).await
 }
-struct Runner<'a, 'b> {
-    client: &'a Client<'b>,
+struct Runner<'a> {
+    client: &'a Client,
     pages: u16,
 }
 
-impl Runner<'_, '_> {
+impl Runner<'_> {
     async fn run(&self, plan: &Plan) -> Result<Value> {
         let before = read::state(self.client, &plan.target, &plan.intent, self.pages).await?;
         if before != plan.before {

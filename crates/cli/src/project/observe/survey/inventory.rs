@@ -1,14 +1,13 @@
 use super::super::super::{
     fault,
-    wire::{Client, Collection},
+    wire::{self, Client, Collection},
 };
 use crate::args::project::Survey;
+use crate::runtime::github;
 use concord_core::Result;
+use runseal::github::Window;
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
-
-const REPOSITORIES: &str = "query($owner:String!,$after:String){organization(login:$owner){id login url repositories(first:100,after:$after){totalCount pageInfo{hasNextPage endCursor} nodes{id nameWithOwner url isArchived hasIssuesEnabled owner{id login}}}}}";
-const ISSUES: &str = "query($id:ID!,$after:String){node(id:$id){... on Repository{id nameWithOwner url owner{id login} issues(first:100,states:OPEN,after:$after){totalCount pageInfo{hasNextPage endCursor} nodes{id number title url state updatedAt issueType{id name} repository{id nameWithOwner owner{id login}}}}}}}";
 
 pub(super) struct Inventory {
     pub owner: Value,
@@ -17,7 +16,7 @@ pub(super) struct Inventory {
     pub complete: bool,
 }
 
-pub(super) async fn read(client: &Client<'_>, args: &Survey) -> Result<Inventory> {
+pub(super) async fn read(client: &Client, args: &Survey) -> Result<Inventory> {
     let (owner, repositories) = repositories(client, args).await?;
     let mut complete = repositories.complete;
     let mut rows = Vec::new();
@@ -52,17 +51,17 @@ pub(super) async fn read(client: &Client<'_>, args: &Survey) -> Result<Inventory
     })
 }
 
-async fn repositories(client: &Client<'_>, args: &Survey) -> Result<(Value, Collection)> {
+async fn repositories(client: &Client, args: &Survey) -> Result<(Value, Collection)> {
+    let native = client.open()?;
     let mut collection = Collection::new();
     let mut identity = Value::Null;
     for _ in 0..args.remote.pages {
-        let data = client
-            .read(
-                REPOSITORIES,
-                json!({"owner":args.owner,"after":collection.after()}),
-            )
-            .await?;
-        let owner = &data["organization"];
+        let after = collection.after();
+        let window = Window::new(100, after.as_str()).map_err(wire::provider)?;
+        let catalog = github::call("project.catalog", || native.catalog(&args.owner, &window))
+            .map_err(wire::provider)?
+            .value;
+        let owner = &catalog.owner;
         let current = json!({"id":owner["id"],"login":owner["login"],"url":owner["url"]});
         if current["id"].as_str().is_none_or(str::is_empty)
             || !current["login"]
@@ -86,7 +85,7 @@ async fn repositories(client: &Client<'_>, args: &Survey) -> Result<(Value, Coll
             ));
         }
         identity = current;
-        collection.push(&owner["repositories"])?;
+        collection.push(&catalog.repositories)?;
         if collection.nodes.len() > usize::from(args.repositories) {
             return Err(fault(
                 "bounds",
@@ -103,13 +102,19 @@ async fn repositories(client: &Client<'_>, args: &Survey) -> Result<(Value, Coll
     Ok((identity, collection))
 }
 
-async fn issues(client: &Client<'_>, repo: &Value, pages: u16) -> Result<Collection> {
+async fn issues(client: &Client, repo: &Value, pages: u16) -> Result<Collection> {
+    let native = client.open()?;
+    let id = repo["id"]
+        .as_str()
+        .ok_or_else(|| fault("identity", "repository identity is unreadable"))?;
     let mut collection = Collection::new();
     for _ in 0..pages {
-        let data = client
-            .read(ISSUES, json!({"id":repo["id"],"after":collection.after()}))
-            .await?;
-        let current = &data["node"];
+        let after = collection.after();
+        let window = Window::new(100, after.as_str()).map_err(wire::provider)?;
+        let open = github::call("project.backlog", || native.backlog(id, &window))
+            .map_err(wire::provider)?
+            .value;
+        let current = &open.repository;
         if current["id"] != repo["id"]
             || current["nameWithOwner"] != repo["nameWithOwner"]
             || current["owner"] != repo["owner"]
@@ -122,7 +127,7 @@ async fn issues(client: &Client<'_>, repo: &Value, pages: u16) -> Result<Collect
         if current["url"] != repo["url"] {
             return Err(fault("identity", "repository URL disagrees while paging"));
         }
-        collection.push(&current["issues"])?;
+        collection.push(&open.issues)?;
         if collection.complete {
             break;
         }

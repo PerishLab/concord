@@ -1,43 +1,8 @@
 use super::super::projection::{PageRequest, Projection, fault};
-use super::envelope;
+use super::{Fault, RawIssue, identity, provider};
+use crate::runtime::github;
 use concord_core::acceptance::{Report, Target};
 use concord_core::{Coordinate, Error, Result};
-use serde::Deserialize;
-
-const LABELS: &str = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){labels(first:100){nodes{name} pageInfo{hasNextPage}}}}}";
-
-#[derive(Deserialize)]
-struct Data {
-    repository: Option<Repository>,
-}
-
-#[derive(Deserialize)]
-struct Repository {
-    issue: Option<Issue>,
-}
-
-#[derive(Deserialize)]
-struct Issue {
-    labels: Labels,
-}
-
-#[derive(Deserialize)]
-struct Labels {
-    nodes: Vec<Label>,
-    #[serde(rename = "pageInfo")]
-    page: Page,
-}
-
-#[derive(Deserialize)]
-struct Label {
-    name: String,
-}
-
-#[derive(Deserialize)]
-struct Page {
-    #[serde(rename = "hasNextPage")]
-    more: bool,
-}
 
 pub struct Observation {
     pub snapshot: plumb::delivery::Snapshot,
@@ -46,7 +11,7 @@ pub struct Observation {
     pub acceptance: Option<Report>,
 }
 
-impl Projection<'_> {
+impl Projection {
     pub async fn delivery(&self, coordinate: &Coordinate) -> Result<Observation> {
         let request = PageRequest::first(100);
         let raw = self.query(coordinate, &request).await.map_err(fault)?;
@@ -60,7 +25,7 @@ impl Projection<'_> {
             ));
         }
         let issue = super::super::shape::root(coordinate, &raw).map_err(fault)?;
-        let target = Target::select(&self.labels(coordinate).await?)?;
+        let target = Target::select(&self.labels(coordinate, &issue.node).await?)?;
         let kind = raw
             .issue_type
             .as_ref()
@@ -93,7 +58,6 @@ impl Projection<'_> {
                 "{}/{}#{}",
                 coordinate.owner, coordinate.repository, coordinate.number
             ),
-            command: self.command.to_path_buf(),
             timeout: self.timeout,
             pages: usize::from(self.max_pages),
         };
@@ -129,42 +93,74 @@ impl Projection<'_> {
             acceptance,
         })
     }
-}
 
-impl Projection<'_> {
-    async fn labels(&self, coordinate: &Coordinate) -> Result<Vec<String>> {
-        let process = self
-            .request()
-            .args(["api", "graphql", "-f"])
-            .arg(format!("query={LABELS}"))
-            .args(["-f", &format!("owner={}", coordinate.owner)])
-            .args(["-f", &format!("name={}", coordinate.repository)])
-            .args(["-F", &format!("number={}", coordinate.number)]);
-        let body = self.run(process).await.map_err(fault)?;
-        let labels = envelope::<Data>(&body)
-            .map_err(fault)?
-            .and_then(|data| data.repository)
-            .and_then(|repository| repository.issue)
-            .ok_or_else(|| {
-                Error::typed(
-                    "concord.issue.projection.missing",
-                    "GitHub Issue labels are not readable",
-                )
-            })?
-            .labels;
-        if labels.page.more {
-            return Err(Error::typed(
-                "concord.delivery.snapshot",
-                "Issue delivery snapshot exceeds the native label bound",
-            ));
-        }
-        let names = labels
-            .nodes
-            .into_iter()
-            .map(|label| label.name)
-            .collect::<Vec<_>>();
+    async fn labels(&self, coordinate: &Coordinate, node: &str) -> Result<Vec<String>> {
+        let names = self.names(coordinate, node)?;
         needs(names.iter().cloned())?;
         Ok(names)
+    }
+
+    fn names(&self, coordinate: &Coordinate, node: &str) -> Result<Vec<String>> {
+        use runseal::github::{Target, Window};
+        let scope = format!("{}/{}", coordinate.owner, coordinate.repository);
+        let native = identity::Native::open(&scope, self.timeout)?;
+        let number = u32::try_from(coordinate.number)
+            .map_err(|_| Error::typed("concord.delivery.snapshot", "invalid Issue number"))?;
+        let target = Target::new(&coordinate.owner, &coordinate.repository, number)
+            .map_err(identity::diagnostic)?;
+        let window = Window::new(100, None).map_err(identity::diagnostic)?;
+        let page = github::call("issue.labels", || native.client.labels(&target, &window))
+            .map_err(identity::diagnostic)?
+            .value;
+        if page.target != node || page.next.is_some() || page.rows.len() != page.total as usize {
+            return Err(Error::typed(
+                "concord.delivery.snapshot",
+                "Issue delivery labels are incomplete or belong to another Issue",
+            ));
+        }
+        Ok(page.rows.into_iter().map(|label| label.name).collect())
+    }
+
+    pub(super) fn snapshot(
+        &self,
+        coordinate: &Coordinate,
+        request: &PageRequest,
+    ) -> std::result::Result<RawIssue, Fault> {
+        use runseal::github::{Target, snapshot::Cursors};
+        let scope = format!("{}/{}", coordinate.owner, coordinate.repository);
+        let native = identity::Native::open(&scope, self.timeout)
+            .map_err(|error| provider("provider", error.message()))?;
+        let number = u32::try_from(coordinate.number)
+            .map_err(|_| provider("malformed", "invalid Issue number"))?;
+        let size = u8::try_from(request.size)
+            .map_err(|_| provider("page-limit", "invalid Issue page size"))?;
+        let target = Target::new(&coordinate.owner, &coordinate.repository, number)
+            .map_err(|error| provider("malformed", error.to_string()))?;
+        let cursors = Cursors {
+            children: request.sub_issues_after.clone(),
+            blockers: request.blocked_by_after.clone(),
+            blocking: request.blocking_after.clone(),
+            pulls: request.pulls_after.clone(),
+            comments: request.comments_after.clone(),
+        };
+        let receipt = github::call("issue.snapshot", || {
+            native.client.snapshot(&target, size, &cursors)
+        })
+        .map_err(|error| provider("provider", identity::diagnostic(error).message()))?;
+        let bytes = serde_json::to_vec(&receipt.value)
+            .map_err(|_| provider("malformed", "GitHub Issue projection could not be encoded"))?;
+        if bytes.len() > super::LIMIT {
+            return Err(provider(
+                "malformed",
+                "GitHub Issue projection exceeds the reply limit",
+            ));
+        }
+        serde_json::from_slice(&bytes).map_err(|_| {
+            provider(
+                "malformed",
+                "GitHub Issue projection does not match Concord facts",
+            )
+        })
     }
 }
 

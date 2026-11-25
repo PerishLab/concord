@@ -51,7 +51,6 @@ async fn observe(args: &Observe) -> Result<model::Snapshot> {
     let coordinate = Coordinate::parse(&args.issue)?;
     let reader = read::Reader {
         coordinate: &coordinate,
-        command: &args.command,
         timeout: args.timeout,
         pages: args.pages,
     };

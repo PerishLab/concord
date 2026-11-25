@@ -73,13 +73,9 @@ pub(super) async fn repository(root: &Path) -> Result<String> {
     github::identity::repository(root).await
 }
 
-pub(super) async fn observe(
-    command: &Path,
-    timeout: u64,
-    issue: &Coordinate,
-) -> Result<Observation> {
+pub(super) async fn observe(timeout: u64, issue: &Coordinate) -> Result<Observation> {
     select("github")?;
-    super::super::projection::Projection::new(command, 100, 1, timeout)
+    super::super::projection::Projection::new(100, 1, timeout)
         .delivery(issue)
         .await
 }

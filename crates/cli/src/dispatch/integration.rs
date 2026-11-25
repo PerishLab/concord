@@ -2,17 +2,10 @@ mod rebind;
 
 use super::emit;
 use crate::args::integration;
+use crate::runtime::github;
 use concord_core::{Error, Estate, Integration, Register, Rename, Repository, Result};
-use serde::Deserialize;
 use serde_json::json;
-use std::path::Path;
-use std::process::Stdio;
-use std::time::Duration;
-use tokio::process::Command;
 
-const LIMIT: usize = 16 * 1024;
-
-#[derive(Deserialize)]
 struct Observed {
     node: String,
     coordinate: String,
@@ -39,11 +32,10 @@ pub async fn run(estate: &Estate, command: integration::Command, output: bool) -
         integration::Command::Register {
             repository,
             path,
-            command,
             timeout,
         } => {
             let repository = Repository::parse(&repository)?;
-            let observed = observe(&repository, &command, timeout).await?;
+            let observed = observe(&repository, timeout).await?;
             let integration = estate
                 .register(&Register {
                     node: observed.node,
@@ -55,11 +47,10 @@ pub async fn run(estate: &Estate, command: integration::Command, output: bool) -
         }
         integration::Command::Reconcile {
             repository,
-            command,
             timeout,
         } => {
             let repository = Repository::parse(&repository)?;
-            let observed = observe(&repository, &command, timeout).await?;
+            let observed = observe(&repository, timeout).await?;
             let integration = estate
                 .rename(&Rename {
                     node: observed.node,
@@ -77,48 +68,32 @@ fn retirement(integration: Integration, applied: bool) -> serde_json::Value {
 
 async fn select(estate: &Estate, repository: &str, node: &str, key: i64) -> Result<Integration> {
     let repository = Repository::parse(repository)?;
-    estate.integrations().await?.into_iter()
+    estate
+        .integrations()
+        .await?
+        .into_iter()
         .find(|held| held.key == key && held.node == node && held.repository == repository)
-        .ok_or_else(|| Error::typed(
-            "concord.integration.changed",
-            "no Integration matches the exact key, node and repository; reread integration list",
-        ))
+        .ok_or_else(|| {
+            Error::typed(
+                "concord.integration.changed",
+                "no Integration matches the exact key, node and repository; reread integration list",
+            )
+        })
 }
 
-async fn observe(repository: &Repository, command: &Path, timeout: u64) -> Result<Observed> {
-    let query = "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){id nameWithOwner defaultBranchRef{name}}}";
-    let selector = ".data.repository | if . == null then null else {node: .id, coordinate: .nameWithOwner, branch: (.defaultBranchRef.name // \"\")} end";
-    let mut process = Command::new(command);
-    process
-        .args(["api", "graphql", "-f"])
-        .arg(format!("query={query}"))
-        .args(["-f", &format!("owner={}", repository.owner)])
-        .args(["-f", &format!("name={}", repository.name)])
-        .args(["--jq", selector])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .kill_on_drop(true);
-    let output = match tokio::time::timeout(Duration::from_secs(timeout), process.output()).await {
-        Ok(Ok(output)) => output,
-        Ok(Err(error)) => return Err(fault("command", error.to_string())),
-        Err(_) => return Err(fault("timeout", "GitHub repository observation timed out")),
+async fn observe(repository: &Repository, timeout: u64) -> Result<Observed> {
+    let client = github::client(timeout).map_err(|error| fault("provider", error))?;
+    let found = github::call("repository.show", || {
+        client.repository(&repository.owner, &repository.name)
+    })
+    .map_err(|error| fault("provider", github::describe(error)))?
+    .value;
+    let node = found.node.unwrap_or_default();
+    let observed = Observed {
+        node,
+        coordinate: found.name,
+        branch: found.branch,
     };
-    if !output.status.success() {
-        return Err(fault(
-            "provider",
-            "GitHub repository observation was refused by the provider",
-        ));
-    }
-    if output.stdout.len() > LIMIT {
-        return Err(fault(
-            "malformed",
-            "GitHub repository observation exceeds the reply limit",
-        ));
-    }
-    let observed = serde_json::from_slice::<Option<Observed>>(&output.stdout)
-        .map_err(|_| fault("malformed", "GitHub repository reply is not valid JSON"))?
-        .ok_or_else(|| fault("missing", "GitHub repository is not readable"))?;
     if observed.node.trim().is_empty()
         || observed.coordinate != repository.identity()
         || observed.branch != "main"

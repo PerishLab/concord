@@ -153,7 +153,7 @@ fn identity() {
 fn object() {
     let mut held = World::new("stable", "v1.0.0");
     held.manifest["data"]["repository"]["object"]["oid"] = "".into();
-    world::refused(&held.run(), "concord.acceptance.identity");
+    world::refused(&held.run(), "concord.acceptance.provider");
 }
 
 #[test]
@@ -193,7 +193,7 @@ fn old() {
     }
     let body = marker.render().unwrap();
     held.source.fresh["data"]["closure"]["body"] = body.clone().into();
-    held.source.page["data"]["repository"]["issue"]["comments"]["nodes"][1]["body"] = body.into();
+    held.source.page["data"]["repository"]["issue"]["comments"]["rows"][1]["body"] = body.into();
     let decoded = world::decoded(&held.run());
     let evaluation = &decoded["acceptance"]["evaluation"];
     assert_eq!(evaluation["verdict"], "unmet");

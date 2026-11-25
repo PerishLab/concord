@@ -1,24 +1,22 @@
 use super::{Binding, fault, schema, wire::Client};
+use crate::runtime::github;
 use concord_core::{Coordinate, Result};
+use runseal::github::Target;
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 
 struct Projection {
-    query: &'static str,
+    full: bool,
     connections: &'static [&'static str],
 }
 
-pub(super) async fn snapshot(
-    client: &Client<'_>,
-    binding: &Binding,
-    target: &str,
-) -> Result<Value> {
+pub(super) async fn snapshot(client: &Client, binding: &Binding, target: &str) -> Result<Value> {
     read(
         client,
         binding,
         target,
         Projection {
-            query: QUERY,
+            full: true,
             connections: &[
                 "issueFieldValues",
                 "labels",
@@ -32,13 +30,13 @@ pub(super) async fn snapshot(
     .await
 }
 
-pub(super) async fn observe(client: &Client<'_>, binding: &Binding, target: &str) -> Result<Value> {
+pub(super) async fn observe(client: &Client, binding: &Binding, target: &str) -> Result<Value> {
     read(
         client,
         binding,
         target,
         Projection {
-            query: OBSERVE,
+            full: false,
             connections: &["issueFieldValues"],
         },
     )
@@ -46,7 +44,7 @@ pub(super) async fn observe(client: &Client<'_>, binding: &Binding, target: &str
 }
 
 async fn read(
-    client: &Client<'_>,
+    client: &Client,
     binding: &Binding,
     target: &str,
     projection: Projection,
@@ -59,8 +57,14 @@ async fn read(
         ));
     }
     let schema = schema::read(client, binding).await?;
-    let data = client.query(projection.query, json!({"owner":coordinate.owner,"name":coordinate.repository,"number":coordinate.number})).await?;
-    let issue = &data["repository"]["issue"];
+    let native = client.open()?;
+    let number = u32::try_from(coordinate.number)
+        .map_err(|_| fault("unavailable", "invalid Issue number"))?;
+    let locator = Target::new(&coordinate.owner, &coordinate.repository, number)
+        .map_err(super::wire::provider)?;
+    let issue = github::call("phase.read", || native.phase(&locator, projection.full))
+        .map_err(super::wire::provider)?
+        .value;
     let url = format!(
         "https://github.com/{}/{}/issues/{}",
         coordinate.owner, coordinate.repository, coordinate.number
@@ -90,7 +94,7 @@ async fn read(
             ));
         }
     }
-    value(binding, issue)?;
+    value(binding, &issue)?;
     Ok(json!({"field":schema,"issue":issue}))
 }
 
@@ -144,7 +148,3 @@ fn complete(connection: &Value) -> Result<()> {
     }
     Ok(())
 }
-
-const QUERY: &str = r#"query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){id number url body state updatedAt viewerCanUpdate parent{id} subIssues(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id state}} issueType{id name} repository{id nameWithOwner owner{id}} labels(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id name}} blockedBy(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id state}} blocking(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id state}} comments(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id body updatedAt}} issueFieldValues(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on IssueFieldSingleSelectValue{id optionId name field{... on Node{id}}} ... on IssueFieldTextValue{id value field{... on Node{id}}} ... on IssueFieldNumberValue{id value field{... on Node{id}}} ... on IssueFieldDateValue{id value field{... on Node{id}}} ... on IssueFieldMultiSelectValue{id value field{... on Node{id}}}}}}}}"#;
-
-const OBSERVE: &str = r#"query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){id number url repository{id nameWithOwner owner{id}} issueFieldValues(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on IssueFieldSingleSelectValue{id optionId name field{... on Node{id}}} ... on IssueFieldTextValue{id value field{... on Node{id}}} ... on IssueFieldNumberValue{id value field{... on Node{id}}} ... on IssueFieldDateValue{id value field{... on Node{id}}} ... on IssueFieldMultiSelectValue{id value field{... on Node{id}}}}}}}}"#;

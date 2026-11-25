@@ -4,12 +4,8 @@ use serde_json::json;
 #[test]
 fn early() {
     let temp = tempfile::tempdir().expect("fixture");
-    let seat = Native::governance(temp.path(), "R_kgDOUsHIOQ");
-    std::fs::rename(
-        seat.space.join("provider"),
-        seat.space.join("offline-provider"),
-    )
-    .expect("remove provider access");
+    let mut seat = Native::governance(temp.path(), "R_kgDOUsHIOQ");
+    seat.offline();
     refused(
         &seat.prepare("governance-manual"),
         "concord.delivery.review",

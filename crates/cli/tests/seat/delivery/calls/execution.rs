@@ -1,4 +1,6 @@
+use super::super::spawn::{Reply, Server};
 use super::fixture::Native;
+use super::provider::wire;
 use super::unix::{refused, success};
 use serde_json::{Value, json};
 use std::io::Write;
@@ -48,24 +50,11 @@ fn until(mut ready: impl FnMut() -> bool) {
     }
 }
 
-fn observe(seat: &Native) {
-    let provider = seat.space.join("provider");
-    let script = std::fs::read_to_string(&provider).unwrap();
-    let added = format!(
-        "printf '%s|%s|%s|%s\\n' \"${{LAND_CALLER:-setup}}\" \"$1\" \"$2\" \"$7\" >> '{}/calls'\n",
-        seat.space.display()
-    );
-    plumb::testing::executable(
-        &provider,
-        script.replacen("#!/bin/sh\n", &format!("#!/bin/sh\n{added}"), 1),
-    );
-}
-
 fn polls(space: &Path) -> usize {
     std::fs::read_to_string(space.join("calls"))
         .unwrap_or_default()
         .lines()
-        .filter(|line| *line == "holder|pr|view|statusCheckRollup")
+        .filter(|line| *line == "rollup")
         .count()
 }
 
@@ -76,19 +65,26 @@ fn contenders() {
     seat.tools();
     let prepared = seat.prepare("wharf-native");
     assert!(prepared.status.success());
-    observe(&seat);
     let pending = seat.space.join("checks-rollup");
-    std::fs::write(&pending, json!({"statusCheckRollup":[{"__typename":"CheckRun","name":"Guard","status":"IN_PROGRESS","conclusion":null}]}).to_string()).unwrap();
+    std::fs::write(
+        &pending,
+        json!({"statusCheckRollup":[{"__typename":"CheckRun","name":"Guard","status":"IN_PROGRESS","conclusion":null}]})
+            .to_string(),
+    )
+    .unwrap();
     for name in ["plan-a", "plan-b"] {
         std::fs::write(seat.space.join(name), &prepared.stdout).unwrap();
     }
     let mut command = seat.command("land", "wharf-native");
-    command
-        .args(["--plan", seat.space.join("plan-a").to_str().unwrap()])
-        .env("LAND_CALLER", "holder");
+    command.args(["--plan", seat.space.join("plan-a").to_str().unwrap()]);
     let holder = Run::start(command, None);
     let pid = holder.0.as_ref().unwrap().id();
     until(|| polls(seat.space) >= 2);
+    let log = seat.space.join("calls");
+    let spy = Server::start(move |_| {
+        wire::append(&log, "contender\n");
+        Reply::status(500, json!({"message": "unexpected contender call"}))
+    });
     for path in ["plan-a", "plan-b", "-"] {
         let mut command = seat.command("land", "wharf-native");
         let file = seat.space.join(path);
@@ -101,7 +97,7 @@ fn contenders() {
                     file.to_str().unwrap()
                 },
             ])
-            .env("LAND_CALLER", "contender");
+            .env("CONCORD_GITHUB_LOOPBACK", spy.address());
         let output =
             Run::start(command, (path == "-").then_some(prepared.stdout.as_slice())).output();
         refused(&output, "concord.delivery.running");
@@ -118,7 +114,7 @@ fn contenders() {
     assert!(
         !std::fs::read_to_string(seat.space.join("calls"))
             .unwrap()
-            .contains("contender|")
+            .contains("contender")
     );
     assert!(
         success(seat.space, &["audit"])["agreement"]["faults"]

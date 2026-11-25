@@ -1,54 +1,15 @@
+use crate::runtime::github;
 use concord_core::{Error, Repository, Result};
-use serde::Deserialize;
-use serde_json::{Map, Value};
+use runseal::github::{Number, State, lifecycle::Selection};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 
-const LIMIT: usize = 1024 * 1024;
-
-#[derive(Deserialize)]
-struct Envelope {
-    data: Option<Data>,
-    #[serde(default)]
-    errors: Vec<Value>,
-}
-
-#[derive(Deserialize)]
-struct Data {
-    repository: Option<Map<String, Value>>,
-}
-
-#[derive(Deserialize)]
-struct Connection {
-    nodes: Vec<Pull>,
-    #[serde(rename = "pageInfo")]
-    page: Page,
-}
-
-#[derive(Deserialize)]
-struct Page {
-    #[serde(rename = "hasNextPage")]
-    more: bool,
-}
-
-#[derive(Deserialize)]
 pub struct Pull {
     state: String,
-    #[serde(rename = "headRefName")]
     branch: String,
-    #[serde(rename = "headRefOid")]
     head: String,
-    #[serde(rename = "headRepository")]
-    origin: Option<Named>,
-    #[serde(rename = "baseRepository")]
-    target: Named,
+    origin: Option<String>,
+    target: String,
     body: String,
-}
-
-#[derive(Deserialize)]
-struct Named {
-    #[serde(rename = "nameWithOwner")]
-    name: String,
 }
 
 #[derive(PartialEq, Eq)]
@@ -74,8 +35,8 @@ impl Pull {
             state: &self.state,
             branch: &self.branch,
             head: &self.head,
-            origin: self.origin.as_ref().map(|origin| origin.name.as_str()),
-            target: &self.target.name,
+            origin: self.origin.as_deref(),
+            target: &self.target,
         };
         let reference = self
             .body
@@ -93,56 +54,41 @@ impl Pull {
 pub async fn observe(
     repository: &Repository,
     branches: &BTreeSet<String>,
-    command: &Path,
     timeout: u64,
 ) -> Result<BTreeMap<String, Vec<Pull>>> {
     if branches.is_empty() {
         return Ok(BTreeMap::new());
     }
-    let fields = branches.iter().enumerate().map(|(index, branch)| {
-        let head = serde_json::to_string(branch).expect("encode branch string");
-        format!("p{index}:pullRequests(first:2,headRefName:{head},states:OPEN){{nodes{{state headRefName headRefOid headRepository{{nameWithOwner}} baseRepository{{nameWithOwner}} body}} pageInfo{{hasNextPage}}}}")
-    }).collect::<String>();
-    let query = format!(
-        "query Projections($owner:String!,$name:String!){{repository(owner:$owner,name:$name){{{fields}}}}}"
-    );
-    let output = super::transport::Request::new(command, timeout, LIMIT)
-        .args(["api", "graphql", "-f"])
-        .arg(format!("query={query}"))
-        .args(["-f", &format!("owner={}", repository.owner)])
-        .args(["-f", &format!("name={}", repository.name)])
-        .run()
-        .await
-        .map_err(|error| provider(error.to_string()))?;
-    decode(&output.stdout, branches)
-}
-
-fn decode(body: &[u8], branches: &BTreeSet<String>) -> Result<BTreeMap<String, Vec<Pull>>> {
-    let envelope: Envelope = serde_json::from_slice(body)
-        .map_err(|error| provider(format!("projection query did not answer JSON: {error}")))?;
-    if !envelope.errors.is_empty() {
-        return Err(provider("projection query was refused"));
-    }
-    let repository = envelope
-        .data
-        .and_then(|data| data.repository)
-        .ok_or_else(|| provider("projection query read no repository"))?;
+    let client = github::client(timeout).map_err(provider)?;
+    let window = Number::new(1, 3).map_err(|error| provider(github::describe(error)))?;
+    let name = format!("{}/{}", repository.owner, repository.name);
     let mut observed = BTreeMap::new();
-    for (index, branch) in branches.iter().enumerate() {
-        let value = repository
-            .get(&format!("p{index}"))
-            .ok_or_else(|| provider(format!("projection query omitted {branch}")))?;
-        let connection: Connection = serde_json::from_value(value.clone()).map_err(|error| {
-            provider(format!(
-                "projection query returned malformed {branch}: {error}"
-            ))
-        })?;
-        if connection.page.more || connection.nodes.len() > 2 {
+    for branch in branches {
+        let selection = Selection::new(branch, None, State::Open, window)
+            .map_err(|error| provider(github::describe(error)))?;
+        let slice = github::call("pull.listing", || {
+            client.listing(&repository.owner, &repository.name, &selection)
+        })
+        .map_err(|error| provider(github::describe(error)))?
+        .value;
+        if slice.next.is_some() || slice.rows.len() > 2 {
             return Err(provider(format!(
                 "projection query for {branch} exceeds its bound"
             )));
         }
-        observed.insert(branch.clone(), connection.nodes);
+        let pulls = slice
+            .rows
+            .into_iter()
+            .map(|pull| Pull {
+                state: pull.state.to_ascii_uppercase(),
+                branch: pull.head.branch,
+                head: pull.head.sha,
+                origin: Some(name.clone()),
+                target: name.clone(),
+                body: pull.body.unwrap_or_default(),
+            })
+            .collect();
+        observed.insert(branch.clone(), pulls);
     }
     Ok(observed)
 }

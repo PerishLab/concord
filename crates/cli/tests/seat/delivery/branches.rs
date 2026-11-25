@@ -1,5 +1,5 @@
 use super::super::super::execution::unix::git;
-use super::super::provider::{consume, projection, tool};
+use super::super::provider::consume;
 use super::super::unix::{prepare, refused};
 use super::Seat;
 use serde_json::{Value, json};
@@ -9,7 +9,6 @@ fn branches() {
     let fixture = tempfile::tempdir().expect("fixture");
     let seat = Seat::open(fixture.path());
     let space = seat.space;
-    let provider = seat.provider.as_str();
     seat.change();
     let remote = space.join("remote.git");
     for branch in [
@@ -34,11 +33,7 @@ fn branches() {
         "i9": issue("OPEN", "Task"),
     }}, "errors": [{"type": "NOT_FOUND", "path": ["repository", "i8"], "message": "missing"}]});
     std::fs::write(space.join("branch-issues"), issues.to_string()).expect("issues");
-    std::fs::write(
-        space.join("branch-projections"),
-        projections(json!([]), false).to_string(),
-    )
-    .unwrap();
+    std::fs::write(space.join("branch-projections"), json!([]).to_string()).unwrap();
     let output = run(&seat, false);
     refused(&output, "concord.delivery.branches");
     let error: Value = serde_json::from_slice(&output.stderr).expect("refusal JSON");
@@ -68,20 +63,18 @@ fn branches() {
         git(&remote, &["branch", "-D", branch]);
     }
     git(&seat.source, &["branch", "-D", "topic"]);
-    let open = json!({"data": {"repository": {
-        "i7": issue("OPEN", "Feature"),
-    }}});
+    let open = json!({"data": {"repository": {"i7": issue("OPEN", "Feature")}}});
     std::fs::write(space.join("branch-issues"), open.to_string()).expect("issues");
     let plan = run(&seat, true);
     ok(&plan);
     let before = seat.revision();
     git(&seat.source, &["branch", "topic"]);
-    let output = consume(space, provider, &plan.stdout);
+    let output = consume(space, Some(&seat.server), &plan.stdout);
     refused(&output, "concord.delivery.branches");
     assert!(!space.join("pull-state").exists());
     assert_eq!(seat.revision(), before);
     git(&seat.source, &["branch", "-D", "topic"]);
-    ok(&consume(space, provider, &plan.stdout));
+    ok(&consume(space, Some(&seat.server), &plan.stdout));
 }
 
 fn issue(state: &str, kind: &str) -> Value {
@@ -107,13 +100,9 @@ fn sections() {
                 true,
             ),
         ] {
-            let encoded = serde_json::to_string(&body).unwrap();
-            let script = projection(seat.space).replace("Task", kind).replace(
-                "## Outcome\\nPipe exact plan",
-                &encoded[1..encoded.len() - 1],
-            );
-            let provider = tool(seat.space, "outcome-provider", script);
-            let structured = invoke(&seat, &provider, true);
+            std::fs::write(seat.space.join("issue-kind"), kind).expect("kind");
+            std::fs::write(seat.space.join("issue-body"), &body).expect("body");
+            let structured = invoke(&seat, true);
             assert!(!structured.status.success());
             let error: Value = serde_json::from_slice(&structured.stderr).expect("error JSON");
             if valid {
@@ -133,7 +122,7 @@ fn sections() {
             assert!(message.contains(&format!("type {kind}")));
             assert!(message.contains(&format!("`## {heading}`")));
             assert!(message.contains(&format!("`### {heading}`")));
-            let human = invoke(&seat, &provider, false);
+            let human = invoke(&seat, false);
             assert!(!human.status.success());
             assert!(String::from_utf8_lossy(&human.stderr).contains(message));
         }
@@ -145,13 +134,11 @@ fn sections() {
         ("Bug", "Expected outcome"),
     ] {
         let form = format!(
-            "### Problem\\nCtx\\n### Evidence\\nLog\\n### {heading}\\nPipe {kind} H3\\n### Scope\\nParser\\n### Acceptance\\n- [x] Done\\n### Non-goals\\nNone"
+            "### Problem\nCtx\n### Evidence\nLog\n### {heading}\nPipe {kind} H3\n### Scope\nParser\n### Acceptance\n- [x] Done\n### Non-goals\nNone"
         );
-        let script = projection(seat.space)
-            .replace("Task", kind)
-            .replace("## Outcome\\nPipe exact plan", &form);
-        let provider = tool(seat.space, "form-provider", script);
-        let prepared = invoke(&seat, &provider, true);
+        std::fs::write(seat.space.join("issue-kind"), kind).expect("kind");
+        std::fs::write(seat.space.join("issue-body"), form).expect("body");
+        let prepared = invoke(&seat, true);
         ok(&prepared);
         let plan: Value = serde_json::from_slice(&prepared.stdout).expect("plan JSON");
         let body = plan["plan"]["delivery"]["pull"]["body"].as_str().unwrap();
@@ -159,8 +146,9 @@ fn sections() {
     }
 }
 
-fn invoke(seat: &Seat<'_>, provider: &std::path::Path, json: bool) -> std::process::Output {
+fn invoke(seat: &Seat<'_>, json: bool) -> std::process::Output {
     let mut command = super::super::super::spawn::concord(seat.space);
+    seat.server.attach(&mut command);
     command.args(["--home", seat.space.to_str().unwrap()]);
     if json {
         command.arg("--json");
@@ -173,16 +161,35 @@ fn invoke(seat: &Seat<'_>, provider: &std::path::Path, json: bool) -> std::proce
             "PerishLab/probe#1",
             "--revision",
             &seat.revision(),
-            "--github-command",
-            provider.to_str().unwrap(),
         ])
         .output()
         .expect("prepare")
 }
 
-fn projections(nodes: Value, more: bool) -> Value {
-    let connection = json!({"nodes": nodes, "pageInfo": {"hasNextPage": more}});
-    json!({"data": {"repository": {"p0": connection}}})
+fn pull(branch: &str, head: &str, number: u64) -> Value {
+    let origin = json!({"id": 1, "node_id": "R_probe", "full_name": "PerishLab/probe"});
+    json!({
+        "id": 100 + number, "number": number, "node_id": format!("PR_{number}"),
+        "html_url": format!("https://github.com/PerishLab/probe/pull/{number}"),
+        "title": "Retained delivery", "body": "Refs PerishLab/probe#9\n\nRetained delivery.",
+        "state": "open", "draft": false, "merged": false,
+        "merge_commit_sha": null, "merged_at": null, "updated_at": "2026-09-29T00:00:03Z",
+        "head": {"ref": branch, "sha": head, "repo": origin.clone()},
+        "base": {"ref": "main", "sha": head, "repo": origin},
+    })
+}
+
+fn mutate(base: &Value, field: &str) -> Value {
+    let mut wrong = base.clone();
+    match field {
+        "sha" => wrong["head"]["sha"] = json!("0".repeat(40)),
+        "body" => wrong["body"] = json!("mismatch"),
+        "state" => wrong["state"] = json!("closed"),
+        "branch" => wrong["head"]["ref"] = json!("mismatch"),
+        "head" => wrong["head"]["repo"]["full_name"] = json!("PerishLab/other"),
+        _ => wrong["base"]["repo"]["full_name"] = json!("PerishLab/other"),
+    }
+    wrong
 }
 
 #[test]
@@ -196,68 +203,50 @@ fn foreign() {
     let retained = head(&remote, branch);
     let issues = json!({"data":{"repository":{"i9":issue("OPEN", "Feature")}}});
     std::fs::write(seat.space.join("branch-issues"), issues.to_string()).unwrap();
-    let pull = json!({
-        "state":"OPEN", "headRefName":branch, "headRefOid":retained,
-        "headRepository":{"nameWithOwner":"PerishLab/probe"},
-        "baseRepository":{"nameWithOwner":"PerishLab/probe"},
-        "body":"Refs PerishLab/probe#9\n\nRetained delivery."
-    });
+    let first = pull(branch, &retained, 11);
     let path = seat.space.join("branch-projections");
-    std::fs::write(&path, projections(json!([pull.clone()]), false).to_string()).unwrap();
+    std::fs::write(&path, json!([first.clone()]).to_string()).unwrap();
     for value in [issue("CLOSED", "Feature"), issue("OPEN", "Bug")] {
-        let snapshot = states(value);
-        std::fs::write(seat.space.join("branch-issues"), snapshot.to_string()).unwrap();
+        std::fs::write(seat.space.join("branch-issues"), states(value).to_string()).unwrap();
         refused(&run(&seat, false), "concord.delivery.branches");
     }
     std::fs::write(seat.space.join("branch-issues"), issues.to_string()).unwrap();
     git(&seat.source, &["branch", branch, "main"]);
     refused(&run(&seat, false), "concord.delivery.branches");
     git(&seat.source, &["branch", "-D", branch]);
-    for field in [
-        "state",
-        "headRefName",
-        "headRefOid",
-        "headRepository",
-        "baseRepository",
-        "body",
+    for (field, code) in [
+        ("sha", "concord.delivery.branches"),
+        ("body", "concord.delivery.branches"),
+        ("state", "concord.delivery.provider"),
+        ("branch", "concord.delivery.provider"),
+        ("head", "concord.delivery.provider"),
+        ("base", "concord.delivery.provider"),
     ] {
-        let mut wrong = pull.clone();
-        wrong[field] = if field.ends_with("Repository") {
-            json!({"nameWithOwner":"PerishLab/other"})
-        } else {
-            json!("mismatch")
-        };
-        std::fs::write(&path, projections(json!([wrong]), false).to_string()).unwrap();
+        let wrong = mutate(&first, field);
+        std::fs::write(&path, json!([wrong]).to_string()).unwrap();
         let output = run(&seat, false);
-        assert!(
-            !output.status.success(),
-            "accepted mismatch {field}: {}",
-            String::from_utf8_lossy(&output.stdout)
-        );
-        refused(&output, "concord.delivery.branches");
+        assert!(!output.status.success(), "accepted mismatch {field}");
+        refused(&output, code);
     }
     for response in [
-        projections(json!([pull.clone()]), true),
-        json!({"data":{"repository":{}}}),
-        json!({"errors":[{"message":"refused"}]}),
+        json!({"next": true, "body": [first.clone()]}),
+        json!({"body": {}}),
+        json!({"status": 500, "body": {"message": "refused"}}),
     ] {
         std::fs::write(&path, response.to_string()).unwrap();
         refused(&run(&seat, false), "concord.delivery.provider");
     }
-    std::fs::write(
-        &path,
-        projections(json!([pull.clone(), pull.clone()]), false).to_string(),
-    )
-    .unwrap();
+    let second = pull(branch, &retained, 12);
+    std::fs::write(&path, json!([first.clone(), second]).to_string()).unwrap();
     refused(&run(&seat, false), "concord.delivery.branches");
-    std::fs::write(&path, projections(json!([pull]), false).to_string()).unwrap();
+    std::fs::write(&path, json!([first]).to_string()).unwrap();
     let prepared = run(&seat, false);
     ok(&prepared);
     let plan = serde_json::from_slice::<Value>(&prepared.stdout).unwrap();
     assert!(plan.get("plan").is_some());
     let before = seat.revision();
-    std::fs::write(&path, projections(json!([]), false).to_string()).unwrap();
-    let rejected = consume(seat.space, &seat.provider, &prepared.stdout);
+    std::fs::write(&path, json!([]).to_string()).unwrap();
+    let rejected = consume(seat.space, Some(&seat.server), &prepared.stdout);
     refused(&rejected, "concord.delivery.branches");
     assert_eq!(seat.revision(), before);
     assert!(!seat.space.join("pull-state").exists());
@@ -265,7 +254,7 @@ fn foreign() {
 }
 
 fn run(seat: &Seat<'_>, handoff: bool) -> std::process::Output {
-    prepare(seat.space, &seat.provider, &seat.revision(), handoff)
+    prepare(seat.space, &seat.server, &seat.revision(), handoff)
         .output()
         .expect("prepare")
 }

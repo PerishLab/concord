@@ -57,7 +57,6 @@ fn retired() {
                 "plumb land",
                 "concord issue delivery prepare PerishLab/concord#218",
                 "concord issue delivery land PerishLab/concord#218",
-                "--github-command",
                 "--revision",
             ] {
                 assert!(message.contains(expected), "{message}");

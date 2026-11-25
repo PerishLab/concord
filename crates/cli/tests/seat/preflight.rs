@@ -1,23 +1,31 @@
 #[cfg(unix)]
 mod unix {
-    use super::super::spawn;
+    use super::super::execution::unix::{Facts, ticket};
+    use super::super::spawn::{self, Reply, Server};
     use serde_json::{Value, json};
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
     #[test]
     fn preflight() {
         let fixture = tempfile::tempdir().expect("fixture");
-        success(fixture.path(), &["issue", "bootstrap"]);
-        let observed = tool(fixture.path(), "candidate", observation("I_candidate", 62));
+        success(fixture.path(), None, &["issue", "bootstrap"]);
+        let observed = Server::start(|_| {
+            Reply::json(ticket(
+                &Facts {
+                    node: "I_candidate",
+                    stable: "R_concord",
+                    coordinate: "PerishLab/concord",
+                    number: 62,
+                },
+                "OPEN",
+                "Feature",
+                "2026-09-28T00:00:00Z",
+            ))
+        });
         success(
             fixture.path(),
-            &[
-                "issue",
-                "attach",
-                "PerishLab/concord#62",
-                "--github-command",
-                observed.to_str().expect("candidate path"),
-            ],
+            Some(&observed),
+            &["issue", "attach", "PerishLab/concord#62"],
         );
         let activity = spawn::concord(fixture.path())
             .args([
@@ -32,8 +40,8 @@ mod unix {
             .output()
             .expect("record activity");
         assert!(activity.status.success());
-        let command = tool(fixture.path(), "preflight", search(false));
-        let report = run(fixture.path(), &command, "Preflight Issue collisions");
+        let server = Server::start(|_| Reply::json(search(false)));
+        let report = run(fixture.path(), Some(&server), "Preflight Issue collisions");
         assert_eq!(report["preflight"]["schema"], "concord.issue-preflight/v2");
         assert_eq!(report["preflight"]["complete"], true);
         assert_eq!(report["preflight"]["candidates"][0]["issue"]["number"], 62);
@@ -54,27 +62,36 @@ mod unix {
                 .any(|signal| signal == "outcome-terms")
         );
         stale(fixture.path());
-        let stale = run(fixture.path(), &command, "Preflight Issue collisions");
+        let stale = run(fixture.path(), Some(&server), "Preflight Issue collisions");
         assert_eq!(
             stale["preflight"]["candidates"][0]["execution"]["activity"]["observations"][0]["fresh"],
             false
         );
-        let empty = tool(fixture.path(), "empty", empty());
+        let empty = Server::start(|_| Reply::json(reply(false, Vec::new())));
         assert!(
-            run(fixture.path(), &empty, "Unrelated proposal")["preflight"]["candidates"]
+            run(fixture.path(), Some(&empty), "Unrelated proposal")["preflight"]["candidates"]
                 .as_array()
                 .expect("candidates")
                 .is_empty()
         );
-        let truncated = tool(fixture.path(), "truncated", search(true));
-        let truncated = invoke(fixture.path(), &truncated, "Preflight Issue collisions", 1);
+        let truncated = Server::start(|_| Reply::json(search(true)));
+        let truncated = invoke(
+            fixture.path(),
+            Some(&truncated),
+            "Preflight Issue collisions",
+            1,
+        );
         assert_eq!(truncated["preflight"]["complete"], false);
         assert_eq!(
             truncated["preflight"]["diagnostics"][0]["code"],
             "truncated"
         );
-        let unavailable = tool(fixture.path(), "unavailable", "exit 1".to_string());
-        let unavailable = run(fixture.path(), &unavailable, "Preflight Issue collisions");
+        let unavailable = Server::start(|_| Reply::status(500, json!({"message": "down"})));
+        let unavailable = run(
+            fixture.path(),
+            Some(&unavailable),
+            "Preflight Issue collisions",
+        );
         assert_eq!(unavailable["preflight"]["complete"], false);
         assert_eq!(
             unavailable["preflight"]["diagnostics"][0]["code"],
@@ -85,39 +102,31 @@ mod unix {
     #[test]
     fn refusal() {
         let fixture = tempfile::tempdir().expect("fixture");
-        success(fixture.path(), &["issue", "bootstrap"]);
-        let program = tool(fixture.path(), "gh", empty());
-        let joined = PathBuf::from(format!("{} issue create", program.display()));
-        let report = run(fixture.path(), &joined, "Preflight Issue collisions");
-        let diagnostic = &report["preflight"]["diagnostics"][0];
-        assert_eq!(report["preflight"]["complete"], false);
-        assert_eq!(diagnostic["code"], "command");
-        let message = diagnostic["message"].as_str().expect("message");
-        assert!(message.contains("--github-command"), "{message}");
-        assert!(message.contains(&joined.display().to_string()), "{message}");
-        assert!(
-            message.contains("Concord supplies every argument"),
-            "{message}"
-        );
-        let refused = tool(fixture.path(), "refused", "exit 1".to_string());
-        let refused = run(fixture.path(), &refused, "Preflight Issue collisions");
+        success(fixture.path(), None, &["issue", "bootstrap"]);
+        let server = Server::start(|_| Reply::status(500, json!({"message": "unavailable"})));
+        let refused = run(fixture.path(), Some(&server), "Preflight Issue collisions");
+        assert_eq!(refused["preflight"]["complete"], false);
         assert_eq!(refused["preflight"]["diagnostics"][0]["code"], "provider");
+        let missing = run(fixture.path(), None, "Preflight Issue collisions");
+        assert_eq!(missing["preflight"]["complete"], false);
+        assert_eq!(missing["preflight"]["diagnostics"][0]["code"], "provider");
         let help = spawn::concord(fixture.path())
             .args(["issue", "preflight", "proposed", "--help"])
             .output()
             .expect("help");
+        assert!(help.status.success());
         let help = String::from_utf8_lossy(&help.stdout);
-        assert!(help.contains("--github-command <PROGRAM>"), "{help}");
-        assert!(help.contains("Concord supplies every argument"), "{help}");
+        assert!(!help.contains("--github-command"), "{help}");
     }
 
-    fn run(space: &Path, command: &Path, title: &str) -> Value {
-        invoke(space, command, title, 4)
+    fn run(space: &Path, server: Option<&Server>, title: &str) -> Value {
+        invoke(space, server, title, 4)
     }
 
-    fn invoke(space: &Path, command: &Path, title: &str, pages: u16) -> Value {
+    fn invoke(space: &Path, server: Option<&Server>, title: &str, pages: u16) -> Value {
         success(
             space,
+            server,
             &[
                 "issue",
                 "preflight",
@@ -129,8 +138,6 @@ mod unix {
                 title,
                 "--outcome",
                 "Warn before duplicate execution",
-                "--github-command",
-                command.to_str().expect("provider path"),
                 "--max-pages",
                 &pages.to_string(),
             ],
@@ -146,58 +153,41 @@ mod unix {
             .expect("write activity");
     }
 
-    fn observation(node: &str, number: i64) -> String {
-        let value = json!({
-            "node": node, "stable": "R_concord", "number": number,
-            "url": format!("https://github.com/PerishLab/concord/issues/{number}"),
-            "state": "OPEN", "kind": "Feature", "updated_at": "2026-09-28T00:00:00Z",
-        });
-        format!("printf '%s\\n' '{}'", value)
-    }
-
-    fn search(more: bool) -> String {
+    fn search(more: bool) -> Value {
         let issue = json!({
             "id": "I_candidate", "number": 62,
             "url": "https://github.com/PerishLab/concord/issues/62",
             "title": "Preflight Issue collisions",
             "body": "## Outcome\nWarn before duplicate execution", "state": "OPEN",
-            "updatedAt": "2026-09-28T00:00:00Z", "issueType": {"name": "Feature"},
-            "repository": {"nameWithOwner": "PerishLab/concord"},
+            "updated": "2026-09-28T00:00:00Z", "kind": {"name": "Feature"},
+            "repository": {"name": "PerishLab/concord"},
         });
         let related = json!({
             "id": "I_related", "number": 66,
             "url": "https://github.com/PerishLab/concord/issues/66",
             "title": "Join GitHub candidates to active work",
             "body": "## Outcome\nReport duplicate execution before allocation", "state": "OPEN",
-            "updatedAt": "2026-09-28T00:00:00Z", "issueType": {"name": "Task"},
-            "repository": {"nameWithOwner": "PerishLab/concord"},
+            "updated": "2026-09-28T00:00:00Z", "kind": {"name": "Task"},
+            "repository": {"name": "PerishLab/concord"},
         });
         reply(more, vec![issue, related])
     }
 
-    fn empty() -> String {
-        reply(false, Vec::new())
+    fn reply(more: bool, rows: Vec<Value>) -> Value {
+        let page = json!({"more": more, "cursor": more.then_some("next")});
+        let search = json!({"total": rows.len(), "page": page, "rows": rows});
+        json!({"data": {"search": search}})
     }
 
-    fn reply(more: bool, nodes: Vec<Value>) -> String {
-        let page = json!({"hasNextPage": more, "endCursor": more.then_some("next")});
-        let search = json!({"issueCount": nodes.len(), "pageInfo": page, "nodes": nodes});
-        let value = json!({"data": {"search": search}});
-        format!("printf '%s\\n' '{}'", value)
-    }
-
-    fn tool(root: &Path, name: &str, body: String) -> PathBuf {
-        let path = root.join(name);
-        plumb::testing::executable(&path, format!("#!/bin/sh\n{body}\n"));
-        path
-    }
-
-    fn success(space: &Path, arguments: &[&str]) -> Value {
-        let output = spawn::concord(space)
+    fn success(space: &Path, server: Option<&Server>, arguments: &[&str]) -> Value {
+        let mut command = spawn::concord(space);
+        command
             .args(["--home", space.to_str().expect("root path"), "--json"])
-            .args(arguments)
-            .output()
-            .expect("run Concord");
+            .args(arguments);
+        if let Some(server) = server {
+            server.attach(&mut command);
+        }
+        let output = command.output().expect("run Concord");
         assert!(
             output.status.success(),
             "{}",

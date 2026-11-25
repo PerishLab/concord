@@ -1,29 +1,15 @@
 use crate::args::close::Observe;
 use crate::dispatch::forge::close::model::{Issue, Reason, State};
+use crate::runtime::github;
 use concord_core::{Coordinate, Error, Result};
-use serde::Deserialize;
 use serde_json::{Value, json};
 
-const QUERY: &str = "query ConcordIssueClose($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){id nameWithOwner issue(number:$number){id number url body state reason:stateReason updated:updatedAt writable:viewerCanUpdate kind:issueType{name}}}}";
-const MUTATION: &str = "mutation ConcordIssueClose($id:ID!){closeIssue(input:{issueId:$id,stateReason:COMPLETED}){issue{id state reason:stateReason repository{id}}}}";
-
-#[derive(Deserialize)]
-struct Envelope<T> {
-    data: Option<T>,
-    errors: Option<Value>,
-}
-#[derive(Deserialize)]
-struct Data {
-    repository: Repository,
-}
-#[derive(Deserialize)]
 struct Repository {
     id: String,
-    #[serde(rename = "nameWithOwner")]
     name: String,
     issue: Wire,
 }
-#[derive(Deserialize)]
+
 struct Wire {
     id: String,
     number: i64,
@@ -33,11 +19,7 @@ struct Wire {
     reason: Value,
     updated: String,
     writable: bool,
-    kind: Option<Named>,
-}
-#[derive(Deserialize)]
-struct Named {
-    name: String,
+    kind: Option<String>,
 }
 
 #[derive(Eq, PartialEq)]
@@ -50,13 +32,7 @@ pub(in crate::dispatch::forge) async fn read(
     args: &Observe,
     coordinate: &Coordinate,
 ) -> Result<Observed> {
-    let data: Data = exchange(
-        args,
-        QUERY,
-        json!({"owner":coordinate.owner,"name":coordinate.repository,"number":coordinate.number}),
-    )
-    .await?;
-    let repository = data.repository;
+    let repository = native(coordinate, args.timeout)?;
     let raw = repository.issue;
     let url = format!(
         "https://github.com/{}/{}/issues/{}",
@@ -103,7 +79,7 @@ pub(in crate::dispatch::forge) async fn read(
             node: raw.id,
             repository: repository.id,
             url: raw.url,
-            kind: raw.kind.map(|kind| kind.name).unwrap_or_default(),
+            kind: raw.kind.unwrap_or_default(),
             state,
             reason,
             review: concord_core::acceptance::digest(&raw.body),
@@ -114,11 +90,42 @@ pub(in crate::dispatch::forge) async fn read(
     })
 }
 
+fn native(coordinate: &Coordinate, timeout: u64) -> Result<Repository> {
+    let number =
+        u32::try_from(coordinate.number).map_err(|_| fault("identity", "invalid Issue number"))?;
+    let target = runseal::github::Target::new(&coordinate.owner, &coordinate.repository, number)
+        .map_err(provider)?;
+    let client = github::client(timeout).map_err(|error| fault("provider", error))?;
+    let raw = github::call("issue.show", || client.issue(&target))
+        .map_err(provider)?
+        .value;
+    let writable = raw
+        .writable
+        .ok_or_else(|| fault("identity", "Issue write capability is unavailable"))?;
+    Ok(Repository {
+        id: raw.repository.id,
+        name: format!("{}/{}", coordinate.owner, coordinate.repository),
+        issue: Wire {
+            id: raw.id,
+            number: raw.number.into(),
+            url: raw.url,
+            body: raw.body,
+            state: raw.state,
+            reason: json!(raw.reason),
+            updated: raw.updated,
+            writable,
+            kind: raw.kind.map(|runseal::github::Label { name }| name),
+        },
+    })
+}
+
 pub(in crate::dispatch::forge) async fn close(args: &Observe, issue: &Issue) -> Result<()> {
-    let data: Value = exchange(args, MUTATION, json!({"id":issue.node})).await?;
-    let closed = &data["closeIssue"]["issue"];
-    let identity = closed["id"] == issue.node && closed["repository"]["id"] == issue.repository;
-    let lifecycle = closed["state"] == "CLOSED" && closed["reason"] == "COMPLETED";
+    let client = github::client(args.timeout).map_err(|error| fault("provider", error))?;
+    let closed = github::call("issue.close", || client.close(&issue.node))
+        .map_err(provider)?
+        .value;
+    let identity = closed.id == issue.node && closed.repository.id == issue.repository;
+    let lifecycle = closed.state == "CLOSED" && closed.reason == "COMPLETED";
     if !identity || !lifecycle {
         return Err(fault(
             "reply",
@@ -128,37 +135,10 @@ pub(in crate::dispatch::forge) async fn close(args: &Observe, issue: &Issue) -> 
     Ok(())
 }
 
-async fn exchange<T: serde::de::DeserializeOwned>(
-    args: &Observe,
-    query: &str,
-    variables: Value,
-) -> Result<T> {
-    let input = serde_json::to_vec(&json!({"query":query,"variables":variables}))
-        .expect("fixed closure request");
-    let reply = super::transport::Request::new(&args.command, args.timeout, 1024 * 1024)
-        .args(["api", "graphql", "--input", "-"])
-        .input(&input)
-        .run()
-        .await
-        .map_err(|_| {
-            fault(
-                "provider",
-                "GitHub exchange did not yield a complete closure response",
-            )
-        })?;
-    let envelope: Envelope<T> = serde_json::from_slice(&reply.stdout)
-        .map_err(|error| fault("schema", format!("invalid closure response: {error}")))?;
-    if envelope.errors.is_some() {
-        return Err(fault(
-            "provider",
-            "GitHub returned errors; partial data is unknown",
-        ));
-    }
-    envelope
-        .data
-        .ok_or_else(|| fault("provider", "GitHub closure response omitted current facts"))
-}
-
 fn fault(kind: &str, message: impl Into<String>) -> Error {
     Error::typed(format!("concord.issue.close.{kind}"), message)
+}
+
+fn provider(error: runseal::github::Error) -> Error {
+    fault("provider", github::describe(error))
 }

@@ -1,55 +1,38 @@
 pub(super) mod survey;
 
 use super::{
-    fault, inspect, issue, query,
+    fault, inspect, issue,
     target::Target,
     wire::{self, Client},
 };
 use crate::args::project::Observe;
 use concord_core::Result;
+use runseal::github::board::{Detail, Section};
 use serde_json::{Value, json};
 
 pub(super) async fn run(args: Observe, output: bool) -> Result<()> {
     let Observe {
         project,
-        command,
         size,
         pages,
         timeout,
     } = args;
     let target = Target::parse(&project)?;
-    let client = Client {
-        command: &command,
-        timeout,
-    };
+    let client = Client::new(timeout);
     let started = super::now();
-    let query = "query($owner:String!,$number:Int!){organization(login:$owner){projectV2(number:$number){$META}}}".replace("$META", query::META);
-    let data = client
-        .read(
-            &query,
-            json!({"owner": target.owner, "number": target.number}),
-        )
-        .await?;
-    let project = &data["organization"]["projectV2"];
-    if project.is_null() {
-        return Err(fault(
-            "unavailable",
-            "Project is missing or inaccessible; this proves no absence",
-        ));
-    }
-    target.verify(project)?;
+    let project = &client.project(&target).await?;
     let mut collections = serde_json::Map::new();
     let mut diagnostics = Vec::new();
-    for name in [
-        "fields",
-        "items",
-        "views",
-        "workflows",
-        "repositories",
-        "statusUpdates",
+    for (name, section) in [
+        ("fields", Section::Fields),
+        ("items", Section::Items(Detail::Observe)),
+        ("views", Section::Views),
+        ("workflows", Section::Workflows),
+        ("repositories", Section::Repositories),
+        ("statusUpdates", Section::Updates),
     ] {
         let bound = if name == "items" { size.min(20) } else { size };
-        let mut collection = wire::gather(&client, project, name, (bound, pages)).await?;
+        let mut collection = wire::collect(&client, project, section, (bound, pages)).await?;
         match name {
             "fields" => inspect::fields(&mut collection.nodes, project)?,
             "items" => inspect::items(&mut collection.nodes, project)?,
@@ -64,15 +47,9 @@ pub(super) async fn run(args: Observe, output: bool) -> Result<()> {
     let mut collections = Value::Object(collections);
     issue::observe(&client, &mut collections, pages).await?;
     let finality = client
-        .read(
-            &format!(
-                "query($id:ID!){{node(id:$id){{... on ProjectV2{{{}}}}}}}",
-                query::META
-            ),
-            json!({"id": project["id"]}),
-        )
+        .metadata(project["id"].as_str().expect("qualified Project"))
         .await?;
-    if finality["node"] != *project {
+    if finality != *project {
         return Err(fault(
             "changed",
             "Project metadata changed or became inaccessible before observation completed",

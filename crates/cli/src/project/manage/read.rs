@@ -1,15 +1,16 @@
 use super::super::{
-    fault, inspect, query,
+    fault, inspect,
     target::Target,
-    wire::{self, Client, Spec},
+    wire::{self, Client},
 };
 use super::model::{Action, Intent};
-use super::rest;
+use crate::runtime::github;
 use concord_core::Result;
+use runseal::github::board::{Detail, Section};
 use serde_json::{Value, json};
 
 pub(super) async fn state(
-    client: &Client<'_>,
+    client: &Client,
     target: &str,
     intent: &Intent,
     pages: u16,
@@ -25,42 +26,34 @@ pub(super) async fn state(
     }
     unreachable!("finite projection acquisition")
 }
-pub(super) async fn inventory(client: &Client<'_>, owner: &str, pages: u16) -> Result<Value> {
+
+pub(super) async fn inventory(client: &Client, owner: &str, pages: u16) -> Result<Value> {
     Reader { client, pages }.owner(owner).await
 }
-struct Reader<'a, 'b> {
-    client: &'a Client<'b>,
+
+struct Reader<'a> {
+    client: &'a Client,
     pages: u16,
 }
-impl Reader<'_, '_> {
+
+impl Reader<'_> {
     async fn state(&self, target: &str, intent: &Intent) -> Result<Value> {
         let target = match intent.action {
             Action::Create { .. } => return self.owner(target).await,
             _ => Target::parse(target)?,
         };
-        let query = "query($owner:String!,$number:Int!){organization(login:$owner){projectV2(number:$number){$META}}}".replace("$META", query::META);
-        let data = self
-            .client
-            .read(&query, json!({"owner":target.owner,"number":target.number}))
-            .await?;
-        let project = &data["organization"]["projectV2"];
-        target.verify(project)?;
+        let project = &self.client.project(&target).await?;
         let mut state = json!({"project":project});
-        for name in [
-            "fields",
-            "items",
-            "views",
-            "workflows",
-            "repositories",
-            "statusUpdates",
+        for (name, section) in [
+            ("fields", Section::Fields),
+            ("items", Section::Items(detail(intent))),
+            ("views", Section::Views),
+            ("workflows", Section::Workflows),
+            ("repositories", Section::Repositories),
+            ("statusUpdates", Section::Updates),
         ] {
-            let spec = Spec {
-                name,
-                query: connection(name, intent),
-                size: 100,
-                pages: self.pages,
-            };
-            let mut values = wire::collect(self.client, project, spec).await?;
+            let mut values =
+                wire::collect(self.client, project, section, (100, self.pages)).await?;
             if !values.complete {
                 return Err(fault(
                     "incomplete",
@@ -75,12 +68,12 @@ impl Reader<'_, '_> {
             }
             state[name] = json!(values.nodes);
         }
-        let route = format!(
-            "orgs/{}/projectsV2/{}/fields",
-            project["owner"]["login"].as_str().expect("qualified owner"),
-            target.number
+        let owner = project["owner"]["login"].as_str().expect("qualified owner");
+        state["columns"] = json!(
+            self.client
+                .columns(owner, target.number, self.pages)
+                .await?
         );
-        state["columns"] = json!(rest::fields(self.client, &route, self.pages).await?);
         columns(&state)?;
         state["issues"] = self.issues(intent).await?;
         state["repository"] = self.repository(intent).await?;
@@ -97,8 +90,7 @@ impl Reader<'_, '_> {
         let mut values = wire::Collection::new();
         let mut identity = Value::Null;
         for _ in 0..self.pages {
-            let data = self.client.read("query($owner:String!,$after:String){organization(login:$owner){id login url projectsV2(first:100,after:$after){totalCount pageInfo{hasNextPage endCursor} nodes{__typename id number title url public updatedAt owner{__typename ... on Organization{id login}}}}}}",json!({"owner":login,"after":values.after()})).await?;
-            let owner = &data["organization"];
+            let owner = self.client.organization(login, values.after()).await?;
             let current = json!({"id":owner["id"],"login":owner["login"],"url":owner["url"]});
             if !current["id"].is_string()
                 || !current["login"]
@@ -155,19 +147,19 @@ impl Reader<'_, '_> {
                 "candidate change requires 1..500 stable Issue identities",
             ));
         }
+        let native = self.client.open()?;
         let mut nodes = Vec::new();
         for ids in issues.chunks(50) {
-            let data = self.client.read("query($ids:[ID!]!){nodes(ids:$ids){__typename ... on Issue{id number url state updatedAt issueType{id name} repository{id owner{id}}}}}", json!({"ids":ids})).await?;
-            let values = data["nodes"]
-                .as_array()
-                .ok_or_else(|| fault("schema", "candidate Issue facts are unreadable"))?;
+            let values = github::call("project.candidates", || native.candidates(ids))
+                .map_err(wire::provider)?
+                .value;
             if values.len() != ids.len() {
                 return Err(fault(
                     "identity",
                     "candidate Issue response omitted a requested identity",
                 ));
             }
-            nodes.extend(values.iter().cloned());
+            nodes.extend(values);
         }
         Ok(json!(nodes))
     }
@@ -176,72 +168,43 @@ impl Reader<'_, '_> {
         let Action::Link { repository, .. } = &intent.action else {
             return Ok(Value::Null);
         };
-        let data = self.client.read("query($id:ID!){node(id:$id){__typename ... on Repository{id nameWithOwner owner{id}}}}",json!({"id":repository})).await?;
-        Ok(data["node"].clone())
+        let native = self.client.open()?;
+        Ok(github::call("project.seat", || native.seat(repository))
+            .map_err(wire::provider)?
+            .value)
     }
 
     async fn origin(&self, intent: &Intent) -> Result<Value> {
         let Action::Detach { origin, .. } = &intent.action else {
             return Ok(Value::Null);
         };
-        let data = self
-            .client
-            .read(
-                "query($id:ID!){node(id:$id){__typename ... on Node{id}}}",
-                json!({"id":origin}),
-            )
-            .await?;
-        if data["node"]["id"] != *origin {
+        let native = self.client.open()?;
+        let node = github::call("project.exists", || native.exists(origin))
+            .map_err(wire::provider)?
+            .value;
+        if node["id"] != *origin {
             return Err(fault(
                 "identity",
                 "attached organization Issue field origin is unreadable",
             ));
         }
-        Ok(data["node"].clone())
+        Ok(node)
     }
 }
 
-fn connection(name: &str, intent: &Intent) -> String {
-    let selection = match name {
-        "fields" => query::FIELD,
-        "items" => {
-            "id type isArchived updatedAt project{id} content{__typename ... on Issue{id number url title state updatedAt issueType{id name} repository{id nameWithOwner owner{id}}}}"
-        }
-        "views" => {
-            "id fullDatabaseId number name layout filter updatedAt project{id} configuration{visibleFields(first:100){pageInfo{hasNextPage endCursor} nodes{... on ProjectV2FieldCommon{id}}}} groupByFields(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{... on ProjectV2FieldCommon{id}}} verticalGroupByFields(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{... on ProjectV2FieldCommon{id}}} sortByFields(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{direction field{... on ProjectV2FieldCommon{id}}}}"
-        }
-        "workflows" => "id name enabled updatedAt project{id}",
-        "repositories" => "id nameWithOwner url owner{id}",
-        "statusUpdates" => "id body createdAt updatedAt",
-        _ => unreachable!("fixed native planning surface"),
-    };
-    let selection = if name == "items" && matches!(intent.action, Action::Value { .. }) {
-        super::value::selection(selection)
-    } else if name == "items" && matches!(intent.action, Action::Planning { .. }) {
-        super::super::planning::selection(selection)
-    } else if name == "items" && matches!(intent.action, Action::Remove { .. }) {
-        values(selection)
-    } else {
-        selection.to_string()
-    };
-    format!(
-        "query($id:ID!,$size:Int!,$after:String){{node(id:$id){{... on ProjectV2{{{meta} {name}(first:$size,after:$after){{{page} nodes{{{selection}}}}}}}}}}}",
-        meta = query::META,
-        page = query::PAGE
-    )
+fn detail(intent: &Intent) -> Detail {
+    match intent.action {
+        Action::Value { .. } => Detail::Values,
+        Action::Planning { .. } => Detail::Planning,
+        Action::Remove { .. } => Detail::Removal,
+        _ => Detail::Manage,
+    }
 }
 
 fn columns(state: &Value) -> Result<()> {
-    let url = format!(
-        "https://api.github.com/orgs/{}/projectsV2/{}",
-        state["project"]["owner"]["login"]
-            .as_str()
-            .expect("qualified owner"),
-        state["project"]["number"]
-    );
     let mut ids = std::collections::BTreeSet::new();
     for field in state["columns"].as_array().expect("REST fields") {
-        if field["project_url"] != url || !field["node_id"].is_string() || !field["id"].is_u64() {
+        if !field["node_id"].is_string() || !field["id"].is_u64() {
             return Err(fault(
                 "identity",
                 "REST field escaped the qualified Project or omitted its identity",
@@ -260,33 +223,4 @@ fn columns(state: &Value) -> Result<()> {
         ));
     }
     Ok(())
-}
-
-fn values(item: &str) -> String {
-    let kinds = [
-        "Date",
-        "Iteration",
-        "Label",
-        "Milestone",
-        "MultiSelect",
-        "Number",
-        "PullRequest",
-        "Repository",
-        "Reviewer",
-        "SingleSelect",
-        "Text",
-        "User",
-    ];
-    let fragments = kinds
-        .iter()
-        .map(|kind| {
-            format!(
-                "... on ProjectV2ItemField{kind}Value{{field{{... on ProjectV2FieldCommon{{id}}}}}}"
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(" ");
-    format!(
-        "{item} fieldValues(first:100){{totalCount pageInfo{{hasNextPage endCursor}} nodes{{__typename {fragments} ... on ProjectV2ItemIssueFieldValue{{field{{... on ProjectV2FieldCommon{{id}}}}}}}}}}"
-    )
 }

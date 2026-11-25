@@ -107,9 +107,12 @@ answer here.
 - A Boundary proves only that one committed Member delta stays inside that
   Member's Claim. Concord composes an exact Issue-led delivery plan from the
   live Issue, Member and Boundary, delegates repository proof and candidate
-  construction to Plumb's released delivery kernel, and invokes an explicit
-  external provider command for PR mutation. Concord never carries provider
-  credentials or replaces repository policy.
+  construction to Plumb's released delivery kernel. The default PR adaptor
+  uses Runseal's in-process client with the explicitly selected token. The
+  default Issue projection, exact PR rollup and supported Project item
+  mutations share that client. The remaining provider-command paths retain
+  their own readback gates. Concord stores no provider credentials and keeps
+  repository policy in the delivery kernel.
 - By default land waits for the pull's checks without holding the Integration lock.
   One immediate Radicula file admission per stable Issue Anchor covers the whole
   invocation, including waits and reentry. Its original handle remains held until

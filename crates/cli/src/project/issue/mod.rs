@@ -1,7 +1,8 @@
 use super::fault;
 use super::wire::Client;
-use crate::runtime::transport::Request;
+use crate::runtime::github;
 use concord_core::{Coordinate, Result};
+use runseal::github::{Cause, Number, Target};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 
@@ -10,11 +11,7 @@ mod fixture;
 #[cfg(all(test, unix))]
 mod tests;
 
-pub(super) async fn observe(
-    client: &Client<'_>,
-    collections: &mut Value,
-    pages: u16,
-) -> Result<()> {
+pub(super) async fn observe(client: &Client, collections: &mut Value, pages: u16) -> Result<()> {
     let origins = collections["fields"]["nodes"]
         .as_array()
         .expect("collected fields")
@@ -26,7 +23,7 @@ pub(super) async fn observe(
         return Ok(());
     }
     Reader {
-        client,
+        client: *client,
         origins,
         pages,
     }
@@ -34,13 +31,13 @@ pub(super) async fn observe(
     .await
 }
 
-struct Reader<'a, 'b> {
-    client: &'a Client<'b>,
+struct Reader {
+    client: Client,
     origins: Vec<Value>,
     pages: u16,
 }
 
-impl Reader<'_, '_> {
+impl Reader {
     async fn observe(&self, collections: &mut Value) -> Result<()> {
         for group in collections["items"]["nodes"]
             .as_array_mut()
@@ -73,70 +70,95 @@ impl Reader<'_, '_> {
     }
 
     async fn read(&self, issue: &Value) -> Result<Value> {
-        let client = self.client;
-        let pages = self.pages;
         let repository = issue["repository"]["nameWithOwner"]
             .as_str()
             .expect("validated Issue repository");
         let number = issue["number"].as_u64().expect("validated Issue number");
-        Coordinate::parse(&format!("{repository}#{number}"))?;
-        let mut nodes = Vec::new();
-        let mut seen = BTreeSet::new();
-        let mut complete = false;
-        let mut history = Vec::new();
-        for page in 1..=pages {
-            let endpoint = format!(
-                "repos/{repository}/issues/{number}/issue-field-values?per_page=100&page={page}"
-            );
-            let reply = Request::new(client.command, client.timeout, 4 * 1024 * 1024)
-                .args(["api", "--method", "GET", &endpoint])
-                .run()
-                .await
-                .map_err(|error| fault("provider", error.to_string()))?;
-            let value: Value = serde_json::from_slice(&reply.stdout).map_err(|error| {
-                fault(
-                    "schema",
-                    format!("invalid native Issue field response: {error}"),
-                )
-            })?;
-            let values = value
-                .as_array()
-                .ok_or_else(|| fault("schema", "Issue field values are unreadable"))?;
-            for value in values {
-                let id = value["issue_field_id"].as_u64().ok_or_else(|| {
-                    fault("schema", "Issue field value has no native field identity")
-                })?;
-                if !seen.insert(id) {
-                    return Err(fault(
-                        "changed",
-                        "Issue field identity repeated while paging",
-                    ));
-                }
-            }
-            complete = values.len() < 100;
-            history.push(json!({"requested_page": page, "per_page": 100, "returned": values.len(), "may_have_more": !complete}));
-            nodes.extend(values.iter().cloned());
-            if complete {
-                break;
-            }
-        }
-        let data = client
-            .read(
-                "query($id:ID!){node(id:$id){... on Issue{id updatedAt repository{id}}}}",
-                json!({"id": issue["id"]}),
-            )
-            .await?;
-        if data["node"]["id"] != issue["id"]
-            || data["node"]["updatedAt"] != issue["updatedAt"]
-            || data["node"]["repository"]["id"] != issue["repository"]["id"]
-        {
-            return Err(fault(
-                "changed",
-                "Issue changed or became inaccessible while reading attached field values",
-            ));
-        }
-        Ok(json!({"authority": "issue", "complete": complete, "pages": history, "nodes": nodes}))
+        let coordinate = Coordinate::parse(&format!("{repository}#{number}"))?;
+        let target = Target::new(
+            &coordinate.owner,
+            &coordinate.repository,
+            u32::try_from(coordinate.number)
+                .map_err(|_| fault("schema", "invalid Issue number"))?,
+        )
+        .map_err(translate)?;
+        let id = issue["id"]
+            .as_str()
+            .ok_or_else(|| fault("schema", "Issue identity is unreadable"))?
+            .to_owned();
+        let updated = issue["updatedAt"].clone();
+        let seat = issue["repository"]["id"].clone();
+        let client = self.client;
+        let pages = self.pages;
+        tokio::task::spawn_blocking(move || read(client, pages, &target, (&id, &updated, &seat)))
+            .await
+            .map_err(|error| fault("provider", error.to_string()))?
     }
+}
+
+fn read(
+    client: Client,
+    pages: u16,
+    target: &Target,
+    expected: (&str, &Value, &Value),
+) -> Result<Value> {
+    let native = client.open()?;
+    let mut nodes = Vec::new();
+    let mut seen = BTreeSet::new();
+    let mut complete = false;
+    let mut history = Vec::new();
+    for page in 1..=pages {
+        let window = Number::new(u32::from(page), 100).map_err(translate)?;
+        let listing = github::call("issue.attached", || native.attached(target, window))
+            .map_err(translate)?
+            .value;
+        let count = listing.rows.len();
+        for entry in listing.rows {
+            if !seen.insert(entry.field) {
+                return Err(fault(
+                    "changed",
+                    "Issue field identity repeated while paging",
+                ));
+            }
+            let value =
+                serde_json::to_value(entry).map_err(|error| fault("schema", error.to_string()))?;
+            nodes.push(value);
+        }
+        complete = !listing.more;
+        history.push(json!({"requested_page": page, "per_page": 100, "returned": count, "may_have_more": !complete}));
+        if complete {
+            break;
+        }
+    }
+    let subject = github::call("project.subject", || native.subject(expected.0))
+        .map_err(|error| {
+            let code = if error.cause == Cause::Shape {
+                "changed"
+            } else {
+                "provider"
+            };
+            fault(code, github::describe(error))
+        })?
+        .value;
+    if subject.id != expected.0
+        || *expected.1 != subject.updated
+        || *expected.2 != subject.repository.id
+    {
+        return Err(fault(
+            "changed",
+            "Issue changed or became inaccessible while reading attached field values",
+        ));
+    }
+    Ok(json!({"authority": "issue", "complete": complete, "pages": history, "nodes": nodes}))
+}
+
+fn translate(error: runseal::github::Error) -> concord_core::Error {
+    let code = if error.cause == Cause::Shape {
+        "schema"
+    } else {
+        "provider"
+    };
+    fault(code, github::describe(error))
 }
 
 fn associate(values: &mut Value, origins: &[Value]) -> Result<()> {

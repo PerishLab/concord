@@ -7,8 +7,8 @@ mod support;
 
 #[cfg(unix)]
 mod unix {
-    use super::spawn;
-    use super::support::{executable, fact, git, repository, success, tool};
+    use super::spawn::{self, Reply, Server};
+    use super::support::{fact, git, repository, server, success};
     use serde_json::{Value, json};
     use std::path::{Path, PathBuf};
 
@@ -38,8 +38,10 @@ mod unix {
                 staging.to_str().expect("staging"),
             ],
         );
-        let provider = tool(fixture.path(), "fact", fact());
-        let output = spawn::concord(fixture.path())
+        let provider = server(fact());
+        let mut command = spawn::concord(fixture.path());
+        provider.attach(&mut command);
+        let output = command
             .env("PLUMB_HOME", &home)
             .args(["--home", fixture.path().to_str().expect("Space")])
             .args([
@@ -48,9 +50,9 @@ mod unix {
                 "PerishLab/concord#26",
                 "--claim",
                 "crates",
+                "--revision",
+                "0",
             ])
-            .args(["--revision", "0", "--github-command"])
-            .arg(&provider)
             .output()
             .expect("run Concord");
         assert!(
@@ -110,22 +112,21 @@ mod unix {
     fn refusals() {
         let fixture = tempfile::tempdir().expect("fixture");
         estate(fixture.path());
-        let unavailable = fixture.path().join("unavailable");
-        executable(&unavailable, "#!/bin/sh\nexit 1\n");
+        let unavailable = Server::start(|_| Reply::status(500, json!({"message": "unavailable"})));
         assert_eq!(
             invoke(fixture.path(), &unavailable),
             "concord.member.observe.provider"
         );
         let mut reply = fact();
-        reply["rulesets"] = json!([]);
-        let missing = tool(fixture.path(), "missing", reply);
+        reply["data"]["repository"]["rulesets"]["nodes"] = json!([]);
+        let missing = server(reply);
         assert_eq!(
             invoke(fixture.path(), &missing),
             "concord.member.observe.rules"
         );
         let mut reply = fact();
-        reply["truncated"] = json!(true);
-        let truncated = tool(fixture.path(), "truncated", reply);
+        reply["data"]["repository"]["rulesets"]["pageInfo"]["hasNextPage"] = json!(true);
+        let truncated = server(reply);
         assert_eq!(
             invoke(fixture.path(), &truncated),
             "concord.member.observe.truncated"
@@ -136,42 +137,42 @@ mod unix {
     fn needs() {
         let fixture = tempfile::tempdir().expect("fixture");
         estate(fixture.path());
-        let single = labelled(fixture.path(), &["needs:revalidation", "kind:bug"], false);
+        let single = labelled(&["needs:revalidation", "kind:bug"], false);
         let error = refusal(fixture.path(), &single);
         assert_eq!(error["code"], "concord.issue.needs");
         let message = error["message"].as_str().expect("message");
         assert!(message.contains("needs:revalidation"), "{message}");
         assert!(!message.contains("kind:bug"), "{message}");
-        let double = labelled(
-            fixture.path(),
-            &["needs:owner", "needs:revalidation"],
-            false,
-        );
+        let double = labelled(&["needs:owner", "needs:revalidation"], false);
         let error = refusal(fixture.path(), &double);
         assert_eq!(error["code"], "concord.issue.needs");
         let message = error["message"].as_str().expect("message");
         assert!(message.contains("needs:owner"), "{message}");
         assert!(message.contains("needs:revalidation"), "{message}");
-        let truncated = labelled(fixture.path(), &["kind:bug"], true);
+        let truncated = labelled(&["kind:bug"], true);
         assert_eq!(
             invoke(fixture.path(), &truncated),
             "concord.member.observe.truncated"
         );
-        let foreign = labelled(fixture.path(), &["kind:bug"], false);
+        let foreign = labelled(&["kind:bug"], false);
         start(fixture.path(), &foreign);
         let fixture = tempfile::tempdir().expect("fixture");
         estate(fixture.path());
-        let bare = labelled(fixture.path(), &[], false);
+        let bare = labelled(&[], false);
         start(fixture.path(), &bare);
     }
 
-    fn labelled(space: &Path, names: &[&str], truncated: bool) -> PathBuf {
+    fn labelled(names: &[&str], truncated: bool) -> Server {
         let mut reply = fact();
-        reply["labels"] = json!({"names": names, "truncated": truncated});
-        tool(space, &format!("labelled-{}", names.len()), reply)
+        let nodes: Vec<Value> = names.iter().map(|name| json!({"name": name})).collect();
+        reply["data"]["repository"]["issue"]["labels"] = json!({
+            "nodes": nodes,
+            "pageInfo": {"hasNextPage": truncated},
+        });
+        server(reply)
     }
 
-    fn start(space: &Path, provider: &Path) {
+    fn start(space: &Path, provider: &Server) {
         success(
             space,
             &[
@@ -182,41 +183,25 @@ mod unix {
                 "crates",
                 "--revision",
                 "0",
-                "--github-command",
-                provider.to_str().expect("provider"),
             ],
+            Some(provider),
         );
     }
 
     fn estate(space: &Path) -> PathBuf {
-        success(space, &["issue", "bootstrap"]);
-        let issue = tool(
-            space,
-            "issue",
-            json!({
-                "node": "I_execution", "stable": "R_concord", "number": 26,
-                "url": "https://github.com/PerishLab/concord/issues/26",
-                "state": "OPEN", "kind": "Feature", "updated_at": "one",
-            }),
-        );
+        success(space, &["issue", "bootstrap"], None);
+        let provider = Server::start(|request| {
+            if request.path.starts_with("/repos/") {
+                return Reply::json(registered());
+            }
+            Reply::json(attached())
+        });
         success(
             space,
-            &[
-                "issue",
-                "attach",
-                "PerishLab/concord#26",
-                "--github-command",
-                issue.to_str().expect("Issue provider"),
-            ],
+            &["issue", "attach", "PerishLab/concord#26"],
+            Some(&provider),
         );
         let source = repository(space, "PerishLab/concord");
-        let provider = tool(
-            space,
-            "repository",
-            json!({
-                "node": "R_concord", "coordinate": "PerishLab/concord", "branch": "main",
-            }),
-        );
         success(
             space,
             &[
@@ -225,22 +210,54 @@ mod unix {
                 "PerishLab/concord",
                 "--path",
                 source.to_str().expect("source path"),
-                "--github-command",
-                provider.to_str().expect("repository provider"),
             ],
+            Some(&provider),
         );
         source
     }
 
-    fn invoke(space: &Path, provider: &Path) -> String {
+    fn registered() -> Value {
+        json!({
+            "id": 1,
+            "node_id": "R_concord",
+            "full_name": "PerishLab/concord",
+            "private": false,
+            "default_branch": "main",
+        })
+    }
+
+    fn attached() -> Value {
+        let issue = json!({
+            "id": "I_execution",
+            "number": 26,
+            "title": "Execution",
+            "body": "",
+            "url": "https://github.com/PerishLab/concord/issues/26",
+            "state": "OPEN",
+            "reason": null,
+            "updated": "one",
+            "writable": true,
+            "kind": {"name": "Feature"},
+            "repository": {"id": "R_concord"},
+        });
+        let repository = json!({
+            "nameWithOwner": "PerishLab/concord",
+            "issue": issue,
+        });
+        json!({"data": {"repository": repository}})
+    }
+
+    fn invoke(space: &Path, provider: &Server) -> String {
         refusal(space, provider)["code"]
             .as_str()
             .expect("error code")
             .to_string()
     }
 
-    fn refusal(space: &Path, provider: &Path) -> Value {
-        let output = spawn::concord(space)
+    fn refusal(space: &Path, provider: &Server) -> Value {
+        let mut command = spawn::concord(space);
+        provider.attach(&mut command);
+        let output = command
             .args(["--home", space.to_str().expect("Space"), "--json"])
             .args([
                 "member",
@@ -250,8 +267,6 @@ mod unix {
                 "crates",
                 "--revision",
                 "0",
-                "--github-command",
-                provider.to_str().expect("provider"),
             ])
             .output()
             .expect("run Concord");

@@ -6,7 +6,6 @@ pub use readiness::{Readiness, ReadinessChecks};
 
 use concord_core::{Coordinate, Error, Result};
 use serde::Serialize;
-use std::path::Path;
 use std::time::Instant;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -37,17 +36,15 @@ impl PageRequest {
     }
 }
 
-pub struct Projection<'a> {
-    pub(super) command: &'a Path,
+pub struct Projection {
     pub(super) page_size: u16,
     pub(super) max_pages: u16,
     pub(super) timeout: u64,
 }
 
-impl<'a> Projection<'a> {
-    pub fn new(command: &'a Path, page_size: u16, max_pages: u16, timeout: u64) -> Self {
+impl Projection {
+    pub fn new(page_size: u16, max_pages: u16, timeout: u64) -> Self {
         Self {
-            command,
             page_size,
             max_pages,
             timeout,

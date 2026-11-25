@@ -1,43 +1,144 @@
-pub(in crate::project) mod query;
-
-use super::fault;
-use crate::runtime::transport::Request;
+use super::{fault, target::Target};
+use crate::runtime::github;
 use concord_core::Result;
+use runseal::github::board::Section;
+use runseal::github::{Organization, Overview, Window, columns::Locator};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
-use std::path::Path;
 
-pub(super) struct Client<'a> {
-    pub command: &'a Path,
+#[derive(Clone, Copy)]
+pub(super) struct Client {
     pub timeout: u64,
+    #[cfg(test)]
+    pub loopback: Option<std::net::SocketAddr>,
 }
 
-impl Client<'_> {
-    pub async fn read(&self, query: &str, variables: Value) -> Result<Value> {
-        let input = serde_json::to_vec(&json!({"query": query, "variables": variables}))
-            .expect("fixed GraphQL request");
-        let reply = Request::new(self.command, self.timeout, 4 * 1024 * 1024)
-            .args(["api", "graphql", "--input", "-"])
-            .input(&input)
-            .run()
-            .await
-            .map_err(|error| fault("provider", error.to_string()))?;
-        let value: Value = serde_json::from_slice(&reply.stdout)
-            .map_err(|error| fault("schema", format!("invalid provider JSON: {error}")))?;
-        if let Some(errors) = value.get("errors")
-            && errors.as_array().is_none_or(|errors| !errors.is_empty())
-        {
+impl Client {
+    pub fn new(timeout: u64) -> Self {
+        Self {
+            timeout,
+            #[cfg(test)]
+            loopback: None,
+        }
+    }
+
+    pub fn open(&self) -> Result<runseal::github::Client> {
+        #[cfg(test)]
+        if let Some(address) = self.loopback {
+            return github::loopback(address, self.timeout)
+                .map_err(|error| fault("provider", error));
+        }
+        github::client(self.timeout).map_err(|error| fault("provider", error))
+    }
+
+    pub async fn project(&self, target: &Target) -> Result<Value> {
+        let native = self.open()?;
+        let held = github::call("project.overview", || {
+            native.overview(&target.owner, target.number)
+        })
+        .map_err(provider)?
+        .value;
+        let project = overview(held);
+        target.verify(&project)?;
+        Ok(project)
+    }
+
+    pub async fn metadata(&self, project: &str) -> Result<Value> {
+        let native = self.open()?;
+        let held = github::call("project.metadata", || native.metadata(project))
+            .map_err(provider)?
+            .value;
+        Ok(overview(held))
+    }
+
+    pub async fn organization(&self, login: &str, after: Value) -> Result<Value> {
+        let native = self.open()?;
+        let window = Window::new(100, after.as_str()).map_err(provider)?;
+        let held = github::call("project.projects", || native.projects(login, &window))
+            .map_err(provider)?
+            .value;
+        if held.projects.target != held.owner.id {
             return Err(fault(
-                "provider",
-                format!("GraphQL errors; partial data is not absence: {errors}"),
+                "identity",
+                "organization inventory page belongs to a different owner",
             ));
         }
-        value
-            .get("data")
-            .filter(|data| data.is_object())
-            .cloned()
-            .ok_or_else(|| fault("schema", "provider response has no data object"))
+        let entries = held
+            .projects
+            .rows
+            .into_iter()
+            .map(|project| {
+                json!({
+                    "__typename":project.kind, "id":project.id, "number":project.number,
+                    "title":project.title, "url":project.url, "public":project.public,
+                    "updatedAt":project.updated, "owner":identity(project.owner)
+                })
+            })
+            .collect::<Vec<_>>();
+        Ok(json!({
+            "id":held.owner.id, "login":held.owner.login, "url":held.url,
+            "projectsV2":{
+                "totalCount":held.projects.total, "nodes":entries,
+                "pageInfo":{"hasNextPage":held.projects.next.is_some(),"endCursor":held.projects.next}
+            }
+        }))
     }
+
+    pub async fn locator(&self, owner: &str, number: u32) -> Result<Locator> {
+        let native = self.open()?;
+        let account = github::call("project.account", || native.account(owner))
+            .map_err(provider)?
+            .value;
+        Locator::new(&account.login, number, account.database).map_err(provider)
+    }
+
+    pub async fn columns(&self, owner: &str, number: u32, pages: u16) -> Result<Vec<Value>> {
+        let native = self.open()?;
+        let location = self.locator(owner, number).await?;
+        let mut cursor: Option<String> = None;
+        let mut seen = BTreeSet::new();
+        let mut nodes = Vec::new();
+        for _ in 0..pages {
+            let window = Window::new(100, cursor.as_deref()).map_err(provider)?;
+            let slice = github::call("project.columns", || native.columns(&location, &window))
+                .map_err(provider)?
+                .value;
+            for column in slice.rows {
+                nodes.push(json!({"id":column.id,"node_id":column.node,"name":column.name}));
+            }
+            let Some(next) = slice.next else {
+                return Ok(nodes);
+            };
+            if !seen.insert(next.clone()) {
+                return Err(fault(
+                    "changed",
+                    "REST field pagination repeated its cursor",
+                ));
+            }
+            cursor = Some(next);
+        }
+        Err(fault(
+            "incomplete",
+            "REST field pagination budget exhausted; no write is prepared",
+        ))
+    }
+}
+
+pub(super) fn overview(held: Overview) -> Value {
+    json!({
+        "__typename":"ProjectV2", "id":held.id, "number":held.number, "title":held.title,
+        "url":held.url, "updatedAt":held.updated, "closed":held.closed, "public":held.public,
+        "readme":held.readme, "shortDescription":held.description, "viewerCanUpdate":held.writable,
+        "owner":identity(held.owner)
+    })
+}
+
+fn identity(organization: Organization) -> Value {
+    json!({"__typename":organization.kind,"id":organization.id,"login":organization.login})
+}
+
+pub(super) fn provider(error: runseal::github::Error) -> concord_core::Error {
+    fault("provider", github::describe(error))
 }
 
 pub(super) struct Collection {
@@ -122,71 +223,31 @@ impl Collection {
     }
 }
 
-pub(super) fn metadata(value: &Value) -> Value {
-    let mut value = value.clone();
-    if let Some(object) = value.as_object_mut() {
-        for name in [
-            "fields",
-            "items",
-            "views",
-            "workflows",
-            "repositories",
-            "statusUpdates",
-        ] {
-            object.remove(name);
-        }
-    }
-    value
-}
-
-pub(super) struct Spec<'a> {
-    pub name: &'a str,
-    pub query: String,
-    pub size: u16,
-    pub pages: u16,
-}
-
-pub(super) async fn gather(
-    client: &Client<'_>,
+pub(super) async fn collect(
+    client: &Client,
     project: &Value,
-    name: &str,
+    section: Section,
     budget: (u16, u16),
 ) -> Result<Collection> {
-    collect(
-        client,
-        project,
-        Spec {
-            name,
-            query: query::connection(name),
-            size: budget.0,
-            pages: budget.1,
-        },
-    )
-    .await
-}
-
-pub(super) async fn collect(
-    client: &Client<'_>,
-    project: &Value,
-    spec: Spec<'_>,
-) -> Result<Collection> {
+    let native = client.open()?;
+    let id = project["id"]
+        .as_str()
+        .ok_or_else(|| fault("identity", "Project identity is unreadable"))?;
+    let size = u8::try_from(budget.0).map_err(|_| fault("bounds", "invalid Project page size"))?;
     let mut collection = Collection::new();
-    let query = spec.query;
-    for _ in 0..spec.pages {
-        let data = client
-            .read(
-                &query,
-                json!({"id": project["id"], "size": spec.size, "after": collection.after()}),
-            )
-            .await?;
-        let node = &data["node"];
-        if metadata(node) != *project {
+    for _ in 0..budget.1 {
+        let after = collection.after();
+        let window = Window::new(size, after.as_str()).map_err(provider)?;
+        let slice = github::call("project.board", || native.board(id, section, &window))
+            .map_err(provider)?
+            .value;
+        if slice.project != *project {
             return Err(fault(
                 "changed",
                 "Project metadata changed or became inaccessible while observing",
             ));
         }
-        collection.push(&node[spec.name])?;
+        collection.push(&slice.connection)?;
         if collection.complete {
             break;
         }

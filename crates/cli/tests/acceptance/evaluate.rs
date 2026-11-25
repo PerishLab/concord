@@ -48,11 +48,22 @@ impl World {
         );
         let mut observed = issue.clone();
         observed["edited"] = Value::Null;
-        observed["events"] = world::connection(vec![], None, 0);
+        observed["list"] = world::connection(vec![], None, 0);
+        let origin = json!({"id": "I_issue", "repository": {"id": "R_concord"}});
         let fresh = json!({"data": {
-            "repository": {"id": "R_concord", "issue": observed},
-            "declaration": {"id": "IC_decl", "body": declaration, "created": "2026-09-29T00:00:00Z", "edited": null},
-            "closure": {"id": "IC_close", "body": closure, "created": "2026-09-30T00:00:00Z", "edited": null},
+            "repository": {"id": "R_concord", "nameWithOwner": "PerishLab/concord", "issue": observed},
+            "declaration": {
+                "id": "IC_decl", "body": declaration,
+                "url": "https://github.com/PerishLab/concord/issues/83#issuecomment-1",
+                "created": "2026-09-29T00:00:00Z", "updated": "2026-09-29T00:00:00Z",
+                "edited": null, "issue": origin,
+            },
+            "closure": {
+                "id": "IC_close", "body": closure,
+                "url": "https://github.com/PerishLab/concord/issues/83#issuecomment-2",
+                "created": "2026-09-30T00:00:00Z", "updated": "2026-09-30T00:00:00Z",
+                "edited": null, "issue": origin,
+            },
         }});
         let mut relations = page.clone();
         let issue = &mut relations["data"]["repository"]["issue"];
@@ -125,7 +136,7 @@ fn invalidated() {
         match mode {
             "body" => data["repository"]["issue"]["edited"] = "2026-10-01T00:00:00Z".into(),
             "reopen" => {
-                data["repository"]["issue"]["events"] = world::connection(vec![event], None, 1)
+                data["repository"]["issue"]["list"] = world::connection(vec![event], None, 1)
             }
             _ => data[mode]["edited"] = "2026-10-01T00:00:00Z".into(),
         }
@@ -162,16 +173,16 @@ fn identities() {
         let code = match mode {
             "comment" => {
                 data["closure"]["id"] = "foreign".into();
-                "identity"
+                "provider"
             }
             "body" => {
                 data["closure"]["body"] = "edited".into();
                 "identity"
             }
             "event" => {
-                data["repository"]["issue"]["events"] =
+                data["repository"]["issue"]["list"] =
                     world::connection(vec![event.clone(), event], None, 2);
-                "identity"
+                "provider"
             }
             "errors" => {
                 world.fresh["errors"] = errors;
@@ -186,10 +197,12 @@ fn identities() {
                     .as_object_mut()
                     .unwrap()
                     .remove("edited");
-                "reply"
+                "provider"
             }
             _ => {
                 data["repository"]["issue"]["id"] = "foreign".into();
+                data["declaration"]["issue"]["id"] = "foreign".into();
+                data["closure"]["issue"]["id"] = "foreign".into();
                 "changed"
             }
         };
@@ -204,9 +217,9 @@ fn pagination() {
     let mut second = first.clone();
     let older = json!({"id": "RE_old", "created": "2026-09-28T00:00:00Z"});
     let newer = json!({"id": "RE_new", "created": "2026-10-01T00:00:00Z"});
-    first["data"]["repository"]["issue"]["events"] =
+    first["data"]["repository"]["issue"]["list"] =
         world::connection(vec![older], Some("cursor"), 2);
-    second["data"]["repository"]["issue"]["events"] = world::connection(vec![newer], None, 2);
+    second["data"]["repository"]["issue"]["list"] = world::connection(vec![newer], None, 2);
     let scratch = tempfile::tempdir().unwrap();
     let replies = [
         world.page.clone(),
@@ -232,7 +245,9 @@ fn pagination() {
 fn incomplete() {
     let world = World::new();
     let mut fresh = world.fresh.clone();
-    fresh["data"]["repository"]["issue"]["events"] = world::connection(vec![], Some("cursor"), 1);
+    let event = json!({"id": "RE_one", "created": "2026-09-28T00:00:00Z"});
+    fresh["data"]["repository"]["issue"]["list"] =
+        world::connection(vec![event], Some("cursor"), 2);
     let scratch = tempfile::tempdir().unwrap();
     let replies = [
         world.page.clone(),

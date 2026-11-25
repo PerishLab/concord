@@ -5,7 +5,7 @@ use concord_core::{Coordinate, Error, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Instant;
 
-impl Projection<'_> {
+impl Projection {
     pub async fn ready(&self, coordinate: &Coordinate) -> Result<Readiness> {
         let started = Instant::now();
         let held = self
@@ -34,7 +34,6 @@ impl Projection<'_> {
                 "{}/{}#{}",
                 coordinate.owner, coordinate.repository, coordinate.number
             ),
-            command: self.command.to_path_buf(),
             timeout: self.timeout,
             pages: usize::from(self.max_pages),
         };

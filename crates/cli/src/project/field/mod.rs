@@ -1,9 +1,14 @@
 pub(super) mod value;
 
-use super::{fault, wire::Client};
+use super::{
+    fault,
+    wire::{self, Client},
+};
+use crate::runtime::github;
 use concord_core::Result;
+use runseal::github::Window;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::collections::BTreeSet;
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -172,24 +177,28 @@ pub(super) fn owned<'a>(state: &'a Value, id: &str) -> Result<&'a Value> {
 }
 
 pub(in crate::project) async fn origin(
-    client: &Client<'_>,
+    client: &Client,
     project: &Value,
     intent: &super::manage::Intent,
 ) -> Result<Value> {
     let super::manage::Action::Attach { origin } = &intent.action else {
         unreachable!("attachment intent")
     };
-    let data = client
-        .read(ORIGIN, json!({"owner":project["owner"]["login"]}))
-        .await?;
-    let owner = &data["organization"];
-    if owner["id"] != project["owner"]["id"] {
+    let native = client.open()?;
+    let login = project["owner"]["login"]
+        .as_str()
+        .ok_or_else(|| fault("identity", "Project owner login is unreadable"))?;
+    let window = Window::new(100, None).map_err(wire::provider)?;
+    let origins = github::call("project.origins", || native.origins(login, &window))
+        .map_err(wire::provider)?
+        .value;
+    if origins.owner != project["owner"]["id"] {
         return Err(fault(
             "identity",
             "Issue field organization differs from Project owner",
         ));
     }
-    let fields = &owner["issueFields"];
+    let fields = &origins.fields;
     let nodes = fields["nodes"]
         .as_array()
         .ok_or_else(|| fault("unavailable", "organization Issue fields are unreadable"))?;
@@ -223,5 +232,3 @@ pub(in crate::project) async fn origin(
     }
     Ok((*field).clone())
 }
-
-const ORIGIN: &str = "query($owner:String!){organization(login:$owner){id issueFields(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on IssueFieldSingleSelect{id fullDatabaseId name dataType visibility options{id name color description}} ... on IssueFieldText{id} ... on IssueFieldNumber{id} ... on IssueFieldDate{id} ... on IssueFieldMultiSelect{id}}}}}";

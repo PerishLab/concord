@@ -146,13 +146,13 @@ fn book() -> Cookbook {
             "Land --no-wait returned an observed pending result on stdout with exit 3, or the default bounded wait refused after 30 minutes or repeated mergeability cycles.",
             "Retain the same plan and inspect the pull checks. Pending exit 3 is not an error or completed delivery; it keeps the Member and exact pull for resume. Re-run land with the same plan and --no-wait for another single pass, or omit the flag for the existing bounded wait. The caller owns cross-run timing and retry budgets; Concord stores none and schedules no background work. Every run fully revalidates candidate/base, proof, acceptance and custody. Changed facts require fresh preparation; unknown writes require observation, never blind replay. Failed checks refuse immediately rather than return pending. Never use --admin or --auto around policy.",
             (
-                "Retain the plan, pending result or refusal, exact candidate and pull identity; inspect gh pr checks <pull>. Exit 0 means completed delivery, 3 means observed pending, 1 means refusal and 2 means syntax error.",
+                "Retain the plan, pending result or refusal, exact candidate and pull identity; inspect pull checks through runseal @github. Exit 0 means completed delivery, 3 means observed pending, 1 means refusal and 2 means syntax error.",
                 "The pull's checks have settled and a re-run land merges and reads the merge back.",
             ),
         ),
         entry(
             "concord.issue.projection.provider",
-            "The external GitHub command refused a read of the current Issue. Its exit status and recognized HTTP or transport diagnostic are reported without provider stderr; an unrecognized diagnostic leaves the cause unknown. A reported diagnostic does not establish the cause of an earlier refusal.",
+            "The native GitHub provider request refused a read of the current Issue. Its structured outcome, HTTP status and request ID are reported without secrets or provider response bodies.",
             "Read the current Issue with concord issue brief and independently inspect the exact pull and candidate before resuming. Once readable unchanged facts are available, re-run the same prepared land: it revalidates the Issue, acceptance, candidate, base and gate authority. If any prepared fact changed, prepare again. Never bypass the refused read or replay a provider merge directly.",
             (
                 "Retain the refusal, exact plan, pull and candidate. Do not infer a timeout, authentication failure or API outage from an unknown diagnostic.",
@@ -161,10 +161,10 @@ fn book() -> Cookbook {
         ),
         entry(
             "concord.delivery.provider",
-            "The explicit external provider command could not complete or confirm a pull-request mutation.",
-            "Observe the exact repository, head branch, and pull request on GitHub before retrying. If the mutation already happened, resume from that provider state; otherwise fix the provider command or authentication and re-run the prepared delivery.",
+            "The native GitHub provider request could not complete or confirm a pull-request mutation.",
+            "Observe the exact repository, head branch, and pull request on GitHub before retrying. If the mutation already happened, resume from that provider state; otherwise fix the Runseal profile token or provider state and re-run the prepared delivery.",
             (
-                "Retain the provider stderr and inspect the exact pull-request coordinate and current head OID.",
+                "Retain the provider diagnostic (HTTP status and request ID) and inspect the exact pull-request coordinate and current head OID.",
                 "GitHub reports the intended pull request at the prepared head and Concord can confirm it.",
             ),
         ),

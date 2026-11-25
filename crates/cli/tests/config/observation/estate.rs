@@ -1,4 +1,5 @@
 use super::super::process;
+use super::super::spawn::{Reply, Server};
 use super::Observed;
 use std::fs;
 use std::path::Path;
@@ -18,38 +19,38 @@ fn estate(config: &str) -> Vec<(Option<i32>, String)> {
     let home = Observed::new(config);
     let root = home.0.path().join("space");
     fs::create_dir(&root).expect("space root");
-    let provider = home.0.path().join("provider");
-    let reply = serde_json::json!({
-        "node": "I_parity",
-        "stable": "R_concord",
+    let issue = serde_json::json!({
+        "id": "I_parity",
         "number": 26,
+        "title": "Parity",
+        "body": "",
         "url": "https://github.com/PerishLab/concord/issues/26",
         "state": "OPEN",
-        "kind": "Feature",
-        "updated_at": "one",
+        "reason": null,
+        "updated": "one",
+        "writable": true,
+        "kind": {"name": "Feature"},
+        "repository": {"id": "R_concord"},
     });
-    plumb::testing::executable(&provider, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
-    let provider = provider.to_str().expect("provider path");
+    let repository = serde_json::json!({
+        "nameWithOwner": "PerishLab/concord",
+        "issue": issue,
+    });
+    let reply = serde_json::json!({"data": {"repository": repository}});
+    let server = Server::start(move |_| Reply::json(reply.clone()));
     let mut seen = Vec::new();
     for arguments in [
         vec!["issue", "bootstrap"],
-        vec![
-            "issue",
-            "attach",
-            "PerishLab/concord#26",
-            "--github-command",
-            provider,
-        ],
+        vec!["issue", "attach", "PerishLab/concord#26"],
         vec!["issue", "show", "PerishLab/concord#26"],
         vec!["audit"],
     ] {
-        let output = process(
+        let mut command = process(
             home.0.path(),
             &["--home", root.to_str().expect("root"), "--json"],
-        )
-        .args(&arguments)
-        .output()
-        .expect("estate command");
+        );
+        server.attach(&mut command);
+        let output = command.args(&arguments).output().expect("estate command");
         assert_eq!(
             output.status.code(),
             Some(0),

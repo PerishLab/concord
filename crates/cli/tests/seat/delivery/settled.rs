@@ -1,8 +1,7 @@
-use super::super::execution::unix::{self as execution, Facts, git, repository};
-use super::super::spawn;
-use super::provider::{consume, start};
-use super::provider::{observer, projection, tool};
-use super::unix::{guard, prepare, refused, success};
+use super::super::execution::unix::{git, repository};
+use super::super::spawn::{self, Server};
+use super::provider::{consume, serve, start, tool};
+use super::unix::{attached, guard, prepare, refused, success};
 use serde_json::Value;
 use std::path::Path;
 use std::process::{Child, Stdio};
@@ -12,7 +11,7 @@ use std::time::{Duration, Instant};
 fn settled() {
     let fixture = tempfile::tempdir().expect("fixture");
     let space = fixture.path();
-    let provider = open(space);
+    let server = open(space);
     let source = space.join("source");
     let lock = std::fs::OpenOptions::new()
         .read(true)
@@ -26,7 +25,7 @@ fn settled() {
     let path = stray.to_str().expect("stray path");
     git(&source, &["worktree", "add", "--detach", path]);
     let revision = revision(space);
-    let mut delivery = prepare(space, &provider, &revision, true)
+    let mut delivery = prepare(space, &server, &revision, true)
         .spawn()
         .expect("prepare");
     let mut audit = inspect(space);
@@ -58,7 +57,7 @@ fn waits() {
     let fixture = tempfile::tempdir().expect("fixture");
     let probe = Probe::open(fixture.path());
     probe.write("checks-pending", "3");
-    let mut land = start(probe.space, &probe.provider, &probe.plan());
+    let mut land = start(probe.space, Some(&probe.server), &probe.plan());
     let waiting = Instant::now();
     while probe.read("checks-pending") != "0" {
         assert!(
@@ -92,7 +91,7 @@ fn failed() {
         "checks-rollup",
         r#"{"statusCheckRollup":[{"__typename":"CheckRun","name":"Guard","status":"COMPLETED","conclusion":"FAILURE"}]}"#,
     );
-    let landed = consume(probe.space, &probe.provider, &probe.plan());
+    let landed = consume(probe.space, Some(&probe.server), &probe.plan());
     refused(&landed, "concord.delivery.checks");
     let stderr = String::from_utf8_lossy(&landed.stderr);
     assert!(stderr.contains("pull checks failed: Guard"), "{stderr}");
@@ -109,7 +108,7 @@ fn early() {
         "checks-rollup",
         r#"{"statusCheckRollup":[{"__typename":"CheckRun","name":"Guard","status":"IN_PROGRESS","conclusion":null},{"__typename":"CheckRun","name":"lint","status":"COMPLETED","conclusion":"FAILURE","detailsUrl":"https://ci.example/lint"}]}"#,
     );
-    let mut land = start(probe.space, &probe.provider, &probe.plan());
+    let mut land = start(probe.space, Some(&probe.server), &probe.plan());
     let waiting = Instant::now();
     while land.try_wait().expect("land state").is_none() {
         if waiting.elapsed() > Duration::from_secs(60) {
@@ -131,19 +130,19 @@ fn early() {
 
 struct Probe<'a> {
     space: &'a Path,
-    provider: String,
+    server: Server,
 }
 
 impl<'a> Probe<'a> {
     fn open(space: &'a Path) -> Self {
         Self {
-            provider: open(space),
+            server: open(space),
             space,
         }
     }
 
     fn plan(&self) -> Vec<u8> {
-        let prepared = prepare(self.space, &self.provider, &revision(self.space), true)
+        let prepared = prepare(self.space, &self.server, &revision(self.space), true)
             .output()
             .expect("prepare");
         assert!(
@@ -189,43 +188,25 @@ fn inspect(space: &Path) -> Child {
         .expect("audit")
 }
 
-pub(super) fn open(space: &Path) -> String {
+pub(super) fn open(space: &Path) -> Server {
     success(space, &["issue", "bootstrap"]);
-    let provider = tool(space, "provider", projection(space));
-    let command = provider.to_str().expect("provider path");
-    success(
-        space,
-        &[
-            "issue",
-            "attach",
-            "PerishLab/probe#1",
-            "--github-command",
-            command,
-        ],
-    );
+    let server = serve(space, "PerishLab/probe", "R_probe");
+    attached(space, &server, &["issue", "attach", "PerishLab/probe#1"]);
     let source = repository(space, "PerishLab/probe");
-    let observer = observer(space);
-    success(
+    attached(
         space,
+        &server,
         &[
             "integration",
             "register",
             "PerishLab/probe",
             "--path",
             source.to_str().expect("source path"),
-            "--github-command",
-            observer.to_str().expect("repository provider"),
         ],
     );
-    let facts = Facts {
-        node: "I_delivery",
-        stable: "R_probe",
-        coordinate: "PerishLab/probe",
-        number: 1,
-    };
-    let start = execution::provider(space, facts);
-    success(
+    attached(
         space,
+        &server,
         &[
             "member",
             "start",
@@ -234,8 +215,6 @@ pub(super) fn open(space: &Path) -> String {
             "topic.md",
             "--revision",
             "0",
-            "--github-command",
-            start.to_str().expect("start provider"),
         ],
     );
     let remote = space.join("remote.git");
@@ -272,7 +251,7 @@ pub(super) fn open(space: &Path) -> String {
             &revision,
         ],
     );
-    provider.to_str().expect("provider path").to_string()
+    server
 }
 
 pub(super) fn revision(space: &Path) -> String {

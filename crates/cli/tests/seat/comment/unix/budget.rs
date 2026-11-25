@@ -4,29 +4,25 @@ use super::*;
 fn echoes() {
     let overhead = render::body("", "codex", "thread", None).len();
     let boundary = "a".repeat(65_536 - overhead);
-    for (prose, reply) in [
-        ("Long decision.\n".repeat(2000), Reply::Exact),
-        ("\"\\\u{1}<&中🫧".repeat(1500), Reply::Escaped),
-        (boundary, Reply::Escaped),
+    for (prose, answer) in [
+        ("Long decision.\n".repeat(2000), Answer::Exact),
+        ("\"\\\u{1}<&中🫧".repeat(1500), Answer::Escaped),
+        (boundary, Answer::Escaped),
     ] {
         let fixture = tempfile::tempdir().expect("fixture");
         bootstrap(fixture.path());
         let body = render::body(prose.trim_end(), "codex", "thread", None);
-        let command = provider(fixture.path(), "OPEN", &body, reply);
+        let mock = provider("OPEN", &body, answer);
         success(invoke(
             fixture.path(),
             Run {
-                command: &command,
+                server: &mock.server,
                 body: &prose,
                 environment: &[("CODEX_THREAD_ID", "thread")],
                 timeout: 10,
             },
         ));
-        request(fixture.path(), &body, "thread");
-        assert_eq!(
-            std::fs::read_to_string(fixture.path().join("mutations")).expect("calls"),
-            "mutation\n"
-        );
+        request(&mock, &body);
     }
 }
 
@@ -36,15 +32,11 @@ fn limits() {
     for length in [65_536 - overhead + 1, 65_537] {
         let fixture = tempfile::tempdir().expect("fixture");
         bootstrap(fixture.path());
-        let called = fixture.path().join("called");
-        let command = tool(
-            fixture.path(),
-            &format!("touch '{}'; exit 99", called.display()),
-        );
+        let mock = guard();
         let output = invoke(
             fixture.path(),
             Run {
-                command: &command,
+                server: &mock.server,
                 body: &"a".repeat(length),
                 environment: &[("CODEX_THREAD_ID", "thread")],
                 timeout: 10,
@@ -52,6 +44,6 @@ fn limits() {
         );
         assert!(!output.status.success());
         assert!(String::from_utf8_lossy(&output.stderr).contains("comment.limit"));
-        assert!(!called.exists());
+        assert_eq!(mock.hits(), 0);
     }
 }

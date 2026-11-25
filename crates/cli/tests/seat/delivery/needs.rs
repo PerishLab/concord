@@ -1,6 +1,7 @@
-use super::super::execution::unix::{self as execution, Facts, git, repository};
-use super::provider::{consume, observer, projection, tool};
-use super::unix::{guard, prepare, refused, success};
+use super::super::execution::unix::{git, repository};
+use super::super::spawn::Server;
+use super::provider::{consume, serve, tool};
+use super::unix::{attached, guard, prepare, refused, success};
 use concord_core::acceptance::{Marker, Target};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
@@ -10,10 +11,9 @@ fn needs() {
     let fixture = tempfile::tempdir().expect("fixture");
     let seat = Seat::open(fixture.path());
     let space = seat.space;
-    let provider = seat.provider.as_str();
     seat.change();
     seat.label(&["needs:revalidation", "kind:bug"], false);
-    let output = prepare(space, provider, &seat.revision(), false)
+    let output = prepare(space, &seat.server, &seat.revision(), false)
         .output()
         .expect("prepare");
     refused(&output, "concord.issue.needs");
@@ -23,13 +23,13 @@ fn needs() {
     assert!(!message.contains("kind:bug"), "{message}");
     seat.label(&["needs:revalidation"], true);
     refused(
-        &prepare(space, provider, &seat.revision(), false)
+        &prepare(space, &seat.server, &seat.revision(), false)
             .output()
             .expect("prepare"),
         "concord.delivery.snapshot",
     );
     seat.label(&["kind:bug"], false);
-    let plan = prepare(space, provider, &seat.revision(), true)
+    let plan = prepare(space, &seat.server, &seat.revision(), true)
         .output()
         .expect("prepare");
     assert!(plan.status.success());
@@ -37,7 +37,7 @@ fn needs() {
     assert!(handoff["plan"].is_object(), "{handoff}");
     let before = seat.revision();
     seat.label(&["needs:revalidation", "needs:owner"], false);
-    let output = consume(space, provider, &plan.stdout);
+    let output = consume(space, Some(&seat.server), &plan.stdout);
     refused(&output, "concord.issue.needs");
     let error: Value = serde_json::from_slice(&output.stderr).expect("refusal JSON");
     let message = error["error"]["message"].as_str().expect("message");
@@ -46,7 +46,7 @@ fn needs() {
     assert!(!space.join("pull-state").exists());
     assert_eq!(seat.revision(), before);
     std::fs::remove_file(space.join("labels")).expect("clear labels");
-    let landed = consume(space, provider, &plan.stdout);
+    let landed = consume(space, Some(&seat.server), &plan.stdout);
     assert!(
         landed.status.success(),
         "{}",
@@ -60,7 +60,7 @@ fn unadopted() {
     let seat = Seat::open(fixture.path());
     seat.change();
     seat.label(&[Target::Source.label()], false);
-    let output = prepare(seat.space, &seat.provider, &seat.revision(), false)
+    let output = prepare(seat.space, &seat.server, &seat.revision(), false)
         .output()
         .expect("prepare");
     refused(&output, "concord.acceptance.target");
@@ -75,7 +75,7 @@ mod branches;
 
 struct Seat<'a> {
     space: &'a Path,
-    provider: String,
+    server: Server,
     source: PathBuf,
 }
 
@@ -99,7 +99,7 @@ fn acceptance() {
         .unwrap();
         std::fs::write(seat.space.join("declaration"), &marker).unwrap();
         let revision = seat.revision();
-        let prepared = prepare(seat.space, &seat.provider, &revision, true)
+        let prepared = prepare(seat.space, &seat.server, &revision, true)
             .output()
             .unwrap();
         assert!(
@@ -136,7 +136,7 @@ fn acceptance() {
             "orphan" => seat.label(&[], false),
             _ => {}
         }
-        let landed = consume(seat.space, &seat.provider, &prepared.stdout);
+        let landed = consume(seat.space, Some(&seat.server), &prepared.stdout);
         if matches!(mode, "edited" | "removed" | "orphan") {
             let code = if mode == "orphan" {
                 "concord.acceptance.target"
@@ -171,41 +171,23 @@ impl<'a> Seat<'a> {
 
     fn open(space: &'a Path) -> Self {
         success(space, &["issue", "bootstrap"]);
-        let provider = tool(space, "provider", projection(space));
-        let command = provider.to_str().expect("provider path").to_string();
-        success(
-            space,
-            &[
-                "issue",
-                "attach",
-                "PerishLab/probe#1",
-                "--github-command",
-                &command,
-            ],
-        );
+        let server = serve(space, "PerishLab/probe", "R_probe");
+        attached(space, &server, &["issue", "attach", "PerishLab/probe#1"]);
         let source = repository(space, "PerishLab/probe");
-        let observer = observer(space);
-        success(
+        attached(
             space,
+            &server,
             &[
                 "integration",
                 "register",
                 "PerishLab/probe",
                 "--path",
                 source.to_str().expect("source path"),
-                "--github-command",
-                observer.to_str().expect("repository provider"),
             ],
         );
-        let facts = Facts {
-            node: "I_delivery",
-            stable: "R_probe",
-            coordinate: "PerishLab/probe",
-            number: 1,
-        };
-        let start = execution::provider(space, facts);
-        success(
+        attached(
             space,
+            &server,
             &[
                 "member",
                 "start",
@@ -214,8 +196,6 @@ impl<'a> Seat<'a> {
                 "topic.md",
                 "--revision",
                 "0",
-                "--github-command",
-                start.to_str().expect("start provider"),
             ],
         );
         let remote = space.join("remote.git");
@@ -238,7 +218,7 @@ impl<'a> Seat<'a> {
         git(&source, &["config", "ssh.variant", "simple"]);
         Self {
             space,
-            provider: command,
+            server,
             source,
         }
     }

@@ -39,8 +39,6 @@ pub enum Command {
 #[derive(Clap)]
 pub struct Observe {
     pub issue: String,
-    #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
-    pub command: PathBuf,
     #[arg(long = "observe-timeout", default_value_t = 10, value_name = "SECONDS")]
     pub timeout: u64,
     #[arg(long = "max-pages", default_value_t = 20, value_name = "COUNT")]

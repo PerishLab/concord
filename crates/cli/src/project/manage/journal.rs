@@ -13,12 +13,12 @@ pub(super) enum Phase {
     Confirmed,
 }
 
-pub(super) struct Journal<'a, 'b> {
-    pub client: &'a Client<'b>,
+pub(super) struct Journal<'a> {
+    pub client: &'a Client,
     pub pages: u16,
 }
 
-impl Journal<'_, '_> {
+impl Journal<'_> {
     pub async fn publish(&self, plan: &Plan, state: &Value, phase: Phase) -> Result<Value> {
         let status = match phase {
             Phase::Requested => "requested",

@@ -1,49 +1,65 @@
 use super::{Binding, fault, model::NAMES, wire::Client};
+use crate::runtime::github;
 use concord_core::Result;
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 
-pub(super) async fn read(client: &Client<'_>, binding: &Binding) -> Result<Value> {
-    let mut after = Value::Null;
+pub(super) async fn read(client: &Client, binding: &Binding) -> Result<Value> {
+    let client = client.open()?;
+    let mut after: Option<String> = None;
+    let mut expected = None;
     let mut fields = Vec::new();
     let mut seen = BTreeSet::new();
     for _ in 0..20 {
-        let data = client
-            .query(QUERY, json!({"owner":binding.owner,"after":after}))
-            .await?;
-        let owner = &data["organization"];
-        if owner.is_null() {
-            return Err(fault("unavailable", "Phase organization is inaccessible"));
-        }
-        if owner["id"] != binding.organization || owner["login"] != binding.owner {
+        let window =
+            runseal::github::Window::new(100, after.as_deref()).map_err(super::wire::provider)?;
+        let page = github::call("phase.definitions", || {
+            client.definitions(&binding.owner, &window)
+        })
+        .map_err(super::wire::provider)?
+        .value;
+        if page.target != binding.organization {
             return Err(fault(
                 "invalid",
-                "Phase organization is missing, inaccessible or different from its binding",
+                "Phase organization differs from its binding",
             ));
         }
-        let connection = &owner["issueFields"];
-        fields.extend(super::read::nodes(connection)?.iter().cloned());
-        if connection["pageInfo"]["hasNextPage"] == false {
-            if connection["totalCount"].as_u64() != Some(fields.len() as u64) {
-                return Err(fault(
-                    "unavailable",
-                    "organization Issue field coverage changed",
-                ));
-            }
-            return qualify(binding, &fields);
-        }
-        after = connection["pageInfo"]["endCursor"].clone();
-        if !after.is_string() || !seen.insert(after.to_string()) {
+        if *expected.get_or_insert(page.total) != page.total {
             return Err(fault(
                 "unavailable",
-                "organization Issue field cursor does not advance",
+                "organization Issue field coverage changed",
             ));
+        }
+        fields.extend(page.rows.into_iter().map(definition));
+        match page.next {
+            Some(next) if seen.insert(next.clone()) => after = Some(next),
+            None if fields.len() == page.total as usize => return qualify(binding, &fields),
+            _ => {
+                return Err(fault(
+                    "unavailable",
+                    "organization Issue field coverage is incomplete",
+                ));
+            }
         }
     }
     Err(fault(
         "unavailable",
         "organization Issue field coverage is incomplete",
     ))
+}
+
+fn definition(field: runseal::github::phase::Definition) -> Value {
+    let mut value = json!({"__typename":field.kind});
+    if let Some(id) = field.id {
+        value["id"] = json!(id);
+    }
+    if value["__typename"] == "IssueFieldSingleSelect" {
+        value["name"] = json!(field.name);
+        value["dataType"] = json!(field.datatype);
+        value["visibility"] = json!(field.visibility);
+        value["options"] = json!(field.options);
+    }
+    value
 }
 
 fn qualify(binding: &Binding, fields: &[Value]) -> Result<Value> {
@@ -96,5 +112,3 @@ fn qualify(binding: &Binding, fields: &[Value]) -> Result<Value> {
     }
     Ok((*field).clone())
 }
-
-const QUERY: &str = r#"query($owner:String!,$after:String){organization(login:$owner){id login issueFields(first:100,after:$after){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on IssueFieldSingleSelect{id name dataType visibility options{id name}} ... on IssueFieldText{id} ... on IssueFieldNumber{id} ... on IssueFieldDate{id} ... on IssueFieldMultiSelect{id}}}}}"#;

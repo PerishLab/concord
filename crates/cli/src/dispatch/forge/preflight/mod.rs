@@ -9,7 +9,6 @@ use concord_core::occupancy::Subject;
 use concord_core::{Coordinate, Error, Estate, Result, activity, occupancy};
 use serde::Serialize;
 use std::collections::BTreeSet;
-use std::path::Path;
 
 const SCHEMA: &str = "concord.issue-preflight/v2";
 
@@ -18,11 +17,10 @@ pub struct Request<'a> {
     pub kind: &'a str,
     pub title: &'a str,
     pub outcome: &'a str,
-    pub bounds: Bounds<'a>,
+    pub bounds: Bounds,
 }
 
-pub struct Bounds<'a> {
-    pub command: &'a Path,
+pub struct Bounds {
     pub first: u16,
     pub pages: u16,
     pub timeout: u64,

@@ -36,11 +36,11 @@ fn malformed() {
                 let mut node = node;
                 node["state"] = "UNKNOWN".into();
                 issue["blockers"] = world::connection(vec![node], None, 1);
-                "reply"
+                "provider"
             }
             "missing" => {
                 issue.as_object_mut().unwrap().remove("children");
-                "reply"
+                "provider"
             }
             "total" => {
                 issue["children"] = world::connection(vec![], None, 1);
@@ -116,10 +116,12 @@ fn continuation() {
     let value = world::decoded(&world::invoke(scratch.path(), &provider, "evaluate", None));
     assert_eq!(value["acceptance"]["evaluation"]["verdict"], "unmet");
     assert_eq!(
-        world::request(&scratch.path().join("request-4"))["variables"]["children"],
+        world::request(&scratch.path().join("request-4"))["variables"]["childrenAfter"],
         "next"
     );
-    assert!(world::request(&scratch.path().join("request-4"))["variables"]["blockers"].is_null());
+    assert!(
+        world::request(&scratch.path().join("request-4"))["variables"]["blockersAfter"].is_null()
+    );
 }
 
 #[test]

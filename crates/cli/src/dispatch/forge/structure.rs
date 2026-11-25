@@ -3,7 +3,7 @@ use concord_core::Coordinate;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::time::Instant;
 
-impl Projection<'_> {
+impl Projection {
     pub async fn graph(&self, coordinate: &Coordinate, max_nodes: u16) -> Graph {
         let started = Instant::now();
         let mut walk = Walk::new(coordinate, max_nodes);

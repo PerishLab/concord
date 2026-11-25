@@ -77,7 +77,6 @@ async fn evaluate(args: &Observe, links: &[pull::Link]) -> Result<Vec<Projection
                 "{}/{}#{}",
                 link.coordinate.owner, link.coordinate.repository, link.coordinate.number
             ),
-            command: args.command.clone(),
             timeout: args.timeout,
             pages: args.pages,
         };

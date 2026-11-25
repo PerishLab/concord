@@ -1,6 +1,10 @@
-use super::super::super::spawn;
+use super::super::super::spawn::{self, Reply, Request, Server};
+use super::super::planning::overview;
+pub(super) use super::data::today;
+use super::data::{fields, issue, item, meta};
 use serde_json::{Value, json};
 use std::process::Output;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn pages() {
@@ -49,7 +53,7 @@ fn failures() {
         ("failure", "concord.project.provider"),
         ("truncated", "concord.project.changed"),
         ("duplicate", "concord.project.changed"),
-        ("cursor", "concord.project.schema"),
+        ("cursor", "concord.project.provider"),
         ("metadata", "concord.project.changed"),
         ("selected", "concord.project.changed"),
         ("later", "concord.project.changed"),
@@ -80,22 +84,27 @@ fn complete() {
 
 pub(super) struct Fixture {
     root: tempfile::TempDir,
+    server: Server,
+    calls: Arc<Mutex<Vec<Value>>>,
 }
 
 impl Fixture {
     pub fn new(mode: &str, count: usize) -> Self {
         let root = tempfile::tempdir().unwrap();
-        std::fs::write(
-            root.path().join("state.json"),
-            json!({"mode":mode,"count":count}).to_string(),
-        )
-        .unwrap();
-        plumb::testing::executable(&root.path().join("provider"), PROVIDER);
-        Self { root }
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let shared = Arc::clone(&calls);
+        let mode = mode.to_owned();
+        let server = Server::start(move |request| handle(request, &mode, count, &shared));
+        Self {
+            root,
+            server,
+            calls,
+        }
     }
 
     fn run(&self, operation: &str, size: Option<u16>, pages: u16) -> Output {
         let mut command = spawn::concord(self.root.path());
+        self.server.attach(&mut command);
         command
             .args([
                 "--home",
@@ -104,13 +113,10 @@ impl Fixture {
                 operation,
                 "PerishLab/1",
                 "--json",
-                "--github-command",
             ])
-            .arg(self.root.path().join("provider"))
-            .arg("--max-pages")
-            .arg(pages.to_string());
+            .args(["--max-pages", &pages.to_string()]);
         if let Some(size) = size {
-            command.arg("--page-size").arg(size.to_string());
+            command.args(["--page-size", &size.to_string()]);
         }
         command.output().unwrap()
     }
@@ -128,61 +134,119 @@ impl Fixture {
 
     pub fn refused(&self, size: Option<u16>, pages: u16, code: &str) {
         let output = self.run("next", size, pages);
-        assert!(!output.status.success());
-        assert!(output.stdout.is_empty());
+        assert!(!output.status.success() && output.stdout.is_empty());
         let error: Value = serde_json::from_slice(&output.stderr).unwrap();
         assert_eq!(error["error"]["code"], code);
     }
 
     pub fn calls(&self, kind: &str) -> Vec<Value> {
-        std::fs::read_to_string(self.root.path().join("calls.jsonl"))
+        self.calls
+            .lock()
             .unwrap()
-            .lines()
-            .map(|line| serde_json::from_str::<Value>(line).unwrap())
+            .iter()
             .filter(|call| call["kind"] == kind)
+            .cloned()
             .collect()
     }
 }
 
-const PROVIDER: &str = r#"#!/usr/bin/env python3
-import datetime,json,sys
-from pathlib import Path
-root=Path(__file__).parent
-state=json.loads((root/'state.json').read_text());mode=state['mode'];count=state['count']
-assert sys.argv[1:]==['api','graphql','--input','-']
-request=json.load(sys.stdin);q=request['query'];v=request['variables'];assert q.startswith('query')
-meta={'__typename':'ProjectV2','id':'PVT_plan','number':1,'title':'Planning','url':'https://github.com/orgs/PerishLab/projects/1','updatedAt':'original','closed':False,'public':False,'readme':'Boundary','shortDescription':'Goal','viewerCanUpdate':True,'owner':{'__typename':'Organization','id':'O_lab','login':'PerishLab'}}
-def connection(nodes):return {'totalCount':len(nodes),'nodes':nodes,'pageInfo':{'hasNextPage':False,'endCursor':None}}
-day=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(hours=8)).date().isoformat()
-period={'id':'current','title':'Current','startDate':day,'duration':7}
-common={'isIssueField':False,'updatedAt':'original','project':{'id':'PVT_plan'}}
-fields=[dict(common,__typename='ProjectV2IterationField',id='F_cycle',name='Cycle',dataType='ITERATION',configuration={'duration':7,'startDay':1,'iterations':[period],'completedIterations':[]}),dict(common,__typename='ProjectV2SingleSelectField',id='F_priority',name='Priority',dataType='SINGLE_SELECT',options=[{'id':name,'name':name} for name in ['Urgent','High','Medium','Low']])]
-chosen=139 if count>100 else 4
-def issue(i):
- empty=connection([])
- return {'__typename':'Issue','id':f'I_{i}','number':i+1,'title':f'Work {i}','url':f'https://github.com/PerishLab/concord/issues/{i+1}','state':'OPEN','body':'Research fixture','updatedAt':'original','issueType':{'id':'IT_feature','name':'Feature'},'repository':{'id':'R_repo','nameWithOwner':'PerishLab/concord','owner':{'id':'O_lab'}},'parent':None,'blockedBy':connection([{'id':'I_block','url':'https://github.com/PerishLab/concord/issues/999','state':'OPEN'}]) if i==chosen-1 else empty,'blocking':empty,'subIssues':empty,'labels':connection([{'id':'L_needs','name':'needs:revalidation'}]) if i==chosen-2 else empty,'comments':empty}
-def item(i):
- values=[{'__typename':'ProjectV2ItemFieldIterationValue','iterationId':'current' if i>=chosen-2 else 'backlog','title':'Current','startDate':day,'duration':7,'field':{'id':'F_cycle'}},{'__typename':'ProjectV2ItemFieldSingleSelectValue','optionId':'Low' if i==chosen else 'Urgent','name':'Low' if i==chosen else 'Urgent','field':{'id':'F_priority'}}]
- return {'id':f'ITEM_{i}','type':'ISSUE','isArchived':False,'updatedAt':'original','project':{'id':'PVT_plan'},'content':issue(i),'fieldValues':connection(values)}
-kind='root' if 'organization(login:' in q else next((name for name in ['fields','items','views','workflows','repositories','statusUpdates'] if name+'(first:' in q),None)
-if kind is None:kind='confirm' if '... on Issue{' in q else 'final'
-log=root/'calls.jsonl';previous=[json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
-with log.open('a') as output:output.write(json.dumps({'kind':kind,'size':v.get('size'),'after':v.get('after')})+'\n')
-if kind=='root':print(json.dumps({'data':{'organization':{'projectV2':meta}}}));sys.exit(0)
-if kind=='confirm':
- value=issue(chosen)
- if mode=='selected' or (mode=='later' and any(c['kind']=='confirm' for c in previous)):value['updatedAt']='changed'
- print(json.dumps({'data':{'node':value}}));sys.exit(0)
-if kind in ['fields','items','views','workflows','repositories','statusUpdates']:
- start=int(v.get('after') or 0);size=v['size'];nodes=fields if kind=='fields' else [item(i) for i in range(count)] if kind=='items' else []
- page=nodes[start:start+size];more=start+size<len(nodes);cursor=str(start+size) if more else None;total=len(nodes)
- if kind=='items' and start:
-  if mode=='failure':sys.exit(7)
-  if mode=='truncated':more=False
-  if mode=='duplicate':page[0]['id']='ITEM_0'
-  if mode=='cursor':cursor=v['after']
-  if mode=='metadata':meta['updatedAt']='changed'
- meta[kind]={'totalCount':total,'nodes':page,'pageInfo':{'hasNextPage':more,'endCursor':cursor}}
-if kind=='final' and mode=='final':meta['updatedAt']='changed'
-print(json.dumps({'data':{'node':meta}}))
-"#;
+fn handle(request: Request, mode: &str, count: usize, calls: &Arc<Mutex<Vec<Value>>>) -> Reply {
+    assert_eq!(request.method, "POST");
+    assert_eq!(request.path, "/graphql");
+    let query = request.query();
+    assert!(query.starts_with("query"));
+    let variables = request.variables();
+    let kind = classify(&query);
+    let previous = {
+        let mut log = calls.lock().unwrap();
+        let prior = log.clone();
+        log.push(json!({"kind":kind,"size":variables.get("size"),"after":variables.get("after")}));
+        prior
+    };
+    let chosen = if count > 100 { 139 } else { 4 };
+    match kind {
+        "root" => root(),
+        "confirm" => confirm(mode, chosen, &previous),
+        "final" => finality(mode),
+        _ => section(kind, &variables, mode, (count, chosen)),
+    }
+}
+
+fn root() -> Reply {
+    let organization = json!({"login":"PerishLab","projectV2":overview(&meta())});
+    Reply::json(json!({"data":{"organization":organization}}))
+}
+
+fn confirm(mode: &str, chosen: usize, previous: &[Value]) -> Reply {
+    let mut value = issue(chosen, chosen);
+    let repeated = previous.iter().any(|call| call["kind"] == "confirm");
+    if mode == "selected" || (mode == "later" && repeated) {
+        value["updatedAt"] = "changed".into();
+    }
+    Reply::json(json!({"data":{"node":value}}))
+}
+
+fn finality(mode: &str) -> Reply {
+    let mut project = meta();
+    if mode == "final" {
+        project["updatedAt"] = "changed".into();
+    }
+    Reply::json(json!({"data":{"node":overview(&project)}}))
+}
+
+fn classify(query: &str) -> &'static str {
+    if query.contains("RunsealOverview") {
+        return "root";
+    }
+    if query.contains("RunsealConfirm") {
+        return "confirm";
+    }
+    if query.contains("RunsealMetadata") {
+        return "final";
+    }
+    let names = [
+        "fields",
+        "items",
+        "views",
+        "workflows",
+        "repositories",
+        "statusUpdates",
+    ];
+    names
+        .into_iter()
+        .find(|name| query.contains(&format!("{name}(first:")))
+        .unwrap_or("final")
+}
+
+fn section(kind: &str, variables: &Value, mode: &str, bounds: (usize, usize)) -> Reply {
+    let (count, chosen) = bounds;
+    let day = today();
+    let nodes = match kind {
+        "fields" => fields(&day),
+        "items" => (0..count).map(|index| item(index, chosen, &day)).collect(),
+        _ => Vec::new(),
+    };
+    let start: usize = variables["after"]
+        .as_str()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0);
+    let size = variables["size"].as_u64().unwrap_or(50) as usize;
+    let end = (start + size).min(nodes.len());
+    let mut page = nodes[start..end].to_vec();
+    let mut more = end < nodes.len();
+    let mut cursor = more.then(|| end.to_string());
+    let mut project = meta();
+    if kind == "items" && start > 0 {
+        match mode {
+            "failure" => return Reply::status(500, json!({"message":"failed"})),
+            "truncated" => more = false,
+            "duplicate" => page[0]["id"] = "ITEM_0".into(),
+            "cursor" => cursor = variables["after"].as_str().map(str::to_owned),
+            "metadata" => project["updatedAt"] = "changed".into(),
+            _ => {}
+        }
+    }
+    let info = json!({"hasNextPage":more,"endCursor":cursor});
+    project[kind] = json!({"totalCount":nodes.len(),"nodes":page,"pageInfo":info});
+    Reply::json(json!({"data":{"node":project}}))
+}

@@ -3,65 +3,49 @@
 mod recovery;
 #[cfg(unix)]
 pub(super) mod unix {
-    use super::super::spawn;
+    use super::super::spawn::{self, Reply, Request, Server};
     use serde_json::{Value, json};
     use std::path::Path;
     use std::process::{Command, Output};
+
     #[test]
     fn execution() {
         let fixture = tempfile::tempdir().expect("fixture");
-        success(fixture.path(), &["issue", "bootstrap"]);
-        let provider = fixture.path().join("provider");
-        let reply = json!({
-            "node": "I_execution",
-            "stable": "R_concord",
-            "number": 26,
-            "url": "https://github.com/PerishLab/concord/issues/26",
-            "state": "OPEN",
-            "kind": "Feature",
-            "updated_at": "one",
+        let root = fixture.path();
+        success(root, None, &["issue", "bootstrap"]);
+        let server = Server::start(|request: Request| {
+            if request.method == "GET" && request.path == "/repos/PerishLab/concord" {
+                return Reply::json(record("R_concord", "PerishLab/concord"));
+            }
+            let facts = Facts {
+                node: "I_execution",
+                stable: "R_concord",
+                coordinate: "PerishLab/concord",
+                number: 26,
+            };
+            if request.query().contains("RunsealAdmission") {
+                return Reply::json(admission(&facts, "Feature"));
+            }
+            Reply::json(ticket(&facts, "OPEN", "Feature", "one"))
         });
-        plumb::testing::executable(&provider, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
         success(
-            fixture.path(),
-            &[
-                "issue",
-                "attach",
-                "PerishLab/concord#26",
-                "--github-command",
-                provider.to_str().expect("provider path"),
-            ],
+            root,
+            Some(&server),
+            &["issue", "attach", "PerishLab/concord#26"],
         );
-        let source = repository(fixture.path(), "PerishLab/concord");
-        let provider = fixture.path().join("repository-provider");
-        let reply = json!({
-            "node": "R_concord",
-            "coordinate": "PerishLab/concord",
-            "branch": "main",
-        });
-        executable(&provider, &format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
+        let source = repository(root, "PerishLab/concord");
         success(
-            fixture.path(),
+            root,
+            Some(&server),
             &[
                 "integration",
                 "register",
                 "PerishLab/concord",
                 "--path",
                 source.to_str().expect("source path"),
-                "--github-command",
-                provider.to_str().expect("provider path"),
             ],
         );
-        let start = self::provider(
-            fixture.path(),
-            Facts {
-                node: "I_execution",
-                stable: "R_concord",
-                coordinate: "PerishLab/concord",
-                number: 26,
-            },
-        );
-        let pending = fixture.path().join("workspace/issues/I_execution/worktree");
+        let pending = root.join("workspace/issues/I_execution/worktree");
         std::fs::create_dir_all(pending.parent().expect("Issue seat")).expect("Issue seat");
         let branch = "feature/26".to_string();
         git(
@@ -82,10 +66,9 @@ pub(super) mod unix {
             "crates",
             "--revision",
             "0",
-            "--github-command",
-            start.to_str().expect("start provider"),
         ];
-        let attached = operator(fixture.path(), &arguments, "CODEX_THREAD_ID", "codex-one");
+        let actor = ("CODEX_THREAD_ID", "codex-one");
+        let attached = remote(root, Some(&server), &arguments, actor);
         assert!(
             attached.status.success(),
             "{}",
@@ -93,20 +76,15 @@ pub(super) mod unix {
         );
         let body: Value = serde_json::from_slice(&attached.stdout).expect("Member JSON");
         assert_eq!(body["member"]["node"], "I_execution");
-        assert!(
-            fixture
-                .path()
-                .join("workspace/issues/I_execution/worktree/.git")
-                .is_file()
-        );
-        let replay = operator(fixture.path(), &arguments, "CODEX_THREAD_ID", "codex-one");
+        assert!(pending.join(".git").is_file());
+        let replay = remote(root, Some(&server), &arguments, actor);
         assert!(replay.status.success());
         assert_eq!(
-            success(fixture.path(), &["issue", "show", "PerishLab/concord#26"])["anchor"]["revision"],
+            success(root, None, &["issue", "show", "PerishLab/concord#26"])["anchor"]["revision"],
             1
         );
         let claimed = operator(
-            fixture.path(),
+            root,
             &[
                 "member",
                 "claim",
@@ -139,12 +117,13 @@ pub(super) mod unix {
             assert!(subjects.iter().any(|subject| subject["kind"] == kind));
         }
         assert_eq!(
-            success(fixture.path(), &["issue", "show", "PerishLab/concord#26"])["anchor"]["revision"],
+            success(root, None, &["issue", "show", "PerishLab/concord#26"])["anchor"]["revision"],
             2
         );
-        super::recovery::run(fixture.path(), &source, &pending);
+        super::recovery::run(root, &source, &pending);
         let completed = success(
-            fixture.path(),
+            root,
+            None,
             &[
                 "member",
                 "complete",
@@ -155,23 +134,18 @@ pub(super) mod unix {
             ],
         );
         assert_eq!(completed["revision"], 3);
-        assert!(
-            !fixture
-                .path()
-                .join("workspace/issues/I_execution/worktree")
-                .exists()
-        );
+        assert!(!pending.exists());
         let mut arguments = arguments;
         arguments[6] = "3";
-        let restarted = success(fixture.path(), &arguments);
+        let restarted = success(root, Some(&server), &arguments);
         assert_eq!(restarted["member"]["branch"], branch);
         assert!(pending.join(".git").is_file());
         assert_eq!(
-            success(fixture.path(), &["issue", "show", "PerishLab/concord#26"])["anchor"]["revision"],
+            success(root, None, &["issue", "show", "PerishLab/concord#26"])["anchor"]["revision"],
             4
         );
         assert!(
-            success(fixture.path(), &["audit"])["agreement"]["faults"]
+            success(root, None, &["audit"])["agreement"]["faults"]
                 .as_array()
                 .unwrap()
                 .is_empty()
@@ -193,21 +167,14 @@ pub(super) mod unix {
         std::fs::write(source.join("README.md"), "fixture\n").expect("fixture file");
         git(&source, &["add", "README.md"]);
         git(&source, &["commit", "-m", "fixture"]);
-        git(
-            &source,
-            &[
-                "remote",
-                "add",
-                "origin",
-                &format!("https://github.com/{coordinate}.git"),
-            ],
-        );
+        let origin = format!("https://github.com/{coordinate}.git");
+        git(&source, &["remote", "add", "origin", &origin]);
         git(
             &source,
             &[
                 "config",
                 &format!("url.{}.insteadOf", remote.display()),
-                &format!("https://github.com/{coordinate}.git"),
+                &origin,
             ],
         );
         git(&source, &["push", "-u", "origin", "main"]);
@@ -221,45 +188,66 @@ pub(super) mod unix {
         pub number: i64,
     }
 
-    pub(crate) fn provider(root: &Path, facts: Facts<'_>) -> std::path::PathBuf {
-        let path = root.join(format!("start-{}", facts.number));
-        let reply = fact(&facts);
-        executable(&path, &format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
-        path
-    }
-
-    fn fact(facts: &Facts<'_>) -> Value {
+    pub(crate) fn record(node: &str, coordinate: &str) -> Value {
         json!({
-            "node": facts.node,
-            "stable": facts.stable,
-            "coordinate": facts.coordinate,
-            "branch": "main",
-            "number": facts.number,
-            "url": format!("https://github.com/{}/issues/{}", facts.coordinate, facts.number),
-            "state": "OPEN",
-            "kind": "Feature",
-            "leaves": 0,
-            "truncated": false,
-            "rulesets": [{
-                "enforcement": "ACTIVE",
-                "target": "BRANCH",
-                "include": ["~DEFAULT_BRANCH"],
-                "exclude": [],
-                "bypass": 0,
-                "truncated": false,
-                "rules": ["DELETION", "NON_FAST_FORWARD", "PULL_REQUEST"],
-            }],
-            "labels": {"names": [], "truncated": false},
+            "id": 1, "node_id": node, "full_name": coordinate,
+            "private": false, "default_branch": "main",
         })
     }
 
-    fn executable(path: &Path, body: &str) {
-        plumb::testing::executable(path, body);
+    pub(crate) fn ticket(facts: &Facts<'_>, state: &str, kind: &str, updated: &str) -> Value {
+        let label = (!kind.is_empty()).then(|| json!({"name": kind}));
+        let url = format!(
+            "https://github.com/{}/issues/{}",
+            facts.coordinate, facts.number
+        );
+        let issue = json!({
+            "id": facts.node, "number": facts.number, "title": format!("Issue {}", facts.number),
+            "body": "Body", "url": url, "state": state, "reason": null,
+            "updated": updated, "writable": true, "kind": label,
+            "repository": {"id": facts.stable},
+        });
+        let seat = json!({"nameWithOwner": facts.coordinate, "issue": issue});
+        json!({"data": {"repository": seat}})
     }
 
-    pub(super) fn success(space: &Path, arguments: &[&str]) -> Value {
-        let output = operator(space, arguments, "NO_CONCORD_AGENT", "none");
-        assert!(output.status.success());
+    pub(crate) fn admission(facts: &Facts<'_>, kind: &str) -> Value {
+        let url = format!(
+            "https://github.com/{}/issues/{}",
+            facts.coordinate, facts.number
+        );
+        let page = json!({"hasNextPage": false});
+        let issue = json!({
+            "id": facts.node, "number": facts.number, "url": url, "state": "OPEN",
+            "issueType": {"name": kind}, "subIssuesSummary": {"total": 0},
+            "labels": {"nodes": [], "pageInfo": page},
+        });
+        let kinds = [
+            json!({"type": "DELETION"}),
+            json!({"type": "NON_FAST_FORWARD"}),
+            json!({"type": "PULL_REQUEST"}),
+        ];
+        let rules = json!({"nodes": kinds, "pageInfo": page});
+        let names = json!({"include": ["~DEFAULT_BRANCH"], "exclude": []});
+        let ruleset = json!({
+            "enforcement": "ACTIVE", "target": "BRANCH", "conditions": {"refName": names},
+            "bypassActors": {"totalCount": 0}, "rules": rules,
+        });
+        let rulesets = json!({"nodes": [ruleset], "pageInfo": page});
+        let seat = json!({
+            "id": facts.stable, "nameWithOwner": facts.coordinate,
+            "defaultBranchRef": {"name": "main"}, "issue": issue, "rulesets": rulesets,
+        });
+        json!({"data": {"repository": seat}})
+    }
+
+    pub(super) fn success(space: &Path, server: Option<&Server>, arguments: &[&str]) -> Value {
+        let output = remote(space, server, arguments, ("NO_CONCORD_AGENT", "none"));
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         serde_json::from_slice(&output.stdout).expect("Concord JSON")
     }
 
@@ -269,12 +257,24 @@ pub(super) mod unix {
         variable: &str,
         session: &str,
     ) -> Output {
-        spawn::concord(space)
+        remote(space, None, arguments, (variable, session))
+    }
+
+    fn remote(
+        space: &Path,
+        server: Option<&Server>,
+        arguments: &[&str],
+        actor: (&str, &str),
+    ) -> Output {
+        let mut command = spawn::concord(space);
+        command
             .args(["--home", space.to_str().expect("root path"), "--json"])
             .args(arguments)
-            .env(variable, session)
-            .output()
-            .expect("run Concord as operator")
+            .env(actor.0, actor.1);
+        if let Some(server) = server {
+            server.attach(&mut command);
+        }
+        command.output().expect("run Concord as operator")
     }
 
     pub(crate) fn git(root: &Path, arguments: &[&str]) {

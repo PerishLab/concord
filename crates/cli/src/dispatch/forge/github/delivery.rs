@@ -1,94 +1,30 @@
 use super::super::delivery::pull::provider;
-use super::pull::Pull;
-use super::pull::{Checks, Rollup};
+use super::identity::{Native, diagnostic};
+use super::pull::{Checks, Pull};
+use crate::runtime::github;
 use concord_core::Result;
-use std::path::Path;
 use std::time::Duration;
 
-const LIMIT: usize = 1024 * 1024;
-
-const FIELDS: &str =
-    "id,number,url,state,baseRefName,headRefOid,mergeCommit,mergedAt,updatedAt,title,body";
-
 pub(crate) struct Client<'a> {
-    pub command: &'a Path,
     pub repository: &'a str,
     pub timeout: u64,
 }
 
 impl Client<'_> {
     pub async fn all(&mut self, base: &str, head: &str) -> Result<Vec<Pull>> {
-        let body = self
-            .gh(&[
-                "pr",
-                "list",
-                "-R",
-                self.repository,
-                "--state",
-                "all",
-                "--base",
-                base,
-                "--head",
-                head,
-                "--json",
-                FIELDS,
-            ])
-            .await?;
-        let pulls = serde_json::from_str::<Vec<Pull>>(&body)
-            .map_err(|error| provider(format!("gh pr list did not answer JSON: {error}")))?;
-        for pull in &pulls {
-            super::identity::pull(pull, self.repository)?;
-        }
-        Ok(pulls)
+        Native::open(self.repository, self.timeout)?.listing(base, head)
     }
 
     pub async fn raise(&mut self, base: &str, head: &str, title: &str, body: &str) -> Result<Pull> {
-        let reply = self
-            .gh(&[
-                "pr",
-                "create",
-                "-R",
-                self.repository,
-                "--base",
-                base,
-                "--head",
-                head,
-                "--title",
-                title,
-                "--body",
-                body,
-            ])
-            .await?;
-        let url = reply
-            .lines()
-            .rev()
-            .find(|line| line.contains("/pull/"))
-            .ok_or_else(|| provider("gh pr create named no pull"))?;
-        let number = url
-            .rsplit_once('/')
-            .and_then(|(_, number)| number.parse::<i64>().ok())
-            .ok_or_else(|| provider("gh pr create returned a malformed pull URL"))?;
-        self.view(number).await
+        Native::open(self.repository, self.timeout)?.raise(base, head, title, body)
     }
 
     pub async fn edit(&mut self, pull: i64, title: &str, body: &str) -> Result<()> {
-        let path = format!("repos/{}/pulls/{pull}", self.repository);
-        let title = format!("title={title}");
-        let body = format!("body={body}");
-        self.gh(&["api", "-X", "PATCH", &path, "-f", &title, "-f", &body])
-            .await
-            .map(|_| ())
+        Native::open(self.repository, self.timeout)?.edit(pull, title, body)
     }
 
     pub async fn view(&mut self, pull: i64) -> Result<Pull> {
-        let pull = pull.to_string();
-        let body = self
-            .gh(&["pr", "view", &pull, "-R", self.repository, "--json", FIELDS])
-            .await?;
-        let pull = serde_json::from_str(&body)
-            .map_err(|error| provider(format!("gh pr view did not answer JSON: {error}")))?;
-        super::identity::pull(&pull, self.repository)?;
-        Ok(pull)
+        Native::open(self.repository, self.timeout)?.view(pull)
     }
 
     pub async fn mark(
@@ -110,33 +46,35 @@ impl Client<'_> {
                 "Concord revalidated the exact Wharf native proof",
             ),
         };
-        self.gh(&[
-            "api",
-            "-X",
-            "POST",
-            &format!("repos/{}/statuses/{candidate}", self.repository),
-            "-f",
-            "state=success",
-            "-f",
-            &format!("context={context}"),
-            "-f",
-            &format!("description={description}"),
-        ])
-        .await
-        .map(|_| ())
+        Native::open(self.repository, self.timeout)?.mark(candidate, context, description)
     }
 
     pub async fn settle(&mut self, pull: i64, squash: &plumb::delivery::Squash) -> Result<Merge> {
-        let number =
-            u64::try_from(pull).map_err(|_| provider(format!("pull number {pull} is negative")))?;
-        let arguments = squash.arguments(self.repository, number);
-        let arguments = arguments.iter().map(String::as_str).collect::<Vec<_>>();
+        let native = Native::open(self.repository, self.timeout)?;
+        self.squash(&native, pull, squash).await
+    }
+
+    async fn squash(
+        &mut self,
+        native: &Native<'_>,
+        pull: i64,
+        squash: &plumb::delivery::Squash,
+    ) -> Result<Merge> {
+        use runseal::github::{Outcome, Squash};
+        let target = native.target(pull)?;
+        let input = Squash::new(&squash.candidate, Some(&squash.subject), Some(&squash.body))
+            .map_err(diagnostic)?;
         let mut last = None;
         for turn in 1..=6 {
-            let error = match self.gh(&arguments).await {
+            let error = match github::call("pull.squash", || native.client.squash(&target, &input))
+            {
                 Ok(_) => return Ok(Merge::Merged),
-                Err(error) if pending(error.message()) => error,
-                Err(error) => return Err(error),
+                Err(error)
+                    if error.outcome == Outcome::Refused && error.evidence.status == Some(405) =>
+                {
+                    diagnostic(error)
+                }
+                Err(error) => return Err(diagnostic(error)),
             };
             let checks = self.checks(pull).await?;
             if !checks.pending.is_empty() {
@@ -152,40 +90,7 @@ impl Client<'_> {
     }
 
     pub async fn checks(&mut self, pull: i64) -> Result<Checks> {
-        let pull = pull.to_string();
-        let body = self
-            .gh(&[
-                "pr",
-                "view",
-                &pull,
-                "-R",
-                self.repository,
-                "--json",
-                "statusCheckRollup",
-            ])
-            .await?;
-        serde_json::from_str::<Rollup>(&body)
-            .map_err(|error| provider(format!("gh pr view did not answer check JSON: {error}")))?
-            .qualified()
-    }
-
-    async fn gh(&mut self, args: &[&str]) -> Result<String> {
-        let mut arguments = args
-            .iter()
-            .map(|arg| (*arg).to_string())
-            .collect::<Vec<_>>();
-        if let Some(index) = arguments
-            .iter()
-            .position(|arg| arg == "-R" || arg == "--repo")
-        {
-            arguments[index + 1] = format!("https://github.com/{}", self.repository);
-        }
-        let output = super::transport::Request::new(self.command, self.timeout, LIMIT)
-            .args(arguments)
-            .run()
-            .await
-            .map_err(|failure| provider(failure.to_string()))?;
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        Native::open(self.repository, self.timeout)?.checks(pull)
     }
 }
 
@@ -200,22 +105,4 @@ fn failed(error: &concord_core::Error, checks: &[String]) -> concord_core::Error
 pub enum Merge {
     Merged,
     Pending,
-}
-
-fn pending(message: &str) -> bool {
-    ["not mergeable", "is expected", "mergeability"]
-        .iter()
-        .any(|needle| message.contains(needle))
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn pending() {
-        assert!(super::pending("pull is not mergeable"));
-        assert!(super::pending(
-            "X Pull request PerishLab/plumb#188 is not mergeable: the base branch policy prohibits the merge."
-        ));
-        assert!(!super::pending("authentication failed"));
-    }
 }

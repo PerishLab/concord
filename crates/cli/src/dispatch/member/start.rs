@@ -1,11 +1,7 @@
+use crate::runtime::github;
 use concord_core::{Coordinate, Error, Result};
+use runseal::github::Target;
 use serde::Deserialize;
-use std::path::Path;
-use std::process::Stdio;
-use std::time::Duration;
-use tokio::process::Command;
-
-const LIMIT: usize = 32 * 1024;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -43,42 +39,140 @@ struct Ruleset {
     rules: Vec<String>,
 }
 
-pub(super) async fn observe(issue: &Coordinate, command: &Path, timeout: u64) -> Result<Reply> {
-    let query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){id nameWithOwner defaultBranchRef{name} issue(number:$number){id number url state issueType{name} subIssuesSummary{total} labels(first:100){nodes{name} pageInfo{hasNextPage}}} rulesets(first:100,includeParents:true){nodes{enforcement target conditions{refName{include exclude}} bypassActors(first:100){totalCount} rules(first:100){nodes{type}pageInfo{hasNextPage}}}pageInfo{hasNextPage}}}}";
-    let selector = ".data.repository as $r | $r.issue as $i | if $r == null or $i == null then null else {node:$i.id,stable:$r.id,coordinate:$r.nameWithOwner,branch:($r.defaultBranchRef.name // \"\"),number:$i.number,url:$i.url,state:$i.state,kind:($i.issueType.name // \"\"),leaves:$i.subIssuesSummary.total,truncated:$r.rulesets.pageInfo.hasNextPage,rulesets:[$r.rulesets.nodes[]|{enforcement:.enforcement,target:.target,include:(.conditions.refName.include // []),exclude:(.conditions.refName.exclude // []),bypass:.bypassActors.totalCount,truncated:.rules.pageInfo.hasNextPage,rules:[.rules.nodes[].type]}],labels:{names:[$i.labels.nodes[].name],truncated:$i.labels.pageInfo.hasNextPage}} end";
-    let mut process = Command::new(command);
-    process
-        .args(["api", "graphql", "-f"])
-        .arg(format!("query={query}"))
-        .args(["-f", &format!("owner={}", issue.owner)])
-        .args(["-f", &format!("name={}", issue.repository)])
-        .args(["-F", &format!("number={}", issue.number)])
-        .args(["--jq", selector])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .kill_on_drop(true);
-    let output = match tokio::time::timeout(Duration::from_secs(timeout), process.output()).await {
-        Ok(Ok(output)) => output,
-        Ok(Err(error)) => return Err(fault("command", error.to_string())),
-        Err(_) => return Err(fault("timeout", "GitHub Issue start observation timed out")),
-    };
-    if !output.status.success() {
-        return Err(fault(
-            "provider",
-            "GitHub Issue start observation was refused by the provider",
-        ));
-    }
-    if output.stdout.len() > LIMIT {
-        return Err(fault(
-            "malformed",
-            "GitHub Issue start observation exceeds the reply limit",
-        ));
-    }
-    let reply = serde_json::from_slice::<Option<Reply>>(&output.stdout)
-        .map_err(|_| fault("malformed", "GitHub Issue start reply is not valid JSON"))?
+#[derive(Deserialize)]
+struct Raw {
+    id: String,
+    #[serde(rename = "nameWithOwner")]
+    coordinate: String,
+    #[serde(rename = "defaultBranchRef")]
+    branch: Option<Named>,
+    issue: Option<Ticket>,
+    rulesets: Connection<Policy>,
+}
+
+#[derive(Deserialize)]
+struct Named {
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct Ticket {
+    id: String,
+    number: i64,
+    url: String,
+    state: String,
+    #[serde(rename = "issueType")]
+    kind: Option<Named>,
+    #[serde(rename = "subIssuesSummary")]
+    summary: Summary,
+    labels: Connection<Named>,
+}
+
+#[derive(Deserialize)]
+struct Summary {
+    total: usize,
+}
+
+#[derive(Deserialize)]
+struct Connection<T> {
+    nodes: Vec<T>,
+    #[serde(rename = "pageInfo")]
+    page: Page,
+}
+
+#[derive(Deserialize)]
+struct Page {
+    #[serde(rename = "hasNextPage")]
+    more: bool,
+}
+
+#[derive(Deserialize)]
+struct Policy {
+    enforcement: String,
+    target: String,
+    conditions: Option<Conditions>,
+    #[serde(rename = "bypassActors")]
+    bypass: Count,
+    rules: Connection<Rule>,
+}
+
+#[derive(Deserialize)]
+struct Conditions {
+    #[serde(rename = "refName")]
+    refs: Option<Refs>,
+}
+
+#[derive(Deserialize)]
+struct Refs {
+    include: Vec<String>,
+    exclude: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct Count {
+    #[serde(rename = "totalCount")]
+    total: usize,
+}
+
+#[derive(Deserialize)]
+struct Rule {
+    #[serde(rename = "type")]
+    kind: String,
+}
+
+pub(super) async fn observe(issue: &Coordinate, timeout: u64) -> Result<Reply> {
+    let client = github::client(timeout).map_err(|error| fault("provider", error))?;
+    let number =
+        u32::try_from(issue.number).map_err(|_| fault("coordinate", "invalid Issue number"))?;
+    let target = Target::new(&issue.owner, &issue.repository, number)
+        .map_err(|error| fault("coordinate", github::describe(error)))?;
+    let value = github::call("issue.admission", || client.admission(&target))
+        .map_err(|error| fault("provider", github::describe(error)))?
+        .value;
+    let raw: Raw = serde_json::from_value(value)
+        .map_err(|_| fault("malformed", "GitHub Issue start reply is malformed"))?;
+    let observed = raw
+        .issue
         .ok_or_else(|| fault("missing", "GitHub Issue is not readable"))?;
+    let reply = Reply {
+        node: observed.id,
+        stable: raw.id,
+        coordinate: raw.coordinate,
+        branch: raw.branch.map(|branch| branch.name).unwrap_or_default(),
+        number: observed.number,
+        url: observed.url,
+        state: observed.state,
+        kind: observed.kind.map(|kind| kind.name).unwrap_or_default(),
+        leaves: observed.summary.total,
+        truncated: raw.rulesets.page.more,
+        rulesets: raw.rulesets.nodes.into_iter().map(ruleset).collect(),
+        labels: Labels {
+            names: observed
+                .labels
+                .nodes
+                .into_iter()
+                .map(|label| label.name)
+                .collect(),
+            truncated: observed.labels.page.more,
+        },
+    };
     shape(issue, reply)
+}
+
+fn ruleset(raw: Policy) -> Ruleset {
+    let refs = raw.conditions.and_then(|conditions| conditions.refs);
+    Ruleset {
+        enforcement: raw.enforcement,
+        target: raw.target,
+        include: refs
+            .as_ref()
+            .map(|refs| refs.include.clone())
+            .unwrap_or_default(),
+        exclude: refs.map(|refs| refs.exclude).unwrap_or_default(),
+        bypass: raw.bypass.total,
+        truncated: raw.rules.page.more,
+        rules: raw.rules.nodes.into_iter().map(|rule| rule.kind).collect(),
+    }
 }
 
 fn shape(issue: &Coordinate, reply: Reply) -> Result<Reply> {

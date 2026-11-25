@@ -1,9 +1,9 @@
 #![cfg(unix)]
 use super::super::execution::unix::repository;
-use super::super::spawn;
+use super::super::spawn::{self, Reply, Server};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 struct Span {
     trace: String,
@@ -15,7 +15,7 @@ struct Span {
 fn survey() {
     let fixture = tempfile::tempdir().expect("fixture");
     let space = fixture.path();
-    success(space, &["issue", "bootstrap"]);
+    success(space, None, &["issue", "bootstrap"]);
     for (node, coordinate) in [
         ("R_concord", "PerishLab/concord"),
         ("R_probe", "PerishLab/probe"),
@@ -80,22 +80,23 @@ fn register(space: &Path, node: &str, coordinate: &str) {
     let root = space.join(node);
     std::fs::create_dir(&root).expect("repository root");
     let source = repository(&root, coordinate);
-    let reply = json!({"node": node, "coordinate": coordinate, "branch": "main"});
-    let provider = tool(
-        space,
-        &format!("provider-{node}"),
-        format!("printf '%s\\n' '{reply}'"),
-    );
+    let reply = json!({
+        "id": 1,
+        "node_id": node,
+        "full_name": coordinate,
+        "private": true,
+        "default_branch": "main"
+    });
+    let server = Server::start(move |_| Reply::json(reply.clone()));
     success(
         space,
+        Some(&server),
         &[
             "integration",
             "register",
             coordinate,
             "--path",
             source.to_str().expect("source"),
-            "--github-command",
-            provider.to_str().expect("provider"),
         ],
     );
 }
@@ -111,7 +112,7 @@ fn observe(space: &Path) -> Vec<Value> {
         format!("[locus]\nenabled = true\nendpoint = \"{endpoint}\"\n"),
     )
     .expect("config");
-    success(space, &["audit"]);
+    success(space, None, &["audit"]);
     std::fs::read_to_string(space.join("state").join("locus").join("active.jsonl"))
         .expect("Locus buffer")
         .lines()
@@ -120,18 +121,15 @@ fn observe(space: &Path) -> Vec<Value> {
         .collect()
 }
 
-fn tool(root: &Path, name: &str, body: String) -> PathBuf {
-    let path = root.join(name);
-    plumb::testing::executable(&path, format!("#!/bin/sh\n{body}\n"));
-    path
-}
-
-fn success(space: &Path, arguments: &[&str]) -> Value {
-    let output = spawn::concord(space)
+fn success(space: &Path, server: Option<&Server>, arguments: &[&str]) -> Value {
+    let mut command = spawn::concord(space);
+    command
         .args(["--home", space.to_str().expect("root path"), "--json"])
-        .args(arguments)
-        .output()
-        .expect("run Concord");
+        .args(arguments);
+    if let Some(server) = server {
+        server.attach(&mut command);
+    }
+    let output = command.output().expect("run Concord");
     assert!(
         output.status.success(),
         "{}",

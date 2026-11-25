@@ -1,21 +1,11 @@
-use super::github::RawIssue;
+use super::github::{RawIssue, RawRepository, RawType};
 use super::{Bounds, Diagnostic};
+use crate::runtime::github;
 use concord_core::{Coordinate, Estate, IssueWorktree, automation};
-use serde::{Deserialize, Serialize};
+use runseal::github::records;
+use serde::Serialize;
 use std::collections::BTreeSet;
 use std::path::Path;
-
-const QUERY: &str = r#"
-query($owner: String!, $repo: String!, $first: Int!, $after: String) {
-  repository(owner: $owner, name: $repo) {
-    issues(states: [OPEN], first: $first, after: $after) {
-      nodes { id number url title body state updatedAt issueType { name }
-        repository { nameWithOwner } }
-      pageInfo { hasNextPage endCursor }
-    }
-  }
-}
-"#;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Observation {
@@ -33,47 +23,10 @@ pub(super) struct Observed {
     pub complete: bool,
 }
 
-#[derive(Deserialize)]
-struct Envelope {
-    data: Option<Data>,
-    #[serde(default)]
-    errors: Vec<Failure>,
-}
-
-#[derive(Deserialize)]
-struct Failure {
-    message: String,
-}
-
-#[derive(Deserialize)]
-struct Data {
-    repository: Repository,
-}
-
-#[derive(Deserialize)]
-struct Repository {
-    issues: Page,
-}
-
-#[derive(Deserialize)]
-struct Page {
-    nodes: Vec<RawIssue>,
-    #[serde(rename = "pageInfo")]
-    page: Cursor,
-}
-
-#[derive(Deserialize)]
-struct Cursor {
-    #[serde(rename = "hasNextPage")]
-    more: bool,
-    #[serde(rename = "endCursor")]
-    end: Option<String>,
-}
-
 pub(super) async fn observe(
     estate: &Estate,
     coordinate: &Coordinate,
-    bounds: &Bounds<'_>,
+    bounds: &Bounds,
     members: &[IssueWorktree],
 ) -> Observed {
     let mut observed = Observed {
@@ -106,39 +59,35 @@ pub(super) async fn observe(
             return observed;
         }
     };
-    let mut after = None;
-    let mut cursors = BTreeSet::new();
+    let mut page = 1u32;
+    let mut seen = BTreeSet::new();
     let mut nodes = BTreeSet::new();
     for turn in 0..bounds.pages {
-        let page = match page(coordinate, bounds, after.as_deref()).await {
-            Ok(page) => page,
+        let listing = match slice(coordinate, bounds, page) {
+            Ok(listing) => listing,
             Err(error) => {
                 observed.complete = false;
                 observed.diagnostics.push(error);
                 break;
             }
         };
-        for raw in page.nodes {
+        for raw in listing.0 {
             if !nodes.insert(raw.id.clone()) {
                 continue;
             }
             append(&mut observed.observations, raw, &members, &paths);
         }
-        if !page.page.more {
+        let Some(next) = listing.1 else {
             break;
-        }
-        after = page.page.end;
-        if turn + 1 == bounds.pages
-            || after
-                .as_ref()
-                .is_none_or(|cursor| !cursors.insert(cursor.clone()))
-        {
+        };
+        if turn + 1 == bounds.pages || !seen.insert(next) {
             observed.complete = false;
             observed.diagnostics.push(fault(
                 "Auto observations exhausted pages or received a missing/repeated cursor",
             ));
             break;
         }
+        page = next;
     }
     observed
         .observations
@@ -177,42 +126,46 @@ fn append(
     }
 }
 
-async fn page(
+fn slice(
     coordinate: &Coordinate,
-    bounds: &Bounds<'_>,
-    after: Option<&str>,
-) -> Result<Page, Diagnostic> {
-    let mut process =
-        super::super::github::transport::Request::new(bounds.command, bounds.timeout, 1024 * 1024)
-            .args(["api", "graphql", "-f"])
-            .arg(format!("query={QUERY}"))
-            .args(["-f", &format!("owner={}", coordinate.owner)])
-            .args(["-f", &format!("repo={}", coordinate.repository)])
-            .args(["-F", &format!("first={}", bounds.first)]);
-    if let Some(after) = after {
-        process = process.args(["-f", &format!("after={after}")]);
-    }
-    let output = process.run().await.map_err(fault)?;
-    let envelope: Envelope = serde_json::from_slice(&output.stdout).map_err(fault)?;
-    if !envelope.errors.is_empty() {
-        return Err(fault(
-            envelope
-                .errors
-                .into_iter()
-                .map(|error| error.message)
-                .collect::<Vec<_>>()
-                .join("; "),
-        ));
-    }
-    let page = envelope
-        .data
-        .map(|data| data.repository.issues)
-        .ok_or_else(|| fault("Auto observation has no repository connection"))?;
+    bounds: &Bounds,
+    page: u32,
+) -> Result<(Vec<RawIssue>, Option<u32>), Diagnostic> {
+    let client = github::client(bounds.timeout).map_err(fault)?;
+    let size = u8::try_from(bounds.first).map_err(|_| fault("invalid page size"))?;
+    let listing = github::call("issue.list", || {
+        client.issues(&coordinate.owner, &coordinate.repository, page, size)
+    })
+    .map_err(|error| fault(github::describe(error)))?
+    .value;
     let expected = format!("{}/{}", coordinate.owner, coordinate.repository);
-    for raw in &page.nodes {
-        validate(raw, &expected)?;
+    let mut rows = Vec::with_capacity(listing.rows.len());
+    for record in listing.rows {
+        let raw = convert(record, &listing.repository);
+        validate(&raw, &expected)?;
+        rows.push(raw);
     }
-    Ok(page)
+    Ok((rows, listing.next))
+}
+
+fn convert(record: records::Record, repository: &str) -> RawIssue {
+    let state = match record.state {
+        records::State::Open => "OPEN",
+        records::State::Closed => "CLOSED",
+    };
+    RawIssue {
+        id: record.node,
+        number: i64::from(record.number),
+        url: record.url,
+        title: record.title,
+        body: record.body.unwrap_or_default(),
+        state: state.into(),
+        updated_at: record.updated,
+        issue_type: record.kind.map(|kind| RawType { name: kind.name }),
+        repository: RawRepository {
+            name_with_owner: repository.into(),
+        },
+    }
 }
 
 fn fault(message: impl std::fmt::Display) -> Diagnostic {

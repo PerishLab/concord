@@ -1,20 +1,16 @@
 pub(super) mod authority;
+mod native;
 mod relations;
 
 use concord_core::{Coordinate, Result};
-use serde_json::json;
 use std::collections::BTreeSet;
-use std::path::Path;
 
-use super::super::forge::Request;
-use super::model::{Connection, Entry, Envelope, Header, Issue, Label, Snapshot};
+use super::model::{Connection, Entry, Header, Issue, Label, Snapshot};
 
 const LIMIT: usize = 8 * 1024 * 1024;
-const QUERY: &str = "query($owner:String!,$name:String!,$number:Int!,$labels:String,$comments:String){repository(owner:$owner,name:$name){id issue(number:$number){id number url state body updated:updatedAt kind:issueType{name} labels(first:100,after:$labels){total:totalCount nodes{name} page:pageInfo{next:hasNextPage cursor:endCursor}} comments(first:100,after:$comments){total:totalCount nodes{id body url} page:pageInfo{next:hasNextPage cursor:endCursor}}}}}";
 
 pub(super) struct Reader<'a> {
     pub coordinate: &'a Coordinate,
-    pub command: &'a Path,
     pub timeout: u64,
     pub pages: usize,
 }
@@ -41,11 +37,13 @@ impl<T> Default for Scan<T> {
 
 impl Reader<'_> {
     pub async fn complete(&self) -> Result<Snapshot> {
+        let client = self.native()?;
         let mut header = None;
         let mut labels = Scan::<Label>::default();
         let mut comments = Scan::<Entry>::default();
         for _ in 0..self.pages {
-            let (current, issue) = self.page(&labels.cursor, &comments.cursor).await?;
+            let (repository, issue) = client.acceptance([&labels.cursor, &comments.cursor])?;
+            let current = self.header(repository, &issue)?;
             if header.as_ref().is_some_and(|header| header != &current) {
                 return Err(super::fault(
                     "changed",
@@ -64,51 +62,6 @@ impl Reader<'_> {
             "truncated",
             "acceptance history exceeds the selected page bound; no absence or readiness is inferred",
         ))
-    }
-
-    async fn page(
-        &self,
-        labels: &Option<String>,
-        comments: &Option<String>,
-    ) -> Result<(Header, Issue)> {
-        let input = serde_json::to_vec(&json!({
-            "query": QUERY,
-            "variables": {
-                "owner": self.coordinate.owner,
-                "name": self.coordinate.repository,
-                "number": self.coordinate.number,
-                "labels": labels,
-                "comments": comments,
-            },
-        }))
-        .map_err(|error| super::fault("encode", error.to_string()))?;
-        let reply = Request::new(self.command, self.timeout, LIMIT)
-            .args(["api", "graphql", "--input", "-"])
-            .input(&input)
-            .run()
-            .await
-            .map_err(|error| super::fault("provider", error.to_string()))?;
-        let envelope: Envelope = serde_json::from_slice(&reply.stdout).map_err(|error| {
-            super::fault(
-                "reply",
-                format!("malformed acceptance observation: {error}"),
-            )
-        })?;
-        if envelope.errors.is_some() {
-            return Err(super::fault(
-                "provider",
-                "GraphQL acceptance observation contains provider errors",
-            ));
-        }
-        let repository = envelope
-            .data
-            .and_then(|data| data.repository)
-            .ok_or_else(|| super::fault("missing", "requested repository is unreadable"))?;
-        let issue = repository
-            .issue
-            .ok_or_else(|| super::fault("missing", "requested typed Issue is unreadable"))?;
-        let header = self.header(repository.id, &issue)?;
-        Ok((header, issue))
     }
 
     fn header(&self, repository: String, issue: &Issue) -> Result<Header> {

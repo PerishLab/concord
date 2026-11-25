@@ -1,5 +1,6 @@
 use super::world::{World, decoded, page};
-use crate::execution::unix::{Facts, provider, repository};
+use crate::execution::unix::{Facts, admission, record, repository, ticket};
+use crate::spawn::{Reply, Request, Server};
 use serde_json::{Value, json};
 
 #[test]
@@ -96,53 +97,44 @@ fn incomplete() {
 fn member(world: &World) {
     let space = world.root.path();
     let source = repository(space, "PerishLab/concord");
-    let observer = space.join("repository");
-    plumb::testing::executable(
-        &observer,
-        "#!/bin/sh\nprintf '%s\\n' '{\"node\":\"R_repo\",\"coordinate\":\"PerishLab/concord\",\"branch\":\"main\"}'\n",
-    );
-    decoded(&world.command(&[
-        "integration",
-        "register",
-        "PerishLab/concord",
-        "--path",
-        source.to_str().unwrap(),
-        "--github-command",
-        observer.to_str().unwrap(),
-    ]));
-    let provider = provider(
-        space,
-        Facts {
+    let server = Server::start(|request: Request| {
+        if request.method == "GET" && request.path == "/repos/PerishLab/concord" {
+            return Reply::json(record("R_repo", "PerishLab/concord"));
+        }
+        let facts = Facts {
             node: "I_work",
             stable: "R_repo",
             coordinate: "PerishLab/concord",
             number: 4,
-        },
-    );
-    let attachment = space.join("attachment");
-    let reply = json!({"node":"I_work","stable":"R_repo","number":4,"url":"https://github.com/PerishLab/concord/issues/4","state":"OPEN","kind":"Feature","updated_at":"original"});
-    plumb::testing::executable(
-        &attachment,
-        format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"),
-    );
-    decoded(&world.command(&[
-        "issue",
-        "attach",
-        "PerishLab/concord#4",
-        "--github-command",
-        attachment.to_str().unwrap(),
-    ]));
-    decoded(&world.command(&[
-        "member",
-        "start",
-        "PerishLab/concord#4",
-        "--revision",
-        "0",
-        "--claim",
-        "topic.md",
-        "--github-command",
-        provider.to_str().unwrap(),
-    ]));
+        };
+        if request.query().contains("RunsealAdmission") {
+            return Reply::json(admission(&facts, "Feature"));
+        }
+        Reply::json(ticket(&facts, "OPEN", "Feature", "original"))
+    });
+    decoded(&world.attached(
+        &server,
+        &[
+            "integration",
+            "register",
+            "PerishLab/concord",
+            "--path",
+            source.to_str().unwrap(),
+        ],
+    ));
+    decoded(&world.attached(&server, &["issue", "attach", "PerishLab/concord#4"]));
+    decoded(&world.attached(
+        &server,
+        &[
+            "member",
+            "start",
+            "PerishLab/concord#4",
+            "--revision",
+            "0",
+            "--claim",
+            "topic.md",
+        ],
+    ));
 }
 
 fn configure(state: &mut Value, expected: &str) {

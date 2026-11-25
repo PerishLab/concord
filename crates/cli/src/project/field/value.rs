@@ -192,10 +192,3 @@ pub(in crate::project) fn steps(state: &Value, intent: &Intent) -> Result<Vec<St
         check: intent.clone(),
     }])
 }
-
-pub(in crate::project) fn selection(item: &str) -> String {
-    planning::selection(item).replace(
-        "ProjectV2ItemFieldTextValue{field",
-        "ProjectV2ItemFieldTextValue{text field",
-    )
-}

@@ -23,9 +23,9 @@ mod relations;
 mod settled;
 #[cfg(unix)]
 mod unix {
-    use super::super::execution::unix::{self as execution, Facts, git, repository, text};
-    use super::super::spawn;
-    use super::provider::{consume, observer, projection, start, tool};
+    use super::super::execution::unix::{git, repository, text};
+    use super::super::spawn::{self, Server};
+    use super::provider::{consume, serve, start, tool};
     use plumb::guard::{Action, Authority, Descriptor};
     use serde::Serialize;
     use serde_json::Value;
@@ -46,34 +46,27 @@ mod unix {
     fn handoff() {
         let fixture = tempfile::tempdir().expect("fixture");
         success(fixture.path(), &["issue", "bootstrap"]);
-        let provider = tool(fixture.path(), "provider", projection(fixture.path()));
-        let provider = provider.to_str().expect("provider path");
-        success(
+        let server = serve(fixture.path(), "PerishLab/probe", "R_probe");
+        attached(
             fixture.path(),
-            &[
-                "issue",
-                "attach",
-                "PerishLab/probe#1",
-                "--github-command",
-                provider,
-            ],
+            &server,
+            &["issue", "attach", "PerishLab/probe#1"],
         );
         let source = repository(fixture.path(), "PerishLab/probe");
-        let observer = observer(fixture.path());
-        success(
+        attached(
             fixture.path(),
+            &server,
             &[
                 "integration",
                 "register",
                 "PerishLab/probe",
                 "--path",
                 source.to_str().expect("source path"),
-                "--github-command",
-                observer.to_str().expect("repository provider"),
             ],
         );
-        success(
+        attached(
             fixture.path(),
+            &server,
             &[
                 "member",
                 "start",
@@ -82,18 +75,6 @@ mod unix {
                 "topic.md",
                 "--revision",
                 "0",
-                "--github-command",
-                execution::provider(
-                    fixture.path(),
-                    Facts {
-                        node: "I_delivery",
-                        stable: "R_probe",
-                        coordinate: "PerishLab/probe",
-                        number: 1,
-                    },
-                )
-                .to_str()
-                .expect("start provider"),
             ],
         );
         git(
@@ -138,19 +119,19 @@ mod unix {
             fixture.path(),
             &["member", "prove", "PerishLab/probe#1", "--revision", "1"],
         );
-        super::handoff::verify(fixture.path(), provider);
-        super::relations::verify(fixture.path(), provider);
+        super::handoff::verify(fixture.path(), &server);
+        super::relations::verify(fixture.path(), &server);
         assert_eq!(
             success(fixture.path(), &["issue", "show", "PerishLab/probe#1"])["anchor"]["revision"],
             2
         );
-        let plan = prepare(fixture.path(), provider, "2", true)
+        let plan = prepare(fixture.path(), &server, "2", true)
             .output()
             .expect("prepare stored plan");
         assert!(plan.status.success());
         std::fs::write(fixture.path().join("fail-create"), "one\n").expect("fail create");
         refused(
-            &consume(fixture.path(), provider, &plan.stdout),
+            &consume(fixture.path(), Some(&server), &plan.stdout),
             "concord.delivery.provider",
         );
         assert_eq!(
@@ -159,7 +140,7 @@ mod unix {
         );
         std::fs::write(fixture.path().join("incomplete"), "one\n").expect("incomplete mode");
         refused(
-            &consume(fixture.path(), provider, &plan.stdout),
+            &consume(fixture.path(), Some(&server), &plan.stdout),
             "concord.delivery.incomplete",
         );
         assert_eq!(
@@ -169,13 +150,13 @@ mod unix {
         std::fs::remove_file(fixture.path().join("incomplete")).expect("enable merge");
         std::fs::write(fixture.path().join("hide-readback"), "one\n").expect("hide readback");
         refused(
-            &consume(fixture.path(), provider, &plan.stdout),
+            &consume(fixture.path(), Some(&server), &plan.stdout),
             "concord.delivery.provider",
         );
         assert!(member.is_dir());
         std::fs::write(fixture.path().join("slow-readback"), "one\n").expect("slow readback");
-        let first = start(fixture.path(), provider, &plan.stdout);
-        let second = start(fixture.path(), provider, &plan.stdout);
+        let first = start(fixture.path(), Some(&server), &plan.stdout);
+        let second = start(fixture.path(), Some(&server), &plan.stdout);
         let outputs = [
             first.wait_with_output().expect("first land"),
             second.wait_with_output().expect("second land"),
@@ -193,15 +174,16 @@ mod unix {
                 .as_str()
                 .expect("main head")
         );
-        let replay = consume(fixture.path(), provider, &plan.stdout);
+        let replay = consume(fixture.path(), Some(&server), &plan.stdout);
         assert!(replay.status.success());
         let replay: Value = serde_json::from_slice(&replay.stdout).expect("replay report");
         assert_eq!(replay["revision"], 4);
         assert_eq!(replay["released"], false);
     }
 
-    pub(super) fn prepare(space: &Path, provider: &str, revision: &str, handoff: bool) -> Command {
+    pub(super) fn prepare(space: &Path, server: &Server, revision: &str, handoff: bool) -> Command {
         let mut command = spawn::concord(space);
+        server.attach(&mut command);
         command
             .args(["--home", space.to_str().expect("root"), "--json"])
             .args([
@@ -211,8 +193,6 @@ mod unix {
                 "PerishLab/probe#1",
                 "--revision",
                 revision,
-                "--github-command",
-                provider,
                 "--observe-timeout",
                 "1",
             ])
@@ -270,6 +250,22 @@ mod unix {
         };
         let bytes = serde_json::to_vec(&claim).expect("claim");
         format!("{:x}", Sha256::digest(bytes))
+    }
+
+    pub(super) fn attached(space: &Path, server: &Server, arguments: &[&str]) -> Value {
+        let mut command = spawn::concord(space);
+        server.attach(&mut command);
+        let output = command
+            .args(["--home", space.to_str().expect("root"), "--json"])
+            .args(arguments)
+            .output()
+            .expect("run Concord");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        serde_json::from_slice(&output.stdout).expect("Concord JSON")
     }
 
     pub(super) fn success(space: &Path, arguments: &[&str]) -> Value {

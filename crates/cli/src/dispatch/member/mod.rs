@@ -26,11 +26,10 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             issue,
             claim,
             revision,
-            command,
             timeout,
         } => {
             let issue = Coordinate::parse(&issue)?;
-            let observed = start::observe(&issue, &command, timeout).await?;
+            let observed = start::observe(&issue, timeout).await?;
             issue_changed(
                 estate
                     .start(&Start {

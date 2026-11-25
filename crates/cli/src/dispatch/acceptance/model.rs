@@ -47,23 +47,6 @@ impl Snapshot {
 }
 
 #[derive(Deserialize)]
-pub(super) struct Envelope {
-    pub data: Option<Data>,
-    pub errors: Option<serde_json::Value>,
-}
-
-#[derive(Deserialize)]
-pub(super) struct Data {
-    pub repository: Option<Repository>,
-}
-
-#[derive(Deserialize)]
-pub(super) struct Repository {
-    pub id: String,
-    pub issue: Option<Issue>,
-}
-
-#[derive(Deserialize)]
 pub(super) struct Issue {
     pub id: String,
     pub number: i64,

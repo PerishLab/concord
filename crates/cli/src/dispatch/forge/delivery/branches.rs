@@ -42,12 +42,7 @@ enum Verdict {
     Refused(Reason),
 }
 
-pub(super) async fn clean(
-    estate: &Estate,
-    integration: &Integration,
-    command: &Path,
-    timeout: u64,
-) -> Result<()> {
+pub(super) async fn clean(estate: &Estate, integration: &Integration, timeout: u64) -> Result<()> {
     let live = estate
         .issue_worktrees()
         .await?
@@ -101,7 +96,7 @@ pub(super) async fn clean(
             ),
         ));
     }
-    let observed = states(&integration.repository, &numbers, command, timeout).await?;
+    let observed = states(&integration.repository, &numbers, timeout).await?;
     let branches = pending
         .iter()
         .filter(|held| {
@@ -109,8 +104,7 @@ pub(super) async fn clean(
         })
         .map(|held| held.branch.clone())
         .collect();
-    let projected =
-        projections::observe(&integration.repository, &branches, command, timeout).await?;
+    let projected = projections::observe(&integration.repository, &branches, timeout).await?;
     for held in pending {
         let mut reason = settle(held.kind, observed.get(&held.number));
         if reason.is_none()

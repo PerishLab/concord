@@ -8,7 +8,7 @@ use concord_core::{Coordinate, Error, Estate, IssueDeclaration, Result, issue_de
 use plumb::delivery::Snapshot;
 use serde::Deserialize;
 use serde_json::json;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -25,7 +25,6 @@ struct Envelope {
 struct Flow<'a> {
     estate: &'a Estate,
     plan: issue_delivery::Plan,
-    command: PathBuf,
     timeout: u64,
 }
 
@@ -35,7 +34,6 @@ pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<Co
         wait: blocking,
         authority,
         plan: path,
-        command,
         timeout,
         forge: _,
     } = command
@@ -79,7 +77,6 @@ pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<Co
     let flow = Flow {
         estate,
         plan,
-        command,
         timeout,
     };
     super::execution::run(permit, async {
@@ -101,13 +98,7 @@ impl Flow<'_> {
         let observed = self.observe().await?;
         let mut resumed = self.reenter(&observed.snapshot).await?;
         if !resumed.released {
-            branches::clean(
-                self.estate,
-                &self.plan.member.integration,
-                &self.command,
-                self.timeout,
-            )
-            .await?;
+            branches::clean(self.estate, &self.plan.member.integration, self.timeout).await?;
         }
         let preparation = self.plan.delivery.preparation();
         let mut provider = self.provider(&preparation, resumed.released).await?;
@@ -238,7 +229,6 @@ impl Flow<'_> {
 
     fn client(&self) -> adaptor::Client<'_> {
         adaptor::Client {
-            command: &self.command,
             repository: &self.plan.delivery.repository,
             timeout: self.timeout,
         }
@@ -260,7 +250,7 @@ impl Flow<'_> {
 
     async fn observe(&self) -> Result<adaptor::Observation> {
         adaptor::integration(&self.plan.member.integration).await?;
-        let observed = adaptor::observe(&self.command, self.timeout, &self.plan.issue).await?;
+        let observed = adaptor::observe(self.timeout, &self.plan.issue).await?;
         if observed.acceptance != self.plan.acceptance {
             return Err(Error::typed(
                 "concord.acceptance.changed",

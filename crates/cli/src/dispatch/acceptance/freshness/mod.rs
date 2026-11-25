@@ -1,16 +1,14 @@
+mod native;
+
 use concord_core::Result;
 use concord_core::acceptance::{Fact, Reference, Verdict, digest};
-use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::collections::BTreeSet;
 
-use super::super::forge::Request;
 use super::clock::timestamp;
 use super::model::{Connection, Snapshot};
 use super::read::Scan;
 use crate::args::acceptance::Observe;
-
-const QUERY: &str = "query($owner:String!,$name:String!,$number:Int!,$after:String,$declaration:ID!,$closure:ID!){repository(owner:$owner,name:$name){id issue(number:$number){id body state updated:updatedAt edited:lastEditedAt events:timelineItems(first:100,after:$after,itemTypes:[REOPENED_EVENT]){total:totalCount nodes{... on ReopenedEvent{id created:createdAt}} page:pageInfo{next:hasNextPage cursor:endCursor}}}} declaration:node(id:$declaration){... on IssueComment{id body created:createdAt edited:lastEditedAt}} closure:node(id:$closure){... on IssueComment{id body created:createdAt edited:lastEditedAt}}}";
 
 pub(super) struct Reader<'a> {
     pub args: &'a Observe,
@@ -19,13 +17,13 @@ pub(super) struct Reader<'a> {
     pub closure: &'a Reference,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct Stamp {
     id: String,
     created: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct Comment {
     id: String,
     body: String,
@@ -41,26 +39,17 @@ pub(super) struct Freshness {
     events: Vec<Stamp>,
 }
 
-#[derive(Deserialize)]
-struct Envelope {
-    data: Data,
-    errors: Option<Value>,
-}
-
-#[derive(Deserialize)]
 struct Data {
     repository: Repository,
     declaration: Comment,
     closure: Comment,
 }
 
-#[derive(Deserialize)]
 struct Repository {
     id: String,
     issue: Issue,
 }
 
-#[derive(Deserialize)]
 struct Issue {
     id: String,
     body: String,
@@ -116,27 +105,12 @@ impl Reader<'_> {
     }
 
     async fn page(&self, cursor: &Option<String>) -> Result<Data> {
-        let coordinate = &self.snapshot.header.coordinate;
-        let input = serde_json::to_vec(&json!({"query": QUERY, "variables": {
-            "owner": coordinate.owner, "name": coordinate.repository, "number": coordinate.number,
-            "after": cursor, "declaration": self.declaration.node, "closure": self.closure.node,
-        }}))
-        .map_err(|error| super::fault("encode", error.to_string()))?;
-        let reply = Request::new(&self.args.command, self.args.timeout, 8 * 1024 * 1024)
-            .args(["api", "graphql", "--input", "-"])
-            .input(&input)
-            .run()
-            .await
-            .map_err(|error| super::fault("provider", error.to_string()))?;
-        let envelope: Envelope = serde_json::from_slice(&reply.stdout)
-            .map_err(|error| super::fault("reply", error.to_string()))?;
-        if envelope.errors.is_some() {
-            return Err(super::fault(
-                "provider",
-                "review metadata contains provider errors",
-            ));
-        }
-        let data = envelope.data;
+        let data = self.native(cursor)?;
+        self.check(&data)?;
+        Ok(data)
+    }
+
+    fn check(&self, data: &Data) -> Result<()> {
         let header = &self.snapshot.header;
         let issue = &data.repository.issue;
         let expected = [
@@ -170,7 +144,7 @@ impl Reader<'_> {
                 ));
             }
         }
-        Ok(data)
+        Ok(())
     }
 }
 

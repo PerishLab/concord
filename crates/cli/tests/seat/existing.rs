@@ -3,37 +3,27 @@
 mod unix {
     mod rebind;
     mod sections;
-    use super::super::execution::unix::{Facts, provider, repository};
-    use super::super::spawn;
+    use super::super::execution::unix::{Facts, admission, record, repository, ticket};
+    use super::super::spawn::{self, Reply, Request, Server};
     use serde_json::{Value, json};
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
     #[test]
     fn retirement() {
         let fixture = tempfile::tempdir().expect("fixture");
         let space = fixture.path();
-        success(space, &["issue", "bootstrap"]);
+        success(space, None, &["issue", "bootstrap"]);
         let source = repository(space, "PerishLab/concord");
-        let provider = tool(
-            space,
-            "repository",
-            format!(
-                "printf '%s\\n' '{}'",
-                json!({
-                    "node": "R_concord", "coordinate": "PerishLab/concord", "branch": "main",
-                })
-            ),
-        );
+        let server = Server::start(|_| Reply::json(record("R_concord", "PerishLab/concord")));
         success(
             space,
+            Some(&server),
             &[
                 "integration",
                 "register",
                 "PerishLab/concord",
                 "--path",
                 source.to_str().expect("source"),
-                "--github-command",
-                provider.to_str().expect("provider"),
             ],
         );
         std::fs::rename(&source, space.join("removed")).expect("domain removal");
@@ -46,10 +36,10 @@ mod unix {
             "--key",
             "1",
         ];
-        let preview = success(space, &args);
+        let preview = success(space, None, &args);
         assert_eq!(preview["retirement"]["applied"], false);
         assert_eq!(
-            success(space, &["integration", "list"])["integrations"]
+            success(space, None, &["integration", "list"])["integrations"]
                 .as_array()
                 .expect("list")
                 .len(),
@@ -57,8 +47,11 @@ mod unix {
         );
         let mut apply = args.to_vec();
         apply.push("--apply");
-        assert_eq!(success(space, &apply)["retirement"]["applied"], true);
-        assert_eq!(success(space, &["audit"])["agreement"]["faults"], json!([]));
+        assert_eq!(success(space, None, &apply)["retirement"]["applied"], true);
+        assert_eq!(
+            success(space, None, &["audit"])["agreement"]["faults"],
+            json!([])
+        );
         assert!(space.join("removed/.git").is_dir());
         assert!(!source.exists());
     }
@@ -66,46 +59,59 @@ mod unix {
     #[test]
     fn relationships() {
         let fixture = tempfile::tempdir().expect("fixture");
-        success(fixture.path(), &["issue", "bootstrap"]);
-        for (node, number) in [("I_root", 68), ("I_parent", 60), ("I_child", 69)] {
-            attach(fixture.path(), node, number);
+        success(fixture.path(), None, &["issue", "bootstrap"]);
+        let setup = Server::start(|request: Request| {
+            if request.method == "GET" && request.path == "/repos/PerishLab/concord" {
+                return Reply::json(record("R_concord", "PerishLab/concord"));
+            }
+            let number = request.variables()["number"].as_i64().unwrap_or(0);
+            let node = match number {
+                68 => "I_root",
+                60 => "I_parent",
+                69 => "I_child",
+                _ => "I_unknown",
+            };
+            let facts = Facts {
+                node,
+                stable: "R_concord",
+                coordinate: "PerishLab/concord",
+                number,
+            };
+            if request.query().contains("RunsealAdmission") {
+                return Reply::json(admission(&facts, "Task"));
+            }
+            Reply::json(ticket(&facts, "OPEN", "Task", "2026-09-29T00:00:00Z"))
+        });
+        for number in [68, 60, 69] {
+            success(
+                fixture.path(),
+                Some(&setup),
+                &["issue", "attach", &format!("PerishLab/concord#{number}")],
+            );
         }
         let source = repository(fixture.path(), "PerishLab/concord");
-        let provider = tool(
-            fixture.path(),
-            "repository",
-            format!(
-                "printf '%s\\n' '{}'",
-                json!({
-                    "node": "R_concord",
-                    "coordinate": "PerishLab/concord",
-                    "branch": "main",
-                })
-            ),
-        );
         success(
             fixture.path(),
+            Some(&setup),
             &[
                 "integration",
                 "register",
                 "PerishLab/concord",
                 "--path",
                 source.to_str().expect("source path"),
-                "--github-command",
-                provider.to_str().expect("provider path"),
             ],
         );
-        member(
-            fixture.path(),
-            "I_root",
-            "PerishLab/concord#68",
-            "crates/cli",
-        );
-        member(fixture.path(), "I_parent", "PerishLab/concord#60", "crates");
-        member(fixture.path(), "I_child", "PerishLab/concord#69", "docs");
+        member(fixture.path(), &setup, "PerishLab/concord#68", "crates/cli");
+        member(fixture.path(), &setup, "PerishLab/concord#60", "crates");
+        member(fixture.path(), &setup, "PerishLab/concord#69", "docs");
 
-        let provider = tool(fixture.path(), "relationships", reply(false));
-        let report = preflight(fixture.path(), &provider, 20);
+        let server = Server::start(|request: Request| {
+            if request.method == "GET" {
+                return Reply::json(json!([]));
+            }
+            Reply::json(reply(false))
+        });
+        let report = preflight(fixture.path(), &server, 20);
         let result = &report["preflight"];
         assert_eq!(result["schema"], "concord.issue-preflight-existing/v2");
         assert_eq!(result["complete"], true);
@@ -128,14 +134,19 @@ mod unix {
                 .is_empty()
         );
 
-        let truncated = tool(fixture.path(), "truncated-relationships", reply(true));
+        let truncated = Server::start(|request: Request| {
+            if request.method == "GET" {
+                return Reply::json(json!([]));
+            }
+            Reply::json(reply(true))
+        });
         let truncated = preflight(fixture.path(), &truncated, 1);
         assert_eq!(truncated["preflight"]["complete"], false);
         assert_eq!(
             truncated["preflight"]["diagnostics"][0]["code"],
             "concord.issue.projection.page-limit"
         );
-        let unavailable = tool(fixture.path(), "unavailable-existing", "exit 1".to_string());
+        let unavailable = Server::start(|_| Reply::status(500, json!({"message": "down"})));
         let unavailable = preflight(fixture.path(), &unavailable, 20);
         assert_eq!(unavailable["preflight"]["complete"], false);
         assert_eq!(
@@ -152,40 +163,10 @@ mod unix {
             .find(|relationship| relationship["kind"] == kind)
     }
 
-    fn attach(space: &Path, node: &str, number: i64) {
-        let provider = tool(
-            space,
-            &format!("observe-{number}"),
-            observation(node, number),
-        );
+    fn member(space: &Path, server: &Server, issue: &str, claim: &str) {
         success(
             space,
-            &[
-                "issue",
-                "attach",
-                &format!("PerishLab/concord#{number}"),
-                "--github-command",
-                provider.to_str().expect("provider path"),
-            ],
-        );
-    }
-
-    fn member(space: &Path, node: &str, issue: &str, claim: &str) {
-        let number = issue
-            .rsplit_once('#')
-            .and_then(|(_, number)| number.parse().ok())
-            .expect("Issue number");
-        let provider = provider(
-            space,
-            Facts {
-                node,
-                stable: "R_concord",
-                coordinate: "PerishLab/concord",
-                number,
-            },
-        );
-        success(
-            space,
+            Some(server),
             &[
                 "member",
                 "start",
@@ -194,38 +175,26 @@ mod unix {
                 claim,
                 "--revision",
                 "0",
-                "--github-command",
-                provider.to_str().expect("start provider"),
             ],
         );
     }
 
-    fn preflight(space: &Path, provider: &Path, pages: u16) -> Value {
+    fn preflight(space: &Path, server: &Server, pages: u16) -> Value {
         success(
             space,
+            Some(server),
             &[
                 "issue",
                 "preflight",
                 "existing",
                 "PerishLab/concord#68",
-                "--github-command",
-                provider.to_str().expect("provider path"),
                 "--max-pages",
                 &pages.to_string(),
             ],
         )
     }
 
-    fn observation(node: &str, number: i64) -> String {
-        let value = json!({
-            "node": node, "stable": "R_concord", "number": number,
-            "url": format!("https://github.com/PerishLab/concord/issues/{number}"),
-            "state": "OPEN", "kind": "Task", "updated_at": "2026-09-29T00:00:00Z",
-        });
-        format!("printf '%s\\n' '{value}'")
-    }
-
-    fn reply(more: bool) -> String {
+    fn reply(more: bool) -> Value {
         let issue = json!({
             "id": "I_root", "number": 68,
             "url": "https://github.com/PerishLab/concord/issues/68",
@@ -242,8 +211,15 @@ mod unix {
             "timelineItems": connection(vec![pull()], more),
             "comments": connection(Vec::<Value>::new(), false),
         });
-        let value = json!({"data": {"repository": {"issue": issue, "issues": connection(Vec::new(), false)}}});
-        format!("printf '%s\\n' '{value}'")
+        json!({
+            "data": {
+                "repository": {
+                    "id": "R_concord",
+                    "nameWithOwner": "PerishLab/concord",
+                    "issue": issue,
+                }
+            }
+        })
     }
 
     fn issue(node: &str, number: i64) -> Value {
@@ -267,25 +243,22 @@ mod unix {
 
     fn connection(nodes: Vec<Value>, more: bool) -> Value {
         json!({
-            "totalCount": nodes.len(),
+            "totalCount": nodes.len() + usize::from(more),
             "pageInfo": {"hasNextPage": more, "endCursor": more.then_some("next")},
             "nodes": nodes,
         })
     }
 
-    fn tool(root: &Path, name: &str, body: String) -> PathBuf {
-        let path = root.join(name);
-        plumb::testing::executable(&path, format!("#!/bin/sh\n{body}\n"));
-        path
-    }
-
-    fn success(space: &Path, arguments: &[&str]) -> Value {
-        let output = spawn::concord(space)
+    fn success(space: &Path, server: Option<&Server>, arguments: &[&str]) -> Value {
+        let mut command = spawn::concord(space);
+        command
             .args(["--home", space.to_str().expect("root path"), "--json"])
             .args(arguments)
-            .env("CODEX_THREAD_ID", "existing-preflight")
-            .output()
-            .expect("run Concord");
+            .env("CODEX_THREAD_ID", "existing-preflight");
+        if let Some(server) = server {
+            server.attach(&mut command);
+        }
+        let output = command.output().expect("run Concord");
         assert!(
             output.status.success(),
             "{}",
