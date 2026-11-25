@@ -83,7 +83,7 @@ impl Projection<'_> {
             Error::detailed(
                 "concord.delivery.outcome",
                 format!(
-                    "GitHub Issue type {kind} requires a non-empty {heading} section; add `## {heading}` with the required outcome text"
+                    "GitHub Issue type {kind} requires a non-empty {heading} section; add `## {heading}` or `### {heading}` with the required outcome text"
                 ),
                 serde_json::json!({"kind": kind, "section": section}),
             )

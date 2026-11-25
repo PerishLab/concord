@@ -39,9 +39,7 @@ fn branches() {
         projections(json!([]), false).to_string(),
     )
     .unwrap();
-    let output = prepare(space, provider, &seat.revision(), false)
-        .output()
-        .expect("prepare");
+    let output = run(&seat, false);
     refused(&output, "concord.delivery.branches");
     let error: Value = serde_json::from_slice(&output.stderr).expect("refusal JSON");
     assert_eq!(error["error"]["details"]["repository"], "PerishLab/probe");
@@ -64,12 +62,7 @@ fn branches() {
     assert!(!message.contains("feature/7"), "{message}");
 
     std::fs::remove_file(space.join("branch-issues")).expect("provider failure");
-    refused(
-        &prepare(space, provider, &seat.revision(), false)
-            .output()
-            .expect("prepare"),
-        "concord.delivery.provider",
-    );
+    refused(&run(&seat, false), "concord.delivery.provider");
 
     for branch in ["task/5", "bug/6", "task/8", "land/task/9", "stray"] {
         git(&remote, &["branch", "-D", branch]);
@@ -79,14 +72,8 @@ fn branches() {
         "i7": issue("OPEN", "Feature"),
     }}});
     std::fs::write(space.join("branch-issues"), open.to_string()).expect("issues");
-    let plan = prepare(space, provider, &seat.revision(), true)
-        .output()
-        .expect("prepare");
-    assert!(
-        plan.status.success(),
-        "{}",
-        String::from_utf8_lossy(&plan.stderr)
-    );
+    let plan = run(&seat, true);
+    ok(&plan);
     let before = seat.revision();
     git(&seat.source, &["branch", "topic"]);
     let output = consume(space, provider, &plan.stdout);
@@ -94,12 +81,7 @@ fn branches() {
     assert!(!space.join("pull-state").exists());
     assert_eq!(seat.revision(), before);
     git(&seat.source, &["branch", "-D", "topic"]);
-    let landed = consume(space, provider, &plan.stdout);
-    assert!(
-        landed.status.success(),
-        "{}",
-        String::from_utf8_lossy(&landed.stderr)
-    );
+    ok(&consume(space, provider, &plan.stdout));
 }
 
 fn issue(state: &str, kind: &str) -> Value {
@@ -115,12 +97,17 @@ fn sections() {
         ("Feature", "Outcome", "outcome"),
         ("Task", "Outcome", "outcome"),
     ] {
-        for body in [
-            "",
-            &format!("## {heading}\n \n"),
-            &format!("## {heading}\nFixed"),
+        for (body, valid) in [
+            (String::new(), false),
+            (format!("## {heading}\n \n"), false),
+            (format!("### {heading}\n \n"), false),
+            (format!("## {heading}\nFixed"), true),
+            (
+                format!("### Problem\nCtx\n### {heading}\nFixed\n### Acceptance\n- [x] Ok"),
+                true,
+            ),
         ] {
-            let encoded = serde_json::to_string(body).unwrap();
+            let encoded = serde_json::to_string(&body).unwrap();
             let script = projection(seat.space).replace("Task", kind).replace(
                 "## Outcome\\nPipe exact plan",
                 &encoded[1..encoded.len() - 1],
@@ -129,7 +116,7 @@ fn sections() {
             let structured = invoke(&seat, &provider, true);
             assert!(!structured.status.success());
             let error: Value = serde_json::from_slice(&structured.stderr).expect("error JSON");
-            if body.ends_with("Fixed") {
+            if valid {
                 assert_ne!(
                     error["error"]["code"], "concord.delivery.outcome",
                     "{error}"
@@ -145,10 +132,30 @@ fn sections() {
             let message = error["error"]["message"].as_str().unwrap();
             assert!(message.contains(&format!("type {kind}")));
             assert!(message.contains(&format!("`## {heading}`")));
+            assert!(message.contains(&format!("`### {heading}`")));
             let human = invoke(&seat, &provider, false);
             assert!(!human.status.success());
             assert!(String::from_utf8_lossy(&human.stderr).contains(message));
         }
+    }
+    seat.change();
+    for (kind, heading) in [
+        ("Task", "Outcome"),
+        ("Feature", "Outcome"),
+        ("Bug", "Expected outcome"),
+    ] {
+        let form = format!(
+            "### Problem\\nCtx\\n### Evidence\\nLog\\n### {heading}\\nPipe {kind} H3\\n### Scope\\nParser\\n### Acceptance\\n- [x] Done\\n### Non-goals\\nNone"
+        );
+        let script = projection(seat.space)
+            .replace("Task", kind)
+            .replace("## Outcome\\nPipe exact plan", &form);
+        let provider = tool(seat.space, "form-provider", script);
+        let prepared = invoke(&seat, &provider, true);
+        ok(&prepared);
+        let plan: Value = serde_json::from_slice(&prepared.stdout).expect("plan JSON");
+        let body = plan["plan"]["delivery"]["pull"]["body"].as_str().unwrap();
+        assert!(body.contains(&format!("Pipe {kind} H3")), "{body}");
     }
 }
 
@@ -200,21 +207,11 @@ fn foreign() {
     for value in [issue("CLOSED", "Feature"), issue("OPEN", "Bug")] {
         let snapshot = states(value);
         std::fs::write(seat.space.join("branch-issues"), snapshot.to_string()).unwrap();
-        refused(
-            &prepare(seat.space, &seat.provider, &seat.revision(), false)
-                .output()
-                .unwrap(),
-            "concord.delivery.branches",
-        );
+        refused(&run(&seat, false), "concord.delivery.branches");
     }
     std::fs::write(seat.space.join("branch-issues"), issues.to_string()).unwrap();
     git(&seat.source, &["branch", branch, "main"]);
-    refused(
-        &prepare(seat.space, &seat.provider, &seat.revision(), false)
-            .output()
-            .unwrap(),
-        "concord.delivery.branches",
-    );
+    refused(&run(&seat, false), "concord.delivery.branches");
     git(&seat.source, &["branch", "-D", branch]);
     for field in [
         "state",
@@ -231,9 +228,7 @@ fn foreign() {
             json!("mismatch")
         };
         std::fs::write(&path, projections(json!([wrong]), false).to_string()).unwrap();
-        let output = prepare(seat.space, &seat.provider, &seat.revision(), false)
-            .output()
-            .unwrap();
+        let output = run(&seat, false);
         assert!(
             !output.status.success(),
             "accepted mismatch {field}: {}",
@@ -247,31 +242,17 @@ fn foreign() {
         json!({"errors":[{"message":"refused"}]}),
     ] {
         std::fs::write(&path, response.to_string()).unwrap();
-        let output = prepare(seat.space, &seat.provider, &seat.revision(), false)
-            .output()
-            .unwrap();
-        refused(&output, "concord.delivery.provider");
+        refused(&run(&seat, false), "concord.delivery.provider");
     }
     std::fs::write(
         &path,
         projections(json!([pull.clone(), pull.clone()]), false).to_string(),
     )
     .unwrap();
-    refused(
-        &prepare(seat.space, &seat.provider, &seat.revision(), false)
-            .output()
-            .unwrap(),
-        "concord.delivery.branches",
-    );
+    refused(&run(&seat, false), "concord.delivery.branches");
     std::fs::write(&path, projections(json!([pull]), false).to_string()).unwrap();
-    let prepared = prepare(seat.space, &seat.provider, &seat.revision(), false)
-        .output()
-        .unwrap();
-    assert!(
-        prepared.status.success(),
-        "{}",
-        String::from_utf8_lossy(&prepared.stderr)
-    );
+    let prepared = run(&seat, false);
+    ok(&prepared);
     let plan = serde_json::from_slice::<Value>(&prepared.stdout).unwrap();
     assert!(plan.get("plan").is_some());
     let before = seat.revision();
@@ -281,6 +262,20 @@ fn foreign() {
     assert_eq!(seat.revision(), before);
     assert!(!seat.space.join("pull-state").exists());
     assert_eq!(head(&remote, branch), retained);
+}
+
+fn run(seat: &Seat<'_>, handoff: bool) -> std::process::Output {
+    prepare(seat.space, &seat.provider, &seat.revision(), handoff)
+        .output()
+        .expect("prepare")
+}
+
+fn ok(output: &std::process::Output) {
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn head(root: &std::path::Path, branch: &str) -> String {
