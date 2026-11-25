@@ -3,6 +3,9 @@ use std::collections::BTreeMap;
 
 pub fn sections(body: &str) -> BTreeMap<String, String> {
     let mut result = BTreeMap::new();
+    let Some(target) = level(body) else {
+        return result;
+    };
     let mut current: Option<(String, usize)> = None;
     let mut heading = None;
     let mut quotes = 0;
@@ -10,17 +13,14 @@ pub fn sections(body: &str) -> BTreeMap<String, String> {
         match event {
             Event::Start(Tag::BlockQuote(_)) => quotes += 1,
             Event::End(TagEnd::BlockQuote(_)) => quotes -= 1,
-            Event::Start(Tag::Heading {
-                level: HeadingLevel::H2,
-                ..
-            }) if quotes == 0 => {
+            Event::Start(Tag::Heading { level, .. }) if quotes == 0 && level == target => {
                 flush(&mut result, &mut current, body, range.start);
                 heading = Some(String::new());
             }
             Event::Text(text) | Event::Code(text) if quotes == 0 => {
                 append(&mut heading, &text);
             }
-            Event::End(TagEnd::Heading(HeadingLevel::H2)) if quotes == 0 => {
+            Event::End(TagEnd::Heading(level)) if quotes == 0 && level == target => {
                 current = heading
                     .take()
                     .map(|name| (name.trim().to_ascii_lowercase(), range.end));
@@ -30,6 +30,27 @@ pub fn sections(body: &str) -> BTreeMap<String, String> {
     }
     flush(&mut result, &mut current, body, body.len());
     result
+}
+
+fn level(body: &str) -> Option<HeadingLevel> {
+    let mut found = None;
+    let mut quotes = 0;
+    for event in Parser::new(body) {
+        match event {
+            Event::Start(Tag::BlockQuote(_)) => quotes += 1,
+            Event::End(TagEnd::BlockQuote(_)) => quotes -= 1,
+            Event::Start(Tag::Heading {
+                level: HeadingLevel::H2,
+                ..
+            }) if quotes == 0 => return Some(HeadingLevel::H2),
+            Event::Start(Tag::Heading {
+                level: HeadingLevel::H3,
+                ..
+            }) if quotes == 0 => found = Some(HeadingLevel::H3),
+            _ => {}
+        }
+    }
+    found
 }
 
 fn append(heading: &mut Option<String>, text: &str) {

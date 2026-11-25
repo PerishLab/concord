@@ -38,14 +38,15 @@ fn warning(report: &Value) -> Vec<&Value> {
         .collect()
 }
 
+struct Case {
+    kind: &'static str,
+    heading: &'static str,
+    outcome: &'static str,
+    missing: bool,
+}
+
 #[test]
 fn types() {
-    struct Case {
-        kind: &'static str,
-        heading: &'static str,
-        outcome: &'static str,
-        missing: bool,
-    }
     for case in [
         Case {
             kind: "Bug",
@@ -139,4 +140,70 @@ fn markdown() {
                 .contains("## expected outcome")
         );
     }
+}
+
+fn form(heading: &str, outcome: &str) -> String {
+    format!(
+        "### Problem\nContext\n### Evidence\nObserved\n### {heading}\n{outcome}\n### Scope\nBounded\n### Acceptance\n- [ ] Future check\n### Non-goals\nNo authority\n"
+    )
+}
+
+#[test]
+fn forms() {
+    for case in [
+        Case {
+            kind: "Task",
+            heading: "Outcome",
+            outcome: "Result",
+            missing: false,
+        },
+        Case {
+            kind: "Feature",
+            heading: "Outcome",
+            outcome: "Result",
+            missing: false,
+        },
+        Case {
+            kind: "Bug",
+            heading: "Expected outcome",
+            outcome: "Result",
+            missing: false,
+        },
+        Case {
+            kind: "Bug",
+            heading: "Outcome",
+            outcome: "Result",
+            missing: true,
+        },
+        Case {
+            kind: "Bug",
+            heading: "Expected outcome",
+            outcome: "  ",
+            missing: true,
+        },
+    ] {
+        let report = observe(case.kind, &form(case.heading, case.outcome));
+        let warnings = warning(&report);
+        assert_eq!(
+            warnings.len(),
+            usize::from(case.missing),
+            "{}/{}/{}",
+            case.kind,
+            case.heading,
+            case.outcome
+        );
+    }
+    for body in [
+        form("Outcome", "```\n### Expected outcome\nResult\n```"),
+        form("Outcome", "> ### Expected outcome\n> Result"),
+        form("Expected outcome", "Result") + "\n### Expected outcome\nDuplicate\n",
+    ] {
+        let report = observe("Bug", &body);
+        assert_eq!(warning(&report).len(), 1);
+    }
+    let report = observe(
+        "Task",
+        &form("Outcome", "Result").replace("### Scope\n", ""),
+    );
+    assert_eq!(warning(&report).len(), 1);
 }
