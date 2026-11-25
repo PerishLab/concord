@@ -1,19 +1,25 @@
 mod diagnostics;
 mod fixture;
 mod issue;
+mod server;
 
 use super::{evaluate::World, world};
+use crate::spawn::Server;
 use serde_json::{Value, json};
 use std::path::Path;
 use std::process::Output;
 
 const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 
+fn connection(nodes: Vec<Value>, cursor: Option<&str>, total: usize) -> Value {
+    json!({"nodes": nodes, "total": total, "page": {"next": cursor.is_some(), "cursor": cursor}})
+}
+
 fn page() -> Value {
     let pull = json!({"id": "PR_one", "number": 83,
         "url": "https://github.com/PerishLab/concord/pull/83", "head": HEAD,
         "body": "Refs PerishLab/concord#83", "state": "OPEN", "updated": "2026-10-07T00:00:00Z",
-        "references": world::connection(vec![], None, 0),
+        "references": connection(vec![], None, 0),
     });
     json!({"data": {"repository": {"id": "R_concord", "pull": pull}}})
 }
@@ -23,7 +29,7 @@ fn link() -> Value {
     json!({"id": "I_issue", "number": 83, "url": "https://github.com/PerishLab/concord/issues/83", "repository": repository})
 }
 
-fn invoke(scratch: &Path, provider: &Path) -> Output {
+fn invoke(scratch: &Path, provider: &Server) -> Output {
     let mut command = world::command(scratch, provider, "closing");
     command.args(["--head", HEAD]);
     command.output().unwrap()
@@ -80,15 +86,15 @@ fn malformed() {
                 "identity"
             }
             "truncated" => {
-                pull["references"] = world::connection(vec![], Some("next"), 1);
+                pull["references"] = connection(vec![], Some("next"), 1);
                 "truncated"
             }
             "duplicate" => {
-                pull["references"] = world::connection(vec![link(), link()], None, 2);
+                pull["references"] = connection(vec![link(), link()], None, 2);
                 "identity"
             }
             _ => {
-                pull["references"] = world::connection(vec![], None, 1);
+                pull["references"] = connection(vec![], None, 1);
                 "reply"
             }
         };
@@ -126,7 +132,7 @@ impl Closing {
     fn new() -> Self {
         let mut pull = page();
         pull["data"]["repository"]["pull"]["body"] = "Closes PerishLab/concord#83".into();
-        pull["data"]["repository"]["pull"]["references"] = world::connection(vec![link()], None, 1);
+        pull["data"]["repository"]["pull"]["references"] = connection(vec![link()], None, 1);
         Self {
             pull,
             issue: World::new(),

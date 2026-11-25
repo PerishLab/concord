@@ -1,3 +1,4 @@
+mod native;
 use super::super::{emit, input};
 use super::projection;
 use crate::args::issue::{Command, Preflight};
@@ -31,7 +32,6 @@ pub async fn run(
         Command::Bootstrap => unreachable!("handled before estate open"),
         Command::Brief {
             issue,
-            command,
             page_size,
             sub_issues_after,
             blocked_by_after,
@@ -40,7 +40,7 @@ pub async fn run(
             timeout,
         } => {
             let coordinate = Coordinate::parse(&issue)?;
-            let brief = projection::Projection::new(&command, page_size, 1, timeout)
+            let brief = projection::Projection::new(page_size, 1, timeout)
                 .brief(
                     &coordinate,
                     projection::PageRequest {
@@ -53,8 +53,7 @@ pub async fn run(
                     },
                 )
                 .await?;
-            let observed =
-                crate::phase::observe(phase, &issue, &brief.issue.node, (&command, timeout)).await;
+            let observed = crate::phase::observe(phase, &issue, &brief.issue.node, timeout).await;
             let mut value = json!(brief);
             value["phase"] = observed;
             emit(json!({"brief": value}), output)
@@ -62,14 +61,13 @@ pub async fn run(
         Command::Preflight { command } => preflight(estate, command, output, phase).await,
         Command::Graph {
             issue,
-            command,
             page_size,
             max_nodes,
             max_pages,
             timeout,
         } => {
             let coordinate = Coordinate::parse(&issue)?;
-            let graph = projection::Projection::new(&command, page_size, max_pages, timeout)
+            let graph = projection::Projection::new(page_size, max_pages, timeout)
                 .graph(&coordinate, max_nodes)
                 .await;
             emit(json!({"graph": graph}), output)
@@ -77,7 +75,6 @@ pub async fn run(
         Command::Ready(relations) => {
             let coordinate = Coordinate::parse(&relations.issue)?;
             let readiness = projection::Projection::new(
-                &relations.command,
                 relations.page_size,
                 relations.max_pages,
                 relations.timeout,
@@ -89,21 +86,16 @@ pub async fn run(
         Command::Comment {
             issue,
             input,
-            command,
             timeout,
         } => {
             let coordinate = Coordinate::parse(&issue)?;
-            let comment = comment::declare(&coordinate, &input, &command, timeout).await?;
+            let comment = comment::declare(&coordinate, &input, timeout).await?;
             comment::output(comment, output)
         }
         Command::Delivery { .. } => unreachable!("delivery completion is handled by dispatch"),
-        Command::Attach {
-            issue,
-            command,
-            timeout,
-        } => {
+        Command::Attach { issue, timeout } => {
             let coordinate = Coordinate::parse(&issue)?;
-            let observed = observe::issue(&coordinate, &command, timeout).await?;
+            let observed = observe::issue(&coordinate, timeout).await?;
             concord_core::automation::admit(&observed.kind)?;
             let anchor = estate
                 .admit(&Admission {
@@ -120,13 +112,12 @@ pub async fn run(
         Command::Prepare {
             issue,
             revision,
-            command,
             timeout,
         } => {
             let coordinate = Coordinate::parse(&issue)?;
             let anchor = estate.issue(&coordinate).await?;
             stale(anchor.revision, revision)?;
-            let observation = observe::issue(&coordinate, &command, timeout).await?;
+            let observation = observe::issue(&coordinate, timeout).await?;
             node(&anchor, &observation)?;
             emit(
                 json!({"plan": Plan { schema: SCHEMA.to_string(), anchor, observation }}),
@@ -135,7 +126,6 @@ pub async fn run(
         }
         Command::Validate {
             input: path,
-            command,
             timeout,
         } => {
             let plan: Plan = input::read(&path, SHAPE)?;
@@ -153,7 +143,7 @@ pub async fn run(
                 ));
             }
             node(&anchor, &plan.observation)?;
-            let observation = observe::issue(&anchor.coordinate, &command, timeout).await?;
+            let observation = observe::issue(&anchor.coordinate, timeout).await?;
             if !same(&observation, &plan.observation) {
                 return Err(Error::typed(
                     "concord.issue.observation_drift",
@@ -169,12 +159,11 @@ pub async fn run(
             issue,
             coordinate,
             revision,
-            command,
             timeout,
         } => {
             let anchor = Coordinate::parse(&issue)?;
             let coordinate = Coordinate::parse(&coordinate)?;
-            let observed = observe::issue(&coordinate, &command, timeout).await?;
+            let observed = observe::issue(&coordinate, timeout).await?;
             concord_core::automation::admit(&observed.kind)?;
             let anchor = estate
                 .reconcile(&Reconcile {
@@ -202,7 +191,6 @@ async fn preflight(
             kind,
             title,
             outcome,
-            command,
             page_size,
             max_pages,
             timeout,
@@ -215,7 +203,6 @@ async fn preflight(
                     title: &title,
                     outcome: &outcome,
                     bounds: super::preflight::Bounds {
-                        command: &command,
                         first: page_size,
                         pages: max_pages,
                         timeout,
@@ -231,7 +218,7 @@ async fn preflight(
                 phase,
                 &relations.issue,
                 &report.issue.node,
-                (&relations.command, relations.timeout),
+                relations.timeout,
             )
             .await;
             let mut value = json!(report);

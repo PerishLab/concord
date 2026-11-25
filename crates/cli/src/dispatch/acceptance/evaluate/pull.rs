@@ -1,14 +1,11 @@
-use concord_core::{Coordinate, Result};
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
-use std::collections::BTreeSet;
-
 use crate::args::acceptance::Closing;
 use crate::dispatch::acceptance::model::Connection;
 use crate::dispatch::acceptance::read::Scan;
-use crate::dispatch::forge::Request;
-
-const QUERY: &str = "query($owner:String!,$name:String!,$number:Int!,$after:String){repository(owner:$owner,name:$name){id pull:pullRequest(number:$number){id number url head:headRefOid body state updated:updatedAt references:closingIssuesReferences(first:100,after:$after){total:totalCount nodes{id number url repository{name owner{login}}} page:pageInfo{next:hasNextPage cursor:endCursor}}}}}";
+use crate::runtime::github;
+use concord_core::{Coordinate, Result};
+use runseal::github::{Target, Window};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub(super) struct Snapshot {
@@ -29,18 +26,6 @@ pub(super) struct Link {
     pub url: String,
 }
 
-#[derive(Deserialize)]
-struct Envelope {
-    data: Data,
-    errors: Option<Value>,
-}
-
-#[derive(Deserialize)]
-struct Data {
-    repository: Repository,
-}
-
-#[derive(Deserialize)]
 struct Repository {
     id: String,
     pull: Pull,
@@ -127,30 +112,23 @@ impl Reader<'_> {
     }
 
     async fn page(&self, cursor: &Option<String>) -> Result<Repository> {
-        let input = serde_json::to_vec(&json!({"query": QUERY, "variables": {
-            "owner": self.coordinate.owner, "name": self.coordinate.repository,
-            "number": self.coordinate.number, "after": cursor,
-        }}))
-        .map_err(|error| fault("encode", error.to_string()))?;
-        let reply = Request::new(
-            &self.args.observe.command,
-            self.args.observe.timeout,
-            8 * 1024 * 1024,
-        )
-        .args(["api", "graphql", "--input", "-"])
-        .input(&input)
-        .run()
-        .await
-        .map_err(|error| fault("provider", error.to_string()))?;
-        let envelope: Envelope = serde_json::from_slice(&reply.stdout)
+        let client =
+            github::client(self.args.observe.timeout).map_err(|error| fault("provider", error))?;
+        let number = u32::try_from(self.coordinate.number)
+            .map_err(|_| fault("identity", "invalid PR number"))?;
+        let target = Target::new(&self.coordinate.owner, &self.coordinate.repository, number)
+            .map_err(|error| fault("identity", github::describe(error)))?;
+        let window = Window::new(100, cursor.as_deref())
+            .map_err(|error| fault("provider", github::describe(error)))?;
+        let found = github::call("pull.closing", || client.closing(&target, &window))
+            .map_err(|error| fault("provider", github::describe(error)))?
+            .value;
+        let pull: Pull = serde_json::from_value(found.pull)
             .map_err(|error| fault("reply", error.to_string()))?;
-        if envelope.errors.is_some() {
-            return Err(fault(
-                "provider",
-                "PR closing-reference observation contains provider errors",
-            ));
-        }
-        Ok(envelope.data.repository)
+        Ok(Repository {
+            id: found.repository,
+            pull,
+        })
     }
 
     fn snapshot(&self, repository: String, pull: &Pull) -> Result<Snapshot> {

@@ -1,31 +1,17 @@
 use super::super::{
-    fault, inspect, planning, query,
+    fault, inspect,
     target::Target,
-    wire::{self, Client, Spec},
+    wire::{self, Client},
 };
 use crate::args::project::Observe;
+use crate::runtime::github;
 use concord_core::Result;
+use runseal::github::board::{Detail, Section};
 use serde_json::{Value, json};
 
-const ISSUE: &str = "__typename id number title url state updatedAt issueType{id name} repository{id nameWithOwner owner{id}} labels(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id name}} blockedBy(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id url state}}";
-
-pub(super) async fn state(client: &Client<'_>, args: &Observe) -> Result<Value> {
+pub(super) async fn state(client: &Client, args: &Observe) -> Result<Value> {
     let target = Target::parse(&args.project)?;
-    let query = format!(
-        "query($owner:String!,$number:Int!){{organization(login:$owner){{projectV2(number:$number){{{}}}}}}}",
-        query::META
-    );
-    let data = client
-        .read(&query, json!({"owner":target.owner,"number":target.number}))
-        .await?;
-    let project = &data["organization"]["projectV2"];
-    if project.is_null() {
-        return Err(fault(
-            "unavailable",
-            "Project is missing or inaccessible; this proves no absence",
-        ));
-    }
-    target.verify(project)?;
+    let project = &client.project(&target).await?;
     if project["owner"]["id"].as_str().is_none_or(str::is_empty) {
         return Err(fault(
             "identity",
@@ -36,18 +22,11 @@ pub(super) async fn state(client: &Client<'_>, args: &Observe) -> Result<Value> 
         return Err(fault("schema", "Project lifecycle is unreadable"));
     }
     let mut state = json!({"project":project});
-    for name in ["fields", "items"] {
-        let spec = Spec {
-            name,
-            query: connection(name),
-            size: if name == "items" {
-                args.size
-            } else {
-                args.size.min(20)
-            },
-            pages: args.pages,
-        };
-        let mut collection = wire::collect(client, project, spec).await?;
+    for (name, section, bound) in [
+        ("fields", Section::Fields, args.size.min(20)),
+        ("items", Section::Items(Detail::Next), args.size),
+    ] {
+        let mut collection = wire::collect(client, project, section, (bound, args.pages)).await?;
         if !collection.complete {
             return Err(fault(
                 "incomplete",
@@ -64,25 +43,15 @@ pub(super) async fn state(client: &Client<'_>, args: &Observe) -> Result<Value> 
     Ok(state)
 }
 
-fn connection(name: &str) -> String {
-    let selection = match name {
-        "fields" => query::FIELD.to_owned(),
-        "items" => planning::selection(&format!(
-            "id type isArchived updatedAt project{{id}} content{{__typename ... on Issue{{{ISSUE}}}}}"
-        )),
-        _ => unreachable!("next connection"),
-    };
-    format!(
-        "query($id:ID!,$size:Int!,$after:String){{node(id:$id){{... on ProjectV2{{{meta} {name}(first:$size,after:$after){{{page} nodes{{{selection}}}}}}}}}}}",
-        meta = query::META,
-        page = query::PAGE
-    )
-}
-
-pub(super) async fn confirm(client: &Client<'_>, issue: &Value) -> Result<()> {
-    let query = format!("query($id:ID!){{node(id:$id){{... on Issue{{{ISSUE}}}}}}}");
-    let data = client.read(&query, json!({"id":issue["id"]})).await?;
-    if data["node"] != *issue {
+pub(super) async fn confirm(client: &Client, issue: &Value) -> Result<()> {
+    let native = client.open()?;
+    let id = issue["id"]
+        .as_str()
+        .ok_or_else(|| fault("identity", "selected Issue identity is unreadable"))?;
+    let observed = github::call("project.confirm", || native.confirm(id))
+        .map_err(wire::provider)?
+        .value;
+    if observed != *issue {
         return Err(fault(
             "changed",
             "selected Issue conditions changed or became inaccessible; read again",
@@ -91,13 +60,11 @@ pub(super) async fn confirm(client: &Client<'_>, issue: &Value) -> Result<()> {
     Ok(())
 }
 
-pub(super) async fn finish(client: &Client<'_>, project: &Value) -> Result<()> {
-    let query = format!(
-        "query($id:ID!){{node(id:$id){{... on ProjectV2{{{}}}}}}}",
-        query::META
-    );
-    let data = client.read(&query, json!({"id":project["id"]})).await?;
-    if data["node"] != *project {
+pub(super) async fn finish(client: &Client, project: &Value) -> Result<()> {
+    let current = client
+        .metadata(project["id"].as_str().expect("qualified Project"))
+        .await?;
+    if current != *project {
         return Err(fault(
             "changed",
             "Project planning changed or became inaccessible before next completed",

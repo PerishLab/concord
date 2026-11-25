@@ -1,16 +1,15 @@
+use super::super::spawn::Server;
 use super::provider::consume;
 use super::unix::prepare;
 use serde_json::{Value, json};
 use std::path::Path;
 
-pub fn verify(space: &Path, provider: &str) {
+pub fn verify(space: &Path, server: &Server) {
     let file = space.join("relationships");
     let first = relation(2);
     let second = relation(3);
     write(&file, &json!([second, first]));
-    let plan = prepare(space, provider, "2", true)
-        .output()
-        .expect("prepare");
+    let plan = prepare(space, server, "2", true).output().expect("prepare");
     assert!(
         plan.status.success(),
         "{}",
@@ -24,7 +23,7 @@ pub fn verify(space: &Path, provider: &str) {
     write(&file, &json!([first, second]));
     std::fs::write(space.join("fail-create"), "once").expect("stop after revalidation");
     refuses(
-        &consume(space, provider, &plan.stdout),
+        &consume(space, Some(server), &plan.stdout),
         "concord.delivery.provider",
     );
     let mut opened = second.clone();
@@ -36,7 +35,7 @@ pub fn verify(space: &Path, provider: &str) {
     ] {
         write(&file, &changed);
         refuses(
-            &consume(space, provider, &plan.stdout),
+            &consume(space, Some(server), &plan.stdout),
             "concord.delivery.stale",
         );
     }
@@ -183,16 +182,17 @@ fn drift() {
 
 struct Probe<'a> {
     space: &'a Path,
-    provider: String,
+    server: Server,
 }
 
 impl<'a> Probe<'a> {
     fn open(space: &'a Path) -> Self {
         Self {
             space,
-            provider: super::settled::open(space),
+            server: super::settled::open(space),
         }
     }
+
     fn declare(&self, promise: &str) {
         use concord_core::acceptance::{Marker, Target};
         let space = self.space;
@@ -211,8 +211,7 @@ impl<'a> Probe<'a> {
 
     fn plan(&self) -> Vec<u8> {
         let space = self.space;
-        let provider = self.provider.as_str();
-        let prepared = prepare(space, provider, &super::settled::revision(space), false)
+        let prepared = prepare(space, &self.server, &super::settled::revision(space), false)
             .output()
             .expect("prepare");
         assert!(
@@ -225,8 +224,8 @@ impl<'a> Probe<'a> {
 
     fn poll(&self, plan: &[u8], machine: bool) -> std::process::Output {
         let space = self.space;
-        let provider = self.provider.as_str();
         let mut command = super::super::spawn::concord(space);
+        self.server.attach(&mut command);
         command
             .args([
                 "--home",
@@ -236,8 +235,6 @@ impl<'a> Probe<'a> {
                 "land",
                 "PerishLab/probe#1",
                 "--no-wait",
-                "--github-command",
-                provider,
             ])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());

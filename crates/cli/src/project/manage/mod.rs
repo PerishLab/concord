@@ -7,7 +7,6 @@ mod model;
 mod native;
 mod qualify;
 mod read;
-mod rest;
 
 use super::{fault, wire::Client};
 use crate::args::project::{Command, Remote};
@@ -86,11 +85,8 @@ pub(super) async fn run(command: Command, output: bool) -> Result<()> {
     crate::dispatch::emit(json!({"project":value}), output)
 }
 
-fn client(remote: &Remote) -> Client<'_> {
-    Client {
-        command: &remote.command,
-        timeout: remote.timeout,
-    }
+fn client(remote: &Remote) -> Client {
+    Client::new(remote.timeout)
 }
 
 fn validate(envelope: &Envelope) -> Result<()> {

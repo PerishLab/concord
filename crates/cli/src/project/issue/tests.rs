@@ -98,10 +98,6 @@ async fn refuse() {
             format!("concord.project.{code}"),
             "{mode}"
         );
-        #[cfg(target_os = "linux")]
-        if mode == "timeout" {
-            world.quiet().await;
-        }
     }
 }
 

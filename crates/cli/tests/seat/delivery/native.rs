@@ -1,9 +1,9 @@
 #[path = "calls/manual.rs"]
 mod manual;
 
-use super::super::execution::unix::{self as execution, Facts, git, text};
+use super::super::execution::unix::{git, text};
 use super::fixture::Native;
-use super::unix::{refused, success};
+use super::unix::{attached, refused, success};
 use serde_json::{Value, json};
 
 #[test]
@@ -95,24 +95,14 @@ fn projection() {
     assert!(prepared.status.success());
     let plan: Value = serde_json::from_slice(&prepared.stdout).expect("plan");
     let before = text(&seat.source, &["rev-parse", "HEAD"]);
-    let provider = seat.space.join("provider");
-    let script = std::fs::read_to_string(&provider).expect("provider");
     let marker = seat.space.join("projection-refusal");
     std::fs::write(&marker, "one").expect("one refusal");
-    let script = script.replace(
-        "if [ \"$1 $2\" = \"api graphql\" ]; then",
-        &format!(
-            "if [ \"$1 $2\" = \"api graphql\" ]; then\nif [ -f '{}/status-call' ] && [ -f '{}' ]; then rm '{}'; printf '%s\\n' 'gh: Bad Gateway (HTTP 502) ghp_private' >&2; exit 7; fi",
-            seat.space.display(), marker.display(), marker.display()
-        ),
-    );
-    plumb::testing::executable(&provider, script);
     let failed = seat.land("wharf-native", &prepared.stdout);
     refused(&failed, "concord.issue.projection.provider");
     let error = String::from_utf8(failed.stderr).expect("refusal");
-    assert!(error.contains("reported HTTP status 502"));
-    assert!(error.contains("exit status: 7"));
+    assert!(error.contains("HTTP status Some(502)"), "{error}");
     assert!(!error.contains("ghp_private"));
+    std::fs::remove_file(&marker).expect("clear refusal");
     assert_eq!(
         std::fs::read_to_string(seat.space.join("pull-state")).unwrap(),
         "OPEN"
@@ -221,20 +211,12 @@ fn restart() {
     assert_eq!(text(&seat.source, &["branch", "--list", "feature/1"]), "");
     let heads = text(&seat.source, &["ls-remote", "--heads", "origin"]);
     assert!(!heads.contains("feature/1"), "{heads}");
-    let start = execution::provider(
-        seat.space,
-        Facts {
-            node: "I_delivery",
-            stable: "R_kgDOUesM0Q",
-            coordinate: "PerishLab/wharf",
-            number: 1,
-        },
-    );
     let revision =
         success(seat.space, &["issue", "show", "PerishLab/wharf#1"])["anchor"]["revision"]
             .to_string();
-    let started = success(
+    let started = attached(
         seat.space,
+        &seat.server,
         &[
             "member",
             "start",
@@ -243,8 +225,6 @@ fn restart() {
             "topic.md",
             "--revision",
             &revision,
-            "--github-command",
-            start.to_str().expect("start"),
         ],
     );
     assert_eq!(started["member"]["branch"], "feature/1");

@@ -1,48 +1,29 @@
 use super::super::super::{
     fault, inspect,
     next::scope::Scope,
-    planning, query,
     target::Target,
-    wire::{self, Client, Spec},
+    wire::{self, Client},
 };
 use concord_core::Result;
+use runseal::github::board::{Detail, Section};
 use serde_json::{Value, json};
 
-const ITEM: &str = "id type isArchived updatedAt project{id} content{__typename ... on Issue{id number title url state updatedAt issueType{id name} repository{id nameWithOwner owner{id login}}}}";
-
 pub(super) async fn project(
-    client: &Client<'_>,
+    client: &Client,
     target: &Target,
     context: (&Value, i64),
     pages: u16,
 ) -> Result<Value> {
-    let statement = format!(
-        "query($owner:String!,$number:Int!){{organization(login:$owner){{projectV2(number:$number){{{}}}}}}}",
-        query::META
-    );
-    let data = client
-        .read(
-            &statement,
-            json!({"owner":target.owner,"number":target.number}),
-        )
-        .await?;
-    let project = &data["organization"]["projectV2"];
-    target.verify(project)?;
+    let project = &client.project(target).await?;
     if project["owner"]["id"] != context.0["id"] || !project["closed"].is_boolean() {
         return Err(fault(
             "identity",
             "Project owner or lifecycle disagrees with inventory",
         ));
     }
-    let mut fields = wire::gather(client, project, "fields", (100, pages)).await?;
+    let mut fields = wire::collect(client, project, Section::Fields, (100, pages)).await?;
     inspect::fields(&mut fields.nodes, project)?;
-    let spec = Spec {
-        name: "items",
-        query: connection(),
-        size: 20,
-        pages,
-    };
-    let items = wire::collect(client, project, spec).await?;
+    let items = wire::collect(client, project, Section::Items(Detail::Survey), (20, pages)).await?;
     inspect::membership(&items.nodes, project)?;
     let known = contents(&items.nodes, context.0)?;
     let mut diagnostics = Vec::new();
@@ -63,13 +44,11 @@ pub(super) async fn project(
     )
 }
 
-pub(super) async fn finish(client: &Client<'_>, project: &Value) -> Result<()> {
-    let statement = format!(
-        "query($id:ID!){{node(id:$id){{... on ProjectV2{{{}}}}}}}",
-        query::META
-    );
-    let data = client.read(&statement, json!({"id":project["id"]})).await?;
-    if data["node"] != *project {
+pub(super) async fn finish(client: &Client, project: &Value) -> Result<()> {
+    let current = client
+        .metadata(project["id"].as_str().expect("qualified Project"))
+        .await?;
+    if current != *project {
         return Err(fault(
             "changed",
             "Project metadata changed before survey completed",
@@ -124,15 +103,4 @@ fn identity(issue: &Value, owner: &Value) -> Result<()> {
         return Err(fault("schema", "Project Issue lifecycle is unreadable"));
     }
     Ok(())
-}
-
-fn connection() -> String {
-    let selection = planning::selection(ITEM).replace(
-        "ProjectV2ItemFieldTextValue{field",
-        "ProjectV2ItemFieldTextValue{text field",
-    );
-    "query($id:ID!,$size:Int!,$after:String){node(id:$id){... on ProjectV2{$META items(first:$size,after:$after){$PAGE nodes{$ITEM}}}}}"
-        .replace("$META", query::META)
-        .replace("$PAGE", query::PAGE)
-        .replace("$ITEM", &selection)
 }

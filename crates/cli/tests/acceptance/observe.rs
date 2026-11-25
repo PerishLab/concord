@@ -50,7 +50,7 @@ fn pagination() {
     );
     let request: serde_json::Value =
         serde_json::from_slice(&std::fs::read(scratch.path().join("request")).unwrap()).unwrap();
-    assert_eq!(request["variables"]["comments"], "first");
+    assert_eq!(request["variables"]["commentsAfter"], "first");
 }
 
 #[test]
@@ -76,22 +76,51 @@ fn changed() {
     );
 }
 
+fn pages(mode: &str) -> Vec<serde_json::Value> {
+    if mode == "cursor" {
+        return [("one", "first"), ("two", "second"), ("three", "first")]
+            .into_iter()
+            .enumerate()
+            .map(|(index, (id, cursor))| {
+                let mut page = world::page();
+                page["data"]["repository"]["issue"]["comments"] = world::connection(
+                    vec![world::entry(id, "Progress.", index + 1)],
+                    Some(cursor),
+                    4,
+                );
+                page
+            })
+            .collect();
+    }
+    let mut page = world::page();
+    match mode {
+        "truncated" => {
+            page["data"]["repository"]["issue"]["comments"] =
+                world::connection(vec![world::entry("one", "Progress.", 1)], Some("next"), 2);
+        }
+        "total" => {
+            page["data"]["repository"]["issue"]["comments"] = world::connection(vec![], None, 1);
+        }
+        _ => {
+            page["errors"] = json!([{"message": "Partial provider result"}]);
+        }
+    }
+    vec![page]
+}
+
 #[test]
 fn incomplete() {
     for mode in ["truncated", "cursor", "total", "errors"] {
         let scratch = tempfile::tempdir().unwrap();
-        let mut page = world::page();
-        page["data"]["repository"]["issue"]["comments"] = match mode {
-            "truncated" | "cursor" => world::connection(vec![], Some("next"), 1),
-            "total" => world::connection(vec![], None, 1),
-            _ => world::connection(vec![], None, 0),
-        };
-        if mode == "errors" {
-            page["errors"] = json!([{"message": "Partial provider result"}]);
-        }
-        let provider = world::provider(scratch.path(), &[page.clone(), page]);
+        let replies = pages(mode);
+        let provider = world::provider(scratch.path(), &replies);
         let mut command = world::command(scratch.path(), &provider, "show");
-        command.args(["--max-pages", if mode == "truncated" { "1" } else { "2" }]);
+        let limit = match mode {
+            "truncated" => "1",
+            "cursor" => "3",
+            _ => "2",
+        };
+        command.args(["--max-pages", limit]);
         let output = command.output().unwrap();
         let code = match mode {
             "truncated" => "truncated",
@@ -124,9 +153,14 @@ fn identities() {
         let count = nodes.len();
         page["data"]["repository"]["issue"]["comments"] = world::connection(nodes, None, count);
         let provider = world::provider(scratch.path(), &[page]);
+        let code = if mode == "duplicate" {
+            "concord.acceptance.identity"
+        } else {
+            "concord.acceptance.provider"
+        };
         world::refused(
             &world::invoke(scratch.path(), &provider, "show", None),
-            "concord.acceptance.identity",
+            code,
         );
     }
 }

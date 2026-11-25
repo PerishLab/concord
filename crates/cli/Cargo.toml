@@ -13,6 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 radicula-config.workspace = true
+runseal = { version = "0", registry = "perish" }
 clap.workspace = true
 concord-core = { path = "../lib" }
 locus.workspace = true

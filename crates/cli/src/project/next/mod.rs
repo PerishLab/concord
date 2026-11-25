@@ -14,10 +14,7 @@ pub(super) async fn run(
     output: bool,
     phase: Option<&crate::phase::Binding>,
 ) -> Result<()> {
-    let client = Client {
-        command: &args.command,
-        timeout: args.timeout,
-    };
+    let client = Client::new(args.timeout);
     let started = super::now();
     let state = read::state(&client, &args).await?;
     let day = i64::try_from((started + 8 * 3600) / 86400).map_err(|_| {
@@ -41,7 +38,7 @@ pub(super) async fn run(
             phase,
             &target,
             issue["id"].as_str().expect("native Issue"),
-            (&args.command, args.timeout),
+            args.timeout,
         )
         .await;
         read::confirm(&client, &result["issue"]).await?;

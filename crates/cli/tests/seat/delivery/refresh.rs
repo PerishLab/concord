@@ -1,6 +1,7 @@
-use super::super::execution::unix::{self as execution, Facts, git, repository, text};
-use super::provider::{consume, feed, land, observer, projection, tool};
-use super::unix::{guard, prepare, refused, success};
+use super::super::execution::unix::{git, repository, text};
+use super::super::spawn::Server;
+use super::provider::{consume, feed, land, serve, tool};
+use super::unix::{attached, guard, prepare, refused, success};
 use serde_json::Value;
 use std::path::Path;
 use std::process::Output;
@@ -75,47 +76,29 @@ fn moved() {
 
 struct Fixture<'a> {
     space: &'a Path,
-    provider: String,
+    server: Server,
 }
 
 impl<'a> Fixture<'a> {
     fn open(space: &'a Path) -> Self {
         success(space, &["issue", "bootstrap"]);
-        let provider = tool(space, "provider", projection(space));
-        let command = provider.to_str().expect("provider path");
-        success(
-            space,
-            &[
-                "issue",
-                "attach",
-                "PerishLab/probe#1",
-                "--github-command",
-                command,
-            ],
-        );
+        let server = serve(space, "PerishLab/probe", "R_probe");
+        attached(space, &server, &["issue", "attach", "PerishLab/probe#1"]);
         let source = repository(space, "PerishLab/probe");
-        let observer = observer(space);
-        success(
+        attached(
             space,
+            &server,
             &[
                 "integration",
                 "register",
                 "PerishLab/probe",
                 "--path",
                 source.to_str().expect("source path"),
-                "--github-command",
-                observer.to_str().expect("repository provider"),
             ],
         );
-        let facts = Facts {
-            node: "I_delivery",
-            stable: "R_probe",
-            coordinate: "PerishLab/probe",
-            number: 1,
-        };
-        let start = execution::provider(space, facts);
-        success(
+        attached(
             space,
+            &server,
             &[
                 "member",
                 "start",
@@ -124,8 +107,6 @@ impl<'a> Fixture<'a> {
                 "topic.md",
                 "--revision",
                 "0",
-                "--github-command",
-                start.to_str().expect("start provider"),
             ],
         );
         let remote = space.join("remote.git");
@@ -146,8 +127,7 @@ impl<'a> Fixture<'a> {
             &["config", "core.sshCommand", ssh.to_str().expect("ssh")],
         );
         git(&source, &["config", "ssh.variant", "simple"]);
-        let provider = provider.to_str().expect("provider path").to_string();
-        Self { space, provider }
+        Self { space, server }
     }
 
     fn change(&self, content: &str) {
@@ -170,7 +150,7 @@ impl<'a> Fixture<'a> {
     }
 
     fn plan(&self) -> Vec<u8> {
-        let output = prepare(self.space, &self.provider, &self.revision(), true)
+        let output = prepare(self.space, &self.server, &self.revision(), true)
             .output()
             .expect("prepare plan");
         assert!(output.status.success());
@@ -180,15 +160,15 @@ impl<'a> Fixture<'a> {
     }
 
     fn land(&self, plan: &[u8]) -> Output {
-        consume(self.space, &self.provider, plan)
+        consume(self.space, Some(&self.server), plan)
     }
 
     fn severed(&self, plan: &[u8]) -> Output {
-        let mut command = land(self.space, &self.provider, "-");
+        let mut command = land(self.space, Some(&self.server), "-");
         command
             .env("ALL_PROXY", "http://127.0.0.1:9")
-            .env("NO_PROXY", "")
-            .env("no_proxy", "");
+            .env("NO_PROXY", "127.0.0.1")
+            .env("no_proxy", "127.0.0.1");
         feed(command, plan).wait_with_output().expect("land")
     }
 

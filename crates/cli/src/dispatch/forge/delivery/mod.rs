@@ -25,7 +25,6 @@ pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<Com
             revision,
             base,
             handoff,
-            command,
             timeout,
             forge: _,
         } => handoff::prepare(
@@ -37,7 +36,6 @@ pub async fn run(estate: &Estate, command: Delivery, output: bool) -> Result<Com
                 revision,
                 base,
                 carry: handoff,
-                command: &command,
                 timeout,
             },
             output,

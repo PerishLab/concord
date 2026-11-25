@@ -10,10 +10,7 @@ use std::collections::BTreeSet;
 
 pub(in crate::project) async fn run(args: Survey, output: bool) -> Result<()> {
     let targets = targets(&args)?;
-    let client = Client {
-        command: &args.remote.command,
-        timeout: args.remote.timeout,
-    };
+    let client = Client::new(args.remote.timeout);
     let started = super::super::now();
     let day = i64::try_from((started + 8 * 3600) / 86400)
         .map_err(|_| fault("date", "calendar day is outside the supported range"))?;

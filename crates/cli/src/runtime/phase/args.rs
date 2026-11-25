@@ -37,8 +37,6 @@ pub enum Command {
 
 #[derive(Args)]
 pub struct Remote {
-    #[arg(long = "github-command", value_name = "PROGRAM", help = crate::args::PROGRAM)]
-    pub command: PathBuf,
     #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
     pub timeout: u64,
 }

@@ -14,7 +14,6 @@ impl Reader<'_> {
         before.issue.ordinary()?;
         let args = crate::args::acceptance::Observe {
             issue: self.args.issue.clone(),
-            command: self.args.command.clone(),
             timeout: self.args.timeout,
             pages: usize::from(self.args.pages),
         };

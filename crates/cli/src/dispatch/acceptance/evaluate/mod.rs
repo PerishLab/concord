@@ -81,7 +81,6 @@ pub(in crate::dispatch) async fn read(args: &Observe) -> Result<Projection> {
     history.target(&snapshot.labels)?;
     let reader = super::read::Reader {
         coordinate: &snapshot.header.coordinate,
-        command: &args.command,
         timeout: args.timeout,
         pages: args.pages,
     };

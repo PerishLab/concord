@@ -20,7 +20,9 @@ fn projection(page: &Value) -> Value {
     ] {
         issue[name] = empty.clone();
     }
-    json!({"data": {"repository": {"issue": issue}}})
+    json!({"data": {"repository": {
+        "id": "R_concord", "nameWithOwner": "PerishLab/concord", "issue": issue
+    }}})
 }
 
 fn invoke(before: &Value, held: &evaluate::World) -> Output {
@@ -37,7 +39,7 @@ fn invoke(before: &Value, held: &evaluate::World) -> Output {
     assert!(bootstrap.status.success());
     let mut replies = vec![
         before.clone(),
-        json!({"data": {"r0": {"object": null}}}),
+        json!({"data": {"repository": {"id": "R_concord", "object": null}}}),
         held.page.clone(),
         held.page.clone(),
         held.relations.clone(),
@@ -53,7 +55,9 @@ fn invoke(before: &Value, held: &evaluate::World) -> Output {
     }
     replies.push(held.relations.clone());
     let provider = world::provider(scratch.path(), &replies);
-    crate::spawn::concord(scratch.path())
+    let mut command = crate::spawn::concord(scratch.path());
+    provider.attach(&mut command);
+    command
         .args([
             "--home",
             scratch.path().to_str().unwrap(),
@@ -61,8 +65,6 @@ fn invoke(before: &Value, held: &evaluate::World) -> Output {
             "issue",
             "ready",
             "PerishLab/concord#83",
-            "--github-command",
-            provider.to_str().unwrap(),
         ])
         .output()
         .unwrap()
@@ -84,7 +86,7 @@ fn source() {
 #[test]
 fn absent() {
     let mut held = evaluate::World::new();
-    let declaration = held.page["data"]["repository"]["issue"]["comments"]["nodes"][0].clone();
+    let declaration = held.page["data"]["repository"]["issue"]["comments"]["rows"][0].clone();
     held.page["data"]["repository"]["issue"]["comments"] =
         world::connection(vec![declaration], None, 1);
     let ready = read(&held);

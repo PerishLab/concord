@@ -1,18 +1,45 @@
-use super::super::spawn;
+use super::super::spawn::{self, Reply, Request, Server};
 use serde_json::{Value, json};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Output;
 
+struct Mock(String);
+
 pub(super) fn meta() -> Value {
-    json!({"__typename":"ProjectV2", "id":"PVT_plan", "number":1, "title":"Planning", "url":"https://github.com/orgs/PerishLab/projects/1", "updatedAt":"2026-10-21T00:00:00Z", "closed":false, "public":false, "readme":"Boundary", "shortDescription":"Goal", "viewerCanUpdate":true, "owner":{"__typename":"Organization", "id":"O_lab", "login":"PerishLab"}})
+    let owner = json!({"__typename":"Organization", "id":"O_lab", "login":"PerishLab"});
+    json!({"__typename":"ProjectV2", "id":"PVT_plan", "number":1, "title":"Planning", "url":"https://github.com/orgs/PerishLab/projects/1", "updatedAt":"2026-10-21T00:00:00Z", "closed":false, "public":false, "readme":"Boundary", "shortDescription":"Goal", "viewerCanUpdate":true, "owner":owner})
+}
+
+pub(super) fn overview(project: &Value) -> Value {
+    let owner = json!({
+        "kind": project["owner"]["__typename"],
+        "id": project["owner"]["id"],
+        "login": project["owner"]["login"],
+    });
+    json!({
+        "id": project["id"],
+        "number": project["number"],
+        "title": project["title"],
+        "url": project["url"],
+        "updated": project["updatedAt"],
+        "closed": project["closed"],
+        "public": project["public"],
+        "writable": project["viewerCanUpdate"],
+        "description": project["shortDescription"],
+        "readme": project["readme"],
+        "owner": owner,
+    })
 }
 
 pub(super) fn connection(nodes: Vec<Value>, more: bool) -> Value {
-    json!({"totalCount":nodes.len(), "nodes":nodes, "pageInfo":{"hasNextPage":more, "endCursor":if more {Some("next")} else {None}}})
+    let cursor = more.then_some("next");
+    let page = json!({"hasNextPage":more, "endCursor":cursor});
+    json!({"totalCount":nodes.len(), "nodes":nodes, "pageInfo":page})
 }
 
 fn field(id: &str, attached: bool) -> Value {
-    let mut field = json!({"__typename":"ProjectV2SingleSelectField", "id":id, "name":"Priority", "dataType":"SINGLE_SELECT", "isIssueField":attached, "updatedAt":"2026-10-21T00:00:00Z", "project":{"id":"PVT_plan"}, "options":[]});
+    let project = json!({"id":"PVT_plan"});
+    let mut field = json!({"__typename":"ProjectV2SingleSelectField", "id":id, "name":"Priority", "dataType":"SINGLE_SELECT", "isIssueField":attached, "updatedAt":"2026-10-21T00:00:00Z", "project":project, "options":[]});
     if attached {
         field["issueField"] = json!({"id":"IFSS_priority", "fullDatabaseId":"42", "name":"Priority", "dataType":"SINGLE_SELECT"});
     }
@@ -21,71 +48,147 @@ fn field(id: &str, attached: bool) -> Value {
 
 pub(super) fn item(kind: &str) -> Value {
     let empty = connection(vec![], false);
-    json!({"id":"PVTI_work", "type":"ISSUE", "isArchived":false, "updatedAt":"2026-10-21T00:00:00Z", "project":{"id":"PVT_plan"}, "fieldValues":empty, "content":{"__typename":"Issue", "id":"I_work", "number":4, "title":"Work", "url":"https://github.com/PerishLab/concord/issues/4", "state":"OPEN", "body":"## Acceptance\n- [ ] source", "updatedAt":"2026-10-21T00:00:00Z", "issueType":{"id":"IT_kind", "name":kind}, "repository":{"id":"R_repo", "nameWithOwner":"PerishLab/concord"}, "parent":null, "blockedBy":empty, "blocking":empty, "subIssues":empty, "labels":empty, "comments":empty}})
+    let kind = json!({"id":"IT_kind", "name":kind});
+    let repository = json!({"id":"R_repo", "nameWithOwner":"PerishLab/concord"});
+    let content = json!({"__typename":"Issue", "id":"I_work", "number":4, "title":"Work", "url":"https://github.com/PerishLab/concord/issues/4", "state":"OPEN", "body":"## Acceptance\n- [ ] source", "updatedAt":"2026-10-21T00:00:00Z", "issueType":kind, "repository":repository, "parent":null, "blockedBy":empty, "blocking":empty, "subIssues":empty, "labels":empty, "comments":empty});
+    json!({"id":"PVTI_work", "type":"ISSUE", "isArchived":false, "updatedAt":"2026-10-21T00:00:00Z", "project":{"id":"PVT_plan"}, "fieldValues":empty, "content":content})
 }
 
-pub(super) fn provider(root: &Path, mode: &str) -> PathBuf {
-    let project = meta();
-    let mut script = String::from(
-        "#!/bin/sh\ncase \"$*\" in\n'api graphql --input -') ;;\n'api --method GET repos/'*) printf '%s\\n' '[{\"issue_field_id\":42,\"data_type\":\"single_select\",\"node_id\":\"IFSSV_value\",\"value\":5,\"single_select_option\":{\"id\":5,\"name\":\"High\"}}]'; exit 0 ;;\n*) exit 9 ;;\nesac\ninput=$(cat)\ncase \"$input\" in *mutation*) exit 8;; esac\ncase \"$input\" in\n",
-    );
-    let mut first = project.clone();
-    if mode == "identity" {
-        first["owner"]["login"] = "Foreign".into();
-    }
-    let mut start = json!({"data":{"organization":{"projectV2":first}}});
-    match mode {
-        "permission" => start["errors"] = json!([{"message":"FORBIDDEN"}]),
-        "missing" => start["data"]["organization"]["projectV2"] = Value::Null,
-        _ => {}
-    }
-    script.push_str(&format!("*'organization(login:'*) {} ;;\n", reply(&start)));
-    for name in [
-        "fields",
-        "items",
-        "views",
-        "workflows",
-        "repositories",
-        "statusUpdates",
-    ] {
-        let nodes = match name {
-            "fields" => vec![field("PVTSSF_local", false), field("PVTSSF_attached", true)],
-            "items" => vec![item(if mode == "auto" { "Auto" } else { "Feature" })],
-            "views" => vec![view()],
-            _ => vec![],
-        };
-        let mut root = project.clone();
-        root[name] = connection(nodes, false);
-        alter(mode, name, &mut root);
-        if let Some(continuation) = page(mode, name, &mut root) {
-            script.push_str(&format!(
-                "*'fields(first:'*'\"after\":\"next\"'*) {} ;;\n",
-                node(&continuation)
-            ));
+pub(super) fn provider(mode: &str) -> Server {
+    let mock = Mock(mode.to_owned());
+    Server::start(move |request| mock.handle(request))
+}
+
+impl Mock {
+    fn handle(&self, request: Request) -> Reply {
+        if request.method == "GET" && request.path.contains("/issue-field-values") {
+            let option = json!({"id": 5, "name": "High"});
+            return Reply::json(
+                json!([{"issue_field_id": 42, "data_type": "single_select", "node_id": "IFSSV_value", "value": 5, "single_select_option": option}]),
+            );
         }
-        script.push_str(&format!("*'{name}(first:'*) {} ;;\n", node(&root)));
+        if request.method != "POST" || request.path != "/graphql" {
+            return Reply::status(404, json!({"message": "unexpected"}));
+        }
+        let query = request.query();
+        if query.contains("mutation") {
+            return Reply::status(403, json!({"message": "mutation forbidden"}));
+        }
+        let variables = request.variables();
+        if query.contains("RunsealOverview") {
+            return self.start();
+        }
+        if query.contains("RunsealSubject") {
+            let node = json!({"id":"I_work","updated":"2026-10-21T00:00:00Z","repository":{"id":"R_repo"}});
+            return Reply::json(json!({"data":{"node":node}}));
+        }
+        if query.contains("RunsealMetadata") {
+            let mut finality = meta();
+            if self.0 == "final" {
+                finality["title"] = "Concurrent edit".into();
+            }
+            let node = overview(&finality);
+            return Reply::json(json!({"data":{"node":node}}));
+        }
+        self.board(&query, &variables)
     }
-    let repository = json!({"id":"R_repo"});
-    let stamp = json!({"id":"I_work", "updatedAt":"2026-10-21T00:00:00Z", "repository":repository});
-    script.push_str(&format!("*'on Issue'*) {} ;;\n", node(&stamp)));
-    let mut finality = project.clone();
-    if mode == "final" {
-        finality["title"] = "Concurrent edit".into();
-    }
-    script.push_str(&format!("*) {} ;;\nesac\n", node(&finality)));
-    let path = root.join(format!("provider-{mode}"));
-    plumb::testing::executable(&path, script);
-    path
-}
 
-fn reply(value: &Value) -> String {
-    let encoded = value.to_string().replace('\'', "'\\''");
-    format!("printf '%s\\n' '{encoded}'")
+    fn start(&self) -> Reply {
+        let mut first = meta();
+        if self.0 == "identity" {
+            first["owner"]["login"] = "Foreign".into();
+        }
+        let organization = json!({"login":"PerishLab","projectV2":overview(&first)});
+        let mut reply = json!({"data":{"organization":organization}});
+        match self.0.as_str() {
+            "permission" => reply["errors"] = json!([{"message":"FORBIDDEN"}]),
+            "missing" => reply["data"]["organization"]["projectV2"] = Value::Null,
+            _ => {}
+        }
+        Reply::json(reply)
+    }
+
+    fn board(&self, query: &str, variables: &Value) -> Reply {
+        for name in [
+            "fields",
+            "items",
+            "views",
+            "workflows",
+            "repositories",
+            "statusUpdates",
+        ] {
+            if !query.contains(&format!("{name}(first:")) {
+                continue;
+            }
+            let nodes = match name {
+                "fields" => vec![field("PVTSSF_local", false), field("PVTSSF_attached", true)],
+                "items" => vec![item(if self.0 == "auto" { "Auto" } else { "Feature" })],
+                "views" => vec![view()],
+                _ => vec![],
+            };
+            let mut root = meta();
+            root[name] = connection(nodes, false);
+            self.alter(name, &mut root);
+            if let Some(continuation) = self.page(name, &mut root)
+                && variables["after"].as_str() == Some("next")
+            {
+                let data = json!({"node":continuation});
+                return Reply::json(json!({"data":data}));
+            }
+            let data = json!({"node":root});
+            return Reply::json(json!({"data":data}));
+        }
+        Reply::status(400, json!({"message": "unknown query"}))
+    }
+
+    fn alter(&self, name: &str, root: &mut Value) {
+        match (self.0.as_str(), name) {
+            ("changed", "views") => root["title"] = "Concurrent edit".into(),
+            ("schema", "fields") => root[name]["nodes"][0]["isIssueField"] = Value::Null,
+            ("missing-connection", "items") => {
+                root[name]["nodes"][0]["content"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("comments");
+            }
+            ("origin", "fields") => {
+                root[name]["nodes"][1]["issueField"]["fullDatabaseId"] = Value::Null
+            }
+            ("builtin", "fields") => {
+                root[name]["nodes"][0]["__typename"] = "ProjectV2Field".into();
+                root[name]["nodes"][0]["dataType"] = "TITLE".into();
+            }
+            ("null", "items") => root[name]["nodes"][0]["content"] = Value::Null,
+            ("nested", "items") => {
+                root[name]["nodes"][0]["content"]["comments"] = connection(vec![], true);
+                root[name]["nodes"][0]["content"]["comments"]["totalCount"] = 101.into();
+            }
+            _ => {}
+        }
+    }
+
+    fn page(&self, name: &str, root: &mut Value) -> Option<Value> {
+        if name != "fields" || !matches!(self.0.as_str(), "pages" | "repeat" | "cursor") {
+            return None;
+        }
+        let mut continuation = root.clone();
+        continuation[name]["nodes"] = json!([field("PVTSSF_attached", true)]);
+        root[name]["nodes"] = json!([field("PVTSSF_local", false)]);
+        root[name]["pageInfo"] = json!({"hasNextPage":true,"endCursor":"next"});
+        match self.0.as_str() {
+            "cursor" => root[name]["pageInfo"]["endCursor"] = Value::Null,
+            "repeat" => continuation[name]["nodes"][0]["id"] = "PVTSSF_local".into(),
+            _ => {}
+        }
+        Some(continuation)
+    }
 }
 
 pub(super) fn run(root: &Path, mode: &str, pages: &str) -> Output {
-    let command = provider(root, mode);
-    spawn::concord(root)
+    let server = provider(mode);
+    let mut command = spawn::concord(root);
+    server.attach(&mut command);
+    command
         .current_dir(root)
         .args([
             "--home",
@@ -94,10 +197,9 @@ pub(super) fn run(root: &Path, mode: &str, pages: &str) -> Output {
             "project",
             "show",
             "https://github.com/orgs/PerishLab/projects/1",
-            "--github-command",
+            "--max-pages",
+            pages,
         ])
-        .arg(command)
-        .args(["--max-pages", pages])
         .output()
         .unwrap()
 }
@@ -111,55 +213,10 @@ pub(super) fn decoded(output: &Output) -> Value {
     serde_json::from_slice::<Value>(&output.stdout).unwrap()["project"].clone()
 }
 
-fn alter(mode: &str, name: &str, root: &mut Value) {
-    match (mode, name) {
-        ("changed", "views") => root["title"] = "Concurrent edit".into(),
-        ("schema", "fields") => root[name]["nodes"][0]["isIssueField"] = Value::Null,
-        ("missing-connection", "items") => {
-            root[name]["nodes"][0]["content"]
-                .as_object_mut()
-                .unwrap()
-                .remove("comments");
-        }
-        ("origin", "fields") => {
-            root[name]["nodes"][1]["issueField"]["fullDatabaseId"] = Value::Null
-        }
-        ("builtin", "fields") => {
-            root[name]["nodes"][0]["__typename"] = "ProjectV2Field".into();
-            root[name]["nodes"][0]["dataType"] = "TITLE".into();
-        }
-        ("null", "items") => root[name]["nodes"][0]["content"] = Value::Null,
-        ("nested", "items") => {
-            root[name]["nodes"][0]["content"]["comments"] = connection(vec![], true);
-            root[name]["nodes"][0]["content"]["comments"]["totalCount"] = 101.into();
-        }
-        _ => {}
-    }
-}
-
-fn page(mode: &str, name: &str, root: &mut Value) -> Option<Value> {
-    if name != "fields" || !matches!(mode, "pages" | "repeat" | "cursor") {
-        return None;
-    }
-    let mut continuation = root.clone();
-    continuation[name]["nodes"] = json!([field("PVTSSF_attached", true)]);
-    root[name]["nodes"] = json!([field("PVTSSF_local", false)]);
-    root[name]["pageInfo"] = json!({"hasNextPage":true,"endCursor":"next"});
-    match mode {
-        "cursor" => root[name]["pageInfo"]["endCursor"] = Value::Null,
-        "repeat" => continuation[name]["nodes"][0]["id"] = "PVTSSF_local".into(),
-        _ => {}
-    }
-    Some(continuation)
-}
-
-fn node(value: &Value) -> String {
-    reply(&json!({"data":{"node":value}}))
-}
-
 fn view() -> Value {
     let empty = connection(vec![], false);
     let mut visible = empty.clone();
     visible.as_object_mut().unwrap().remove("totalCount");
-    json!({"id":"PVTV_triage", "number":1, "name":"Triage", "layout":"TABLE_LAYOUT", "filter":"is:issue", "project":{"id":"PVT_plan"}, "configuration":{"visibleFields":visible}, "groupByFields":empty, "verticalGroupByFields":empty, "sortByFields":empty})
+    let config = json!({"visibleFields":visible});
+    json!({"id":"PVTV_triage", "number":1, "name":"Triage", "layout":"TABLE_LAYOUT", "filter":"is:issue", "project":{"id":"PVT_plan"}, "configuration":config, "groupByFields":empty, "verticalGroupByFields":empty, "sortByFields":empty})
 }

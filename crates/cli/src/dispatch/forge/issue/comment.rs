@@ -1,13 +1,12 @@
 use concord_core::activity::Operator;
 use concord_core::{Coordinate, Error, Result};
+use runseal::github::Comment;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
 const BODY: usize = 65_536;
-const REPLY: usize = 16 * 1024;
-const MUTATION: &str = "mutation($subject:ID!,$body:String!){addComment(input:{subjectId:$subject,body:$body}){commentEdge{node{id url body createdAt}}}}";
 const SEMANTICS: &str =
     "execution fields are caller-environment observations, not identity or authority";
 
@@ -29,48 +28,12 @@ pub struct Declared {
     pub semantics: String,
 }
 
-#[derive(Deserialize)]
-struct Envelope {
-    data: Option<Data>,
-}
-
-#[derive(Deserialize)]
-struct Data {
-    #[serde(rename = "addComment")]
-    addition: Option<Addition>,
-}
-
-#[derive(Deserialize)]
-struct Addition {
-    #[serde(rename = "commentEdge")]
-    edge: Option<Edge>,
-}
-
-#[derive(Deserialize)]
-struct Edge {
-    node: Reply,
-}
-
-#[derive(Deserialize)]
-pub(in crate::dispatch) struct Reply {
-    id: String,
-    url: String,
-    body: String,
-    #[serde(rename = "createdAt")]
-    created: String,
-}
-
-pub async fn declare(
-    coordinate: &Coordinate,
-    input: &Path,
-    command: &Path,
-    timeout: u64,
-) -> Result<Declared> {
+pub async fn declare(coordinate: &Coordinate, input: &Path, timeout: u64) -> Result<Declared> {
     let prose = read(input)?;
     let execution = execution()?;
     let body = render(&prose, &execution)?;
-    let issue = super::observe::issue(coordinate, command, timeout).await?;
-    let reply = submit(command, &issue.node, &body, timeout).await?;
+    let issue = super::observe::issue(coordinate, timeout).await?;
+    let reply = submit(&issue.node, &body, timeout).await?;
     verify(coordinate, &body, &reply)?;
     Ok(Declared {
         node: reply.id,
@@ -221,56 +184,17 @@ fn bounded(mut reader: impl Read, label: &str) -> Result<Vec<u8>> {
 }
 
 pub(in crate::dispatch) async fn submit(
-    command: &Path,
     subject: &str,
     body: &str,
     timeout: u64,
-) -> Result<Reply> {
-    let request = serde_json::to_vec(&json!({
-        "query": MUTATION,
-        "variables": {"subject": subject, "body": body},
-    }))
-    .map_err(|error| Error::typed("concord.issue.comment.encode", error.to_string()))?;
-    let output =
-        super::super::github::transport::Request::new(command, timeout, REPLY + 6 * body.len())
-            .args(["api", "graphql", "--input", "-"])
-            .input(&request)
-            .run()
-            .await
-            .map_err(failure)?;
-    let envelope = serde_json::from_slice::<Envelope>(&output.stdout)
-        .map_err(|_| disagreement("GitHub comment reply is not valid JSON"))?;
-    envelope
-        .data
-        .and_then(|data| data.addition)
-        .and_then(|addition| addition.edge)
-        .map(|edge| edge.node)
-        .ok_or_else(|| disagreement("GitHub comment reply named no comment"))
-}
-
-fn failure(failure: super::super::github::transport::Failure) -> Error {
-    use super::super::github::transport::Failure;
-    match failure {
-        Failure::Spawn { .. } => Error::typed("concord.issue.comment.command", failure.to_string()),
-        Failure::Refused { .. } => Error::typed(
-            "concord.issue.comment.provider",
-            format!("GitHub refused Issue comment declaration: {failure}"),
-        ),
-        Failure::Oversized(_) => Error::typed(
-            "concord.issue.comment.indeterminate",
-            "GitHub comment reply exceeds the bounded reply budget; completion is unknown; observe the exact Issue before another write",
-        ),
-        Failure::Exchange(_) | Failure::Timeout => Error::typed(
-            "concord.issue.comment.indeterminate",
-            format!("GitHub comment completion is indeterminate: {failure}"),
-        ),
-    }
+) -> Result<Comment> {
+    super::native::comment(subject, body, timeout)
 }
 
 pub(in crate::dispatch) fn verify(
     coordinate: &Coordinate,
     body: &str,
-    reply: &Reply,
+    reply: &Comment,
 ) -> Result<()> {
     let prefix = format!(
         "https://github.com/{}/{}/issues/{}#issuecomment-",

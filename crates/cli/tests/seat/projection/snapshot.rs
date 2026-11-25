@@ -119,7 +119,7 @@ fn diagnostics() {
         assert!(!error.to_string().contains("I_one"));
         let state = fixture.state();
         assert_eq!(state["starts"], 2);
-        assert_eq!(state["calls"], if mode == "issues" { 18 } else { 16 });
+        assert_eq!(state["calls"], if mode == "issues" { 20 } else { 18 });
         assert!(state["writes"].as_array().unwrap().is_empty());
     }
 }
@@ -130,10 +130,10 @@ fn acquisition() {
     let fixture = Fixture::new("prepare-key-order");
     decoded(&fixture.run("prepare", &action));
     assert_eq!(fixture.state()["starts"], 2);
-    assert_eq!(fixture.state()["calls"], 16);
+    assert_eq!(fixture.state()["calls"], 18);
     for (mode, code, calls) in [
-        ("prepare-failure", "concord.project.provider", 9),
-        ("prepare-incomplete", "concord.project.schema", 10),
+        ("prepare-failure", "concord.project.provider", 10),
+        ("prepare-incomplete", "concord.project.provider", 11),
     ] {
         let fixture = Fixture::new(mode);
         let error = refused(&fixture.run("prepare", &action), code);

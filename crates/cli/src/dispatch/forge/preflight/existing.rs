@@ -66,14 +66,10 @@ pub async fn run(estate: &Estate, request: &Relations) -> Result<Existing> {
         Connection::Blocking,
         Connection::Pulls,
     ]);
-    let projected = projection::Projection::new(
-        &request.command,
-        request.page_size,
-        request.max_pages,
-        request.timeout,
-    )
-    .complete(&coordinate, connections)
-    .await;
+    let projected =
+        projection::Projection::new(request.page_size, request.max_pages, request.timeout)
+            .complete(&coordinate, connections)
+            .await;
     let complete = match projected {
         Ok(complete) => complete,
         Err(fault) => {
@@ -101,7 +97,6 @@ pub async fn run(estate: &Estate, request: &Relations) -> Result<Existing> {
         estate,
         &coordinate,
         &super::Bounds {
-            command: &request.command,
             first: request.page_size,
             pages: request.max_pages,
             timeout: request.timeout,

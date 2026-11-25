@@ -1,4 +1,4 @@
-use super::unix::{git, operator, success};
+use super::unix::{git, operator, record, repository, success};
 use serde_json::Value;
 use std::path::Path;
 use std::process::Command;
@@ -31,29 +31,25 @@ pub(super) fn run(space: &Path, source: &Path, pending: &Path) {
     let error: Value = serde_json::from_str(line).expect("explicit apply refusal");
     assert_eq!(error["error"]["code"], "concord.apply.required");
     let arguments = recover.into_iter().chain(["--apply"]).collect::<Vec<_>>();
-    assert_eq!(success(space, &arguments)["revision"], 2);
-    assert_eq!(success(space, &arguments)["revision"], 2);
+    assert_eq!(success(space, None, &arguments)["revision"], 2);
+    assert_eq!(success(space, None, &arguments)["revision"], 2);
 }
 
 #[test]
 fn detached() {
-    use super::super::spawn;
-    use super::unix::repository;
-    use serde_json::json;
+    use super::super::spawn::{self, Reply, Server};
 
     let fixture = tempfile::tempdir().expect("fixture");
     let root = fixture.path();
-    success(root, &["issue", "bootstrap"]);
+    success(root, None, &["issue", "bootstrap"]);
     let source = repository(root, "PerishLab/concord");
-    let provider = root.join("repository-provider");
-    let reply = json!({"node": "R_concord", "coordinate": "PerishLab/concord", "branch": "main"});
-    plumb::testing::executable(&provider, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
-    let output = spawn::concord(root)
+    let server = Server::start(|_| Reply::json(record("R_concord", "PerishLab/concord")));
+    let mut command = spawn::concord(root);
+    server.attach(&mut command);
+    let output = command
         .args(["--home", root.to_str().expect("root"), "--json"])
         .args(["integration", "register", "PerishLab/concord", "--path"])
         .arg(&source)
-        .args(["--github-command"])
-        .arg(&provider)
         .env("GIT_DIR", root.join("missing.git"))
         .env("GIT_WORK_TREE", root.join("wrong"))
         .env("GIT_INDEX_FILE", root.join("wrong-index"))

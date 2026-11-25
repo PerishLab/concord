@@ -21,7 +21,6 @@ pub struct Parameters<'a> {
     pub revision: i64,
     pub base: String,
     pub carry: bool,
-    pub command: &'a Path,
     pub timeout: u64,
 }
 
@@ -54,14 +53,8 @@ async fn request(estate: &Estate, parameters: &Parameters<'_>) -> Result<issue_d
     let issue = Coordinate::parse(parameters.issue)?;
     let member = estate.issue_member(&issue).await?;
     adaptor::integration(&member.integration).await?;
-    let observed = adaptor::observe(parameters.command, parameters.timeout, &issue).await?;
-    super::branches::clean(
-        estate,
-        &member.integration,
-        parameters.command,
-        parameters.timeout,
-    )
-    .await?;
+    let observed = adaptor::observe(parameters.timeout, &issue).await?;
+    super::branches::clean(estate, &member.integration, parameters.timeout).await?;
     issue_delivery::prepare::<Plumb>(
         estate,
         &issue_delivery::Request {

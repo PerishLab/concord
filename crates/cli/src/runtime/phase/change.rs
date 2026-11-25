@@ -4,6 +4,7 @@ use super::{
     read,
     wire::Client,
 };
+use crate::runtime::github;
 use concord_core::Result;
 use serde_json::{Value, json};
 
@@ -44,7 +45,7 @@ pub(super) fn qualify(binding: &Binding, intent: &Intent, state: &Value) -> Resu
     Ok(())
 }
 
-pub(super) async fn apply(client: &Client<'_>, plan: &Plan) -> Result<Value> {
+pub(super) async fn apply(client: &Client, plan: &Plan) -> Result<Value> {
     let current = read::snapshot(client, &plan.binding, &plan.issue).await?;
     qualify(&plan.binding, &plan.intent, &current)?;
     if current != plan.before {
@@ -57,16 +58,8 @@ pub(super) async fn apply(client: &Client<'_>, plan: &Plan) -> Result<Value> {
     if old == plan.intent.value {
         return Ok(json!({"outcome":"unchanged","current":current}));
     }
-    let input = input(plan);
-    client
-        .query(MUTATION, json!({"input":input}))
+    submit(client, plan)
         .await
-        .and_then(|data| {
-            data["change"]
-                .is_object()
-                .then_some(data)
-                .ok_or_else(|| fault("indeterminate", "native mutation returned no receipt"))
-        })
         .map_err(|error| uncertain(&error))?;
     let after = read::snapshot(client, &plan.binding, &plan.issue)
         .await
@@ -85,13 +78,24 @@ pub(super) async fn apply(client: &Client<'_>, plan: &Plan) -> Result<Value> {
     )
 }
 
-fn input(plan: &Plan) -> Value {
-    let mut value = json!({"fieldId":plan.binding.field,"rationale":plan.intent.reason});
-    match &plan.intent.value {
-        Some(name) => value["singleSelectOptionId"] = json!(plan.binding.options[name]),
-        None => value["delete"] = json!(true),
-    }
-    json!({"issueId":plan.before["issue"]["id"],"issueFields":[value]})
+async fn submit(client: &Client, plan: &Plan) -> Result<()> {
+    let issue = plan.before["issue"]["id"]
+        .as_str()
+        .ok_or_else(|| fault("invalid", "Phase mutation requires an exact Issue node"))?;
+    let option = plan
+        .intent
+        .value
+        .as_ref()
+        .map(|name| plan.binding.options[name].clone());
+    let update = runseal::github::phase::Update {
+        issue: issue.into(),
+        field: plan.binding.field.clone(),
+        option,
+        rationale: plan.intent.reason.clone(),
+    };
+    let native = client.open()?;
+    github::call("phase.select", || native.select(&update)).map_err(super::wire::provider)?;
+    Ok(())
 }
 
 fn protected(state: &Value, binding: &Binding) -> Value {
@@ -122,5 +126,3 @@ fn uncertain(error: &concord_core::Error) -> concord_core::Error {
         ),
     )
 }
-
-const MUTATION: &str = "mutation($input:SetIssueFieldValueInput!){change:setIssueFieldValue(input:$input){clientMutationId}}";

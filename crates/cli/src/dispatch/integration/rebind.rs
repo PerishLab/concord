@@ -4,7 +4,6 @@ use crate::runtime::input;
 use concord_core::{Error, Estate, Integration, Rebind, Repository, Result};
 use serde::Deserialize;
 use serde_json::json;
-use std::path::Path;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -20,11 +19,10 @@ pub(super) async fn run(estate: &Estate, command: Rebinding, output: bool) -> Re
             node,
             key,
             path,
-            command,
             timeout,
         } => {
             let held = select(estate, &repository, &node, key).await?;
-            confirm(&held, &command, timeout).await?;
+            confirm(&held, timeout).await?;
             let plan = estate.relocation(&held, &path).await?;
             emit(json!({"plan": plan}), output)
         }
@@ -32,7 +30,6 @@ pub(super) async fn run(estate: &Estate, command: Rebinding, output: bool) -> Re
             repository,
             input: source,
             apply,
-            command,
             timeout,
         } => {
             let envelope: Envelope = input::read(&source, r#"{"version":1,"plan":{}}"#)?;
@@ -42,15 +39,15 @@ pub(super) async fn run(estate: &Estate, command: Rebinding, output: bool) -> Re
                 return Err(changed());
             }
             estate.rebind(&envelope.plan, false).await?;
-            confirm(&envelope.plan.integration, &command, timeout).await?;
+            confirm(&envelope.plan.integration, timeout).await?;
             let integration = estate.rebind(&envelope.plan, apply).await?;
             emit(result(integration, apply), output)
         }
     }
 }
 
-async fn confirm(held: &Integration, command: &Path, timeout: u64) -> Result<()> {
-    let current = observe(&held.repository, command, timeout).await?;
+async fn confirm(held: &Integration, timeout: u64) -> Result<()> {
+    let current = observe(&held.repository, timeout).await?;
     if current.node != held.node {
         return Err(changed());
     }

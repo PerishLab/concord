@@ -1,18 +1,48 @@
-use serde_json::{Value, json};
+#[path = "calls/graph.rs"]
+mod graph;
+#[path = "calls/wire.rs"]
+pub(super) mod wire;
+
+use super::super::spawn::{self, Server};
+use graph::Config;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
+use std::sync::{Arc, Mutex};
 
-use super::super::spawn;
+pub fn serve(root: &Path, coordinate: &str, stable: &str) -> Server {
+    let config = Config {
+        root: root.to_path_buf(),
+        coordinate: coordinate.to_string(),
+        stable: stable.to_string(),
+        kind: "Task".to_string(),
+        body: "## Outcome\nPipe exact plan".to_string(),
+    };
+    let lock = Arc::new(Mutex::new(()));
+    Server::start(move |request| {
+        if request.method == "POST" && request.path == "/graphql" {
+            config.wait(&request);
+            let guard = lock.lock().expect("mock lock");
+            let reply = config.graphql(&request);
+            drop(guard);
+            return reply;
+        }
+        config.slow(&request);
+        let guard = lock.lock().expect("mock lock");
+        let reply = config.rest(&request);
+        drop(guard);
+        reply
+    })
+}
 
-pub fn consume(space: &Path, provider: &str, plan: &[u8]) -> Output {
-    start(space, provider, plan)
+pub fn consume(space: &Path, server: Option<&Server>, plan: &[u8]) -> Output {
+    start(space, server, plan)
         .wait_with_output()
         .expect("complete land")
 }
 
-pub fn start(space: &Path, provider: &str, plan: &[u8]) -> Child {
-    feed(land(space, provider, "-"), plan)
+pub fn start(space: &Path, server: Option<&Server>, plan: &[u8]) -> Child {
+    feed(land(space, server, "-"), plan)
 }
 
 pub fn feed(mut command: Command, plan: &[u8]) -> Child {
@@ -29,8 +59,11 @@ pub fn feed(mut command: Command, plan: &[u8]) -> Child {
     consumer
 }
 
-pub fn land(space: &Path, provider: &str, plan: &str) -> Command {
+pub fn land(space: &Path, server: Option<&Server>, plan: &str) -> Command {
     let mut command = spawn::concord(space);
+    if let Some(server) = server {
+        server.attach(&mut command);
+    }
     command
         .args(["--home", space.to_str().expect("root"), "--json"])
         .args([
@@ -40,203 +73,10 @@ pub fn land(space: &Path, provider: &str, plan: &str) -> Command {
             "PerishLab/probe#1",
             "--plan",
             plan,
-            "--github-command",
-            provider,
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     command
-}
-
-pub fn observer(root: &Path) -> PathBuf {
-    let reply = json!({
-        "node": "R_probe",
-        "coordinate": "PerishLab/probe",
-        "branch": "main",
-    });
-    let path = root.join("repository-provider");
-    plumb::testing::executable(&path, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
-    path
-}
-
-pub fn projection(root: &Path) -> String {
-    let observed = json!({
-        "node": "I_delivery", "stable": "R_probe", "number": 1,
-        "url": "https://github.com/PerishLab/probe/issues/1",
-        "state": "OPEN", "kind": "Task", "updated_at": "2026-09-29T00:00:00Z",
-    });
-    let issue = json!({
-        "id": "I_delivery", "number": 1,
-        "url": "https://github.com/PerishLab/probe/issues/1",
-        "title": "Stream delivery plan", "body": "## Outcome\nPipe exact plan",
-        "state": "OPEN", "updatedAt": "2026-09-29T00:00:00Z",
-        "issueType": {"name": "Task"},
-        "repository": {"nameWithOwner": "PerishLab/probe"}, "parent": null,
-        "subIssues": connection(),
-        "subIssuesSummary": {"total": 0, "completed": 0, "percentCompleted": 0},
-        "blockedBy": connection(), "blocking": connection(),
-        "timelineItems": connection(), "comments": connection(),
-        "labels": {"nodes": [], "pageInfo": {"hasNextPage": false}},
-    });
-    let projected = json!({"data": {"repository": {"issue": issue}}});
-    let remote = root.join("remote.git");
-    let state = root.join("pull-state");
-    let merge = root.join("pull-merge");
-    let title = root.join("pull-title");
-    let body = root.join("pull-body");
-    let head = root.join("pull-head");
-    let base = root.join("pull-base");
-    let incomplete = root.join("incomplete");
-    let hidden = root.join("hide-readback");
-    let slow = root.join("slow-readback");
-    let create = root.join("fail-create");
-    let failure = root.join("provider-failure");
-    let delay = root.join("provider-delay");
-    let relations = root.join("relationships");
-    let labels = root.join("labels");
-    let marks = root.join("gate-marks");
-    format!(
-        r#"if [ "$1" = api ]; then
-  case "$*" in *"--hostname github.com"*) ;; *) echo 'unbound API host' >&2; exit 19 ;; esac
-fi
-if [ "$1" = pr ]; then
-  case "$*" in *"https://github.com/PerishLab/probe"*) ;; *) echo 'unbound pull host' >&2; exit 19 ;; esac
-fi
-reply() {{
-  state=$(cat '{state}')
-  candidate=$(cat '{merge}.head' 2>/dev/null || git --git-dir='{remote}' rev-parse "refs/heads/$(cat '{head}')") || exit 1
-  merge=$(cat '{merge}' 2>/dev/null || true)
-  jq -cn --arg id PR_node --argjson number 7 --arg url https://github.com/PerishLab/probe/pull/7 --arg state "$state" --arg base "$(cat '{base}')" --arg head "$candidate" --arg merge "$merge" --arg title "$(cat '{title}')" --arg body "$(cat '{body}')" '{{id:$id,number:$number,url:$url,state:$state,baseRefName:$base,headRefOid:$head,mergeCommit:(if $merge == "" then null else {{oid:$merge}} end),mergedAt:(if $merge == "" then null else "2026-09-29T00:00:02Z" end),updatedAt:"2026-09-29T00:00:03Z",title:$title,body:$body}}'
-}}
-if [ "$1 $2" = "api graphql" ]; then
-  case "$*" in *"query Projections"*) cat '{projections}' || exit 1; exit 0 ;; esac
-  case "$*" in *"query Branches"*) cat '{branches}' || exit 1; exit 0 ;; esac
-  if [ -f '{failure}' ]; then rm '{failure}'; printf '%s\n' observe-failed >&2; exit 1; fi
-  if [ -f '{delay}' ]; then rm '{delay}'; sleep 2; fi
-  for argument in "$@"; do [ "$argument" = "--jq" ] && printf '%s\n' '{observed}' && exit 0; done
-  if [ "$3" = "--input" ]; then
-    request=$(cat)
-    labels='{{"nodes":[]}}'
-    [ ! -f '{labels}' ] || labels=$(cat '{labels}')
-    declaration=''
-    [ ! -f '{declaration}' ] || declaration=$(cat '{declaration}')
-    printf '%s\n' '{projected}' | jq --argjson labels "$labels" --arg declaration "$declaration" '.data.repository.id="R_probe" | .data.repository.issue |= (.updated=.updatedAt | .kind=.issueType | .labels={{nodes:$labels.nodes,total:($labels.nodes|length),page:{{next:false,cursor:null}}}} | .comments={{nodes:(if $declaration == "" then [] else [{{id:"IC_decl",body:$declaration,url:"https://github.com/PerishLab/probe/issues/1#issuecomment-1"}}] end),total:(if $declaration == "" then 0 else 1 end),page:{{next:false,cursor:null}}}} | .children={{nodes:[],total:0,page:{{next:false,cursor:null}}}} | .blockers=.children)'
-    exit 0
-  fi
-  if [ -f '{labels}' ]; then printf '%s\n' '{projected}' | jq --slurpfile labels '{labels}' '.data.repository.issue.labels=$labels[0]'; exit 0; fi
-  if [ -f '{relations}' ]; then printf '%s\n' '{projected}' | jq --slurpfile links '{relations}' '.data.repository.issue.blocking.nodes=$links[0] | .data.repository.issue.blocking.totalCount=($links[0]|length)'; exit 0; fi
-  printf '%s\n' '{projected}'
-  exit 0
-fi
-if [ "$1 $2 $3 $4" = "api -X PATCH repos/PerishLab/probe/pulls/7" ]; then
-  shift 4
-  while [ $# -gt 0 ]; do
-    case "$2" in
-      title=*) printf '%s' "${{2#title=}}" > '{title}' ;;
-      body=*) printf '%s' "${{2#body=}}" > '{body}' ;;
-    esac
-    shift 2
-  done
-  printf '%s\n' '{{}}'
-  exit 0
-fi
-if [ "$1 $2" = "api -X" ]; then printf '%s\n' mark >> '{marks}'; printf '%s\n' '{{}}'; exit 0; fi
-if [ "$1 $2" = "pr list" ]; then
-  [ -f '{state}' ] && reply | jq -s . || printf '%s\n' '[]'
-  exit 0
-fi
-if [ "$1 $2" = "pr create" ]; then
-  if [ -f '{create}' ]; then rm '{create}'; printf '%s\n' create-failed >&2; exit 1; fi
-  shift 2
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      --base) printf '%s' "$2" > '{base}'; shift ;;
-      --head) printf '%s' "$2" > '{head}'; shift ;;
-      --title) printf '%s' "$2" > '{title}'; shift ;;
-      --body) printf '%s' "$2" > '{body}'; shift ;;
-    esac
-    shift
-  done
-  printf '%s' OPEN > '{state}'
-  rm -f '{merge}' '{merge}.head'
-  printf '%s\n' https://github.com/PerishLab/probe/pull/7
-  exit 0
-fi
-if [ "$1 $2" = "pr edit" ]; then printf '%s\n' 'gh pr edit needs read:org' >&2; exit 1; fi
-if [ "$1 $2" = "pr view" ] && [ "$7" = statusCheckRollup ]; then
-  if [ -f '{rollup}' ]; then cat '{rollup}'; exit 0; fi
-  left=$(cat '{waiting}' 2>/dev/null || echo 0)
-  status=COMPLETED
-  conclusion='"SUCCESS"'
-  if [ "$left" -gt 0 ]; then printf '%s' $((left - 1)) > '{waiting}'; status=IN_PROGRESS; conclusion=null; fi
-  printf '{{"statusCheckRollup":[{{"__typename":"CheckRun","name":"Guard","status":"%s","conclusion":%s}}]}}\n' "$status" "$conclusion"
-  exit 0
-fi
-if [ "$1 $2" = "pr view" ]; then
-  if [ -f '{hidden}' ] && [ "$(cat '{state}')" = MERGED ]; then rm '{hidden}'; printf '%s\n' hidden-readback >&2; exit 1; fi
-  [ -f '{slow}' ] && sleep 1
-  reply
-  exit 0
-fi
-if [ "$1 $2" = "pr merge" ]; then
-  printf '%s\n' merge >> '{attempts}'
-  [ -f '{incomplete}' ] && exit 0
-  if [ "$(cat '{waiting}' 2>/dev/null || echo 0)" -gt 0 ] || [ -f '{rollup}' ]; then
-    printf '%s\n' 'X Pull request PerishLab/probe#7 is not mergeable: the base branch policy prohibits the merge.' >&2
-    exit 1
-  fi
-  shift 3
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      --match-head-commit) candidate=$2; shift ;;
-      --subject) subject=$2; shift ;;
-      --body) message=$2; shift ;;
-    esac
-    shift
-  done
-  export GIT_DIR='{remote}'
-  tree=$(git rev-parse "$candidate^{{tree}}") || exit 1
-  parent=$(git rev-parse refs/heads/main) || exit 1
-  commit=$(printf '%s\n\n%s\n' "$subject" "$message" | git -c user.name=GitHub -c user.email=noreply@github.com commit-tree "$tree" -p "$parent") || exit 1
-  git update-ref refs/heads/main "$commit" || exit 1
-  printf '%s' "$commit" > '{merge}'
-  printf '%s' "$candidate" > '{merge}.head'
-  printf '%s' MERGED > '{state}'
-  exit 0
-fi
-printf '%s\n' unsupported-provider-command >&2
-exit 1"#,
-        remote = remote.display(),
-        state = state.display(),
-        merge = merge.display(),
-        title = title.display(),
-        body = body.display(),
-        head = head.display(),
-        base = base.display(),
-        incomplete = incomplete.display(),
-        hidden = hidden.display(),
-        slow = slow.display(),
-        create = create.display(),
-        failure = failure.display(),
-        delay = delay.display(),
-        relations = relations.display(),
-        labels = labels.display(),
-        marks = marks.display(),
-        declaration = root.join("declaration").display(),
-        waiting = root.join("checks-pending").display(),
-        rollup = root.join("checks-rollup").display(),
-        attempts = root.join("merge-attempts").display(),
-        branches = root.join("branch-issues").display(),
-        projections = root.join("branch-projections").display(),
-    )
-}
-
-fn connection() -> Value {
-    json!({
-        "totalCount": 0,
-        "pageInfo": {"hasNextPage": false, "endCursor": null},
-        "nodes": [],
-    })
 }
 
 pub fn tool(root: &Path, name: &str, body: String) -> PathBuf {

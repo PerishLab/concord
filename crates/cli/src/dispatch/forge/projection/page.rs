@@ -3,7 +3,7 @@ use super::{CompleteIssue, Connection, Fault, PageRequest, Projection};
 use concord_core::Coordinate;
 use std::collections::{BTreeMap, BTreeSet};
 
-impl Projection<'_> {
+impl Projection {
     pub(in crate::dispatch::forge) async fn complete(
         &self,
         coordinate: &Coordinate,

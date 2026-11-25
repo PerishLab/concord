@@ -1,18 +1,14 @@
 use concord_core::Result;
 use serde::Deserialize;
-use serde_json::{Value, json};
 use std::collections::BTreeSet;
 
-use super::super::super::forge::Request;
 use super::super::model::{Connection, Header};
-use super::{Reader, Scan};
-
-const QUERY: &str = "query($owner:String!,$name:String!,$number:Int!,$children:String,$blockers:String){repository(owner:$owner,name:$name){id issue(number:$number){id body state updated:updatedAt children:subIssues(first:100,after:$children){total:totalCount nodes{id state} page:pageInfo{next:hasNextPage cursor:endCursor}} blockers:blockedBy(first:100,after:$blockers){total:totalCount nodes{id state} page:pageInfo{next:hasNextPage cursor:endCursor}}}}}";
+use super::{Reader, Scan, native};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-struct Node {
-    id: String,
-    state: String,
+pub(super) struct Node {
+    pub id: String,
+    pub state: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -31,31 +27,18 @@ impl Relations {
     }
 }
 
-#[derive(Deserialize)]
-struct Envelope {
-    data: Data,
-    errors: Option<Value>,
+pub(super) struct Repository {
+    pub id: String,
+    pub issue: Issue,
 }
 
-#[derive(Deserialize)]
-struct Data {
-    repository: Repository,
-}
-
-#[derive(Deserialize)]
-struct Repository {
-    id: String,
-    issue: Issue,
-}
-
-#[derive(Deserialize)]
-struct Issue {
-    id: String,
-    body: String,
-    state: String,
-    updated: String,
-    children: Connection<Node>,
-    blockers: Connection<Node>,
+pub(super) struct Issue {
+    pub id: String,
+    pub body: String,
+    pub state: String,
+    pub updated: String,
+    pub children: Connection<Node>,
+    pub blockers: Connection<Node>,
 }
 
 impl Reader<'_> {
@@ -63,12 +46,13 @@ impl Reader<'_> {
         &self,
         header: &Header,
     ) -> Result<Relations> {
+        let client = self.native()?;
         let mut children = Scan::default();
         let mut blockers = Scan::default();
         for _ in 0..self.pages {
-            let issue = self
-                .relationships(header, [&children.cursor, &blockers.cursor])
-                .await?;
+            let cursors = [&children.cursor, &blockers.cursor];
+            let current = native::relationships(&client, cursors)?;
+            let issue = checked(header, current)?;
             children.append(issue.children)?;
             blockers.append(issue.blockers)?;
             bounded(&children.items)?;
@@ -85,50 +69,31 @@ impl Reader<'_> {
             "native acceptance relationships exceed the selected page bound",
         ))
     }
+}
 
-    async fn relationships(&self, header: &Header, cursors: [&Option<String>; 2]) -> Result<Issue> {
-        let input = serde_json::to_vec(&json!({"query": QUERY, "variables": {
-            "owner": self.coordinate.owner, "name": self.coordinate.repository, "number": self.coordinate.number,
-            "children": cursors[0], "blockers": cursors[1],
-        }})).map_err(|error| super::super::fault("encode", error.to_string()))?;
-        let reply = Request::new(self.command, self.timeout, 8 * 1024 * 1024)
-            .args(["api", "graphql", "--input", "-"])
-            .input(&input)
-            .run()
-            .await
-            .map_err(|error| super::super::fault("provider", error.to_string()))?;
-        let envelope: Envelope = serde_json::from_slice(&reply.stdout)
-            .map_err(|error| super::super::fault("reply", error.to_string()))?;
-        if envelope.errors.is_some() {
-            return Err(super::super::fault(
-                "provider",
-                "relationship observation contains provider errors",
-            ));
-        }
-        let repository = envelope.data.repository;
-        let issue = repository.issue;
-        let expected = [
-            &header.repository,
-            &header.node,
-            &header.body,
-            &header.state,
-            &header.updated,
-        ];
-        let observed = [
-            &repository.id,
-            &issue.id,
-            &issue.body,
-            &issue.state,
-            &issue.updated,
-        ];
-        if observed != expected {
-            return Err(super::super::fault(
-                "changed",
-                "native relationships disagree with the observed Issue",
-            ));
-        }
-        Ok(issue)
+fn checked(header: &Header, repository: Repository) -> Result<Issue> {
+    let issue = repository.issue;
+    let expected = [
+        &header.repository,
+        &header.node,
+        &header.body,
+        &header.state,
+        &header.updated,
+    ];
+    let observed = [
+        &repository.id,
+        &issue.id,
+        &issue.body,
+        &issue.state,
+        &issue.updated,
+    ];
+    if observed != expected {
+        return Err(super::super::fault(
+            "changed",
+            "native relationships disagree with the observed Issue",
+        ));
     }
+    Ok(issue)
 }
 
 fn bounded(nodes: &[Node]) -> Result<()> {

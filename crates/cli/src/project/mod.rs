@@ -5,7 +5,6 @@ mod manage;
 mod next;
 mod observe;
 mod planning;
-use wire::query;
 mod target;
 mod wire;
 

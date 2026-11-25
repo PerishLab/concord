@@ -1,24 +1,29 @@
+use crate::spawn::{Reply, Server};
 use serde_json::{Value, json};
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Output, Stdio};
+use std::sync::Mutex;
 
 pub(super) fn page() -> Value {
     let issue = json!({
-        "id": "I_issue", "number": 83,
+        "id": "I_issue", "number": 83, "title": "Acceptance",
         "url": "https://github.com/PerishLab/concord/issues/83",
-        "state": "OPEN", "kind": {"name": "Feature"},
+        "state": "OPEN", "reason": null, "writable": true,
+        "kind": {"name": "Feature"},
+        "repository": {"id": "R_concord"},
         "body": "Current exact acceptance conditions.",
         "updated": "2026-09-30T00:00:00Z",
         "labels": connection(vec![], None, 0),
         "comments": connection(vec![], None, 0),
     });
-    let repository = json!({"id": "R_concord", "issue": issue});
+    let repository =
+        json!({"id": "R_concord", "nameWithOwner": "PerishLab/concord", "issue": issue});
     json!({"data": {"repository": repository}})
 }
 
-pub(super) fn connection(nodes: Vec<Value>, cursor: Option<&str>, total: usize) -> Value {
-    json!({"nodes": nodes, "total": total, "page": {"next": cursor.is_some(), "cursor": cursor}})
+pub(super) fn connection(rows: Vec<Value>, cursor: Option<&str>, total: usize) -> Value {
+    json!({"rows": rows, "total": total, "page": {"more": cursor.is_some(), "cursor": cursor}})
 }
 
 pub(super) fn entry(node: &str, body: &str, number: usize) -> Value {
@@ -26,46 +31,45 @@ pub(super) fn entry(node: &str, body: &str, number: usize) -> Value {
         "url": format!("https://github.com/PerishLab/concord/issues/83#issuecomment-{number}")})
 }
 
-pub(super) fn provider(scratch: &Path, replies: &[Value]) -> PathBuf {
-    let mut script = format!(
-        "#!/bin/sh\nset -eu\ncat > '{0}/request'\ncount=0\nif [ -f '{0}/calls' ]; then read count < '{0}/calls'; fi\ncount=$((count+1))\nprintf '%s\\n' \"$count\" > '{0}/calls'\ncp '{0}/request' \"{0}/request-$count\"\ncase \"$count\" in\n",
-        scratch.display()
-    );
-    for (index, reply) in replies.iter().enumerate() {
-        let path = scratch.join(format!("reply-{index}.json"));
-        std::fs::write(&path, serde_json::to_vec(reply).unwrap()).unwrap();
-        script.push_str(&format!("{}) cat '{}';;\n", index + 1, path.display()));
-    }
-    script.push_str("*) exit 91;;\nesac\n");
-    let path = scratch.join("provider");
-    plumb::testing::executable(&path, script);
-    path
+pub(super) fn provider(scratch: &Path, replies: &[Value]) -> Server {
+    let root = scratch.to_path_buf();
+    let held = replies.to_vec();
+    let count = Mutex::new(0usize);
+    Server::start(move |request| {
+        let mut index = count.lock().unwrap();
+        *index += 1;
+        let current = *index;
+        std::fs::write(root.join("request"), &request.body).unwrap();
+        std::fs::write(root.join(format!("request-{current}")), &request.body).unwrap();
+        std::fs::write(root.join("calls"), format!("{current}\n")).unwrap();
+        match held.get(current - 1) {
+            Some(reply) => Reply::json(reply.clone()),
+            None => Reply::status(500, json!({"message": "unexpected request"})),
+        }
+    })
 }
 
-pub(super) fn command(scratch: &Path, provider: &Path, operation: &str) -> Command {
+pub(super) fn command(scratch: &Path, server: &Server, operation: &str) -> Command {
     let mut command = crate::spawn::concord(scratch);
+    server.attach(&mut command);
     command.args([
         "--home",
         scratch.to_str().unwrap(),
         "--json",
         "acceptance",
         operation,
-    ]);
-    command.args([
         "PerishLab/concord#83",
-        "--github-command",
-        provider.to_str().unwrap(),
     ]);
     command
 }
 
 pub(super) fn invoke(
     scratch: &Path,
-    provider: &Path,
+    server: &Server,
     operation: &str,
     input: Option<&Value>,
 ) -> Output {
-    let mut command = command(scratch, provider, operation);
+    let mut command = command(scratch, server, operation);
     if operation == "apply" {
         command.arg("--apply");
     }
@@ -124,16 +128,16 @@ pub(super) fn published(plan: &Value) -> Value {
     let body = plan["plan"]["intent"]["body"].as_str().unwrap();
     let node = json!({
         "id": "intended", "url": "https://github.com/PerishLab/concord/issues/83#issuecomment-2",
-        "body": body, "createdAt": "2026-10-07T00:00:00Z"
+        "body": body, "created": "2026-10-07T00:00:00Z", "updated": "2026-10-07T00:00:00Z"
     });
-    let addition = json!({"commentEdge": {"node": node}});
+    let addition = json!({"subject": {"id": "I_issue"}, "commentEdge": {"node": node}});
     json!({"data": {"addComment": addition}})
 }
 
 pub(super) fn retained(page: &Value, plan: &Value, labels: &[&str]) -> Value {
     let mut page = page.clone();
     let issue = &mut page["data"]["repository"]["issue"];
-    let mut entries = issue["comments"]["nodes"].as_array().unwrap().clone();
+    let mut entries = issue["comments"]["rows"].as_array().unwrap().clone();
     entries.push(entry(
         "intended",
         plan["plan"]["intent"]["body"].as_str().unwrap(),

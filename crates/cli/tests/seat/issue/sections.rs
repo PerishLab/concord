@@ -1,5 +1,9 @@
-use super::{preflight, reply, success, tool};
+use super::{Reply, Server, preflight, reply, success};
 use serde_json::{Value, json};
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 
 fn body(heading: &str, outcome: &str) -> String {
     format!(
@@ -9,23 +13,20 @@ fn body(heading: &str, outcome: &str) -> String {
 
 fn observe(kind: &str, body: &str) -> Value {
     let fixture = tempfile::tempdir().unwrap();
-    success(fixture.path(), &["issue", "bootstrap"]);
-    let page = reply(false)
-        .replace("\"Task\"", &json!(kind).to_string())
-        .replace(
-            &json!("## Outcome\nExplain native relationships").to_string(),
-            &json!(body).to_string(),
-        );
-    let path = fixture.path().join("calls");
-    let script = format!(
-        "count=0\nif [ -f '{0}' ]; then read count < '{0}'; fi\ncount=$((count+1))\nprintf '%s\\n' \"$count\" > '{0}'\n{page}",
-        path.display(),
-    );
-    let provider = tool(fixture.path(), "sections", script);
-    let report = preflight(fixture.path(), &provider, 20);
+    success(fixture.path(), None, &["issue", "bootstrap"]);
+    let mut page = reply(false);
+    page["data"]["repository"]["issue"]["issueType"]["name"] = json!(kind);
+    page["data"]["repository"]["issue"]["body"] = json!(body);
+    let calls = Arc::new(AtomicUsize::new(0));
+    let count = Arc::clone(&calls);
+    let server = Server::start(move |_| {
+        count.fetch_add(1, Ordering::SeqCst);
+        Reply::json(page.clone())
+    });
+    let report = preflight(fixture.path(), &server, 20);
     assert_eq!(report["preflight"]["complete"], true);
     assert_eq!(report["preflight"]["execution"]["members"], json!([]));
-    assert_eq!(std::fs::read_to_string(path).unwrap().trim(), "1");
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
     report["preflight"].clone()
 }
 

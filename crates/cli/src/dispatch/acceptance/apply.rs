@@ -97,7 +97,7 @@ impl Writer<'_> {
         let args = self.args;
         let plan = self.plan;
         let body = plan.plan.intent.body()?;
-        let result = forge::submit(&args.command, &snapshot.header.node, body, args.timeout).await;
+        let result = forge::submit(&snapshot.header.node, body, args.timeout).await;
         let acknowledgment =
             result.and_then(|reply| forge::verify(&snapshot.header.coordinate, body, &reply));
         self.refresh(snapshot).await?;

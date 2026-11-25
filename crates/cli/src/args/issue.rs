@@ -26,8 +26,6 @@ pub enum Command {
     #[command(about = "Project one bounded GitHub Issue brief without persisting it")]
     Brief {
         issue: String,
-        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
-        command: PathBuf,
         #[arg(long = "page-size", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
         page_size: u16,
         #[arg(long = "sub-issues-after")]
@@ -49,8 +47,6 @@ pub enum Command {
     #[command(about = "Derive one bounded graph from native GitHub relationships")]
     Graph {
         issue: String,
-        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
-        command: PathBuf,
         #[arg(long = "page-size", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
         page_size: u16,
         #[arg(long = "max-nodes", default_value_t = 100, value_parser = clap::value_parser!(u16).range(1..=500))]
@@ -72,8 +68,6 @@ pub enum Command {
             help = "Markdown comment body (stdin by default); execution card and marker are appended. Bare JSON documents are refused; fenced JSON in prose is allowed"
         )]
         input: PathBuf,
-        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
-        command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
@@ -85,8 +79,6 @@ pub enum Command {
     #[command(about = "Attach local execution to one readable typed GitHub Issue")]
     Attach {
         issue: String,
-        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
-        command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
@@ -97,8 +89,6 @@ pub enum Command {
         issue: String,
         #[arg(long)]
         revision: i64,
-        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
-        command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
@@ -106,8 +96,6 @@ pub enum Command {
     Validate {
         #[arg(long, value_name = "PATH|-", default_value = "-")]
         input: PathBuf,
-        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
-        command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
@@ -117,8 +105,6 @@ pub enum Command {
         coordinate: String,
         #[arg(long)]
         revision: i64,
-        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
-        command: PathBuf,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
@@ -135,8 +121,6 @@ pub enum Preflight {
         title: String,
         #[arg(long)]
         outcome: String,
-        #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
-        command: PathBuf,
         #[arg(long = "page-size", default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=100))]
         page_size: u16,
         #[arg(long = "max-pages", default_value_t = 4, value_parser = clap::value_parser!(u16).range(1..=20))]
@@ -154,8 +138,6 @@ pub enum Preflight {
 #[derive(clap::Args)]
 pub struct Relations {
     pub issue: String,
-    #[arg(long = "github-command", value_name = "PROGRAM", help = super::PROGRAM)]
-    pub command: PathBuf,
     #[arg(long = "page-size", default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=100))]
     pub page_size: u16,
     #[arg(long = "max-pages", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
@@ -190,12 +172,10 @@ pub enum Delivery {
             help = "Carry preparation failures through a streamed delivery handoff"
         )]
         handoff: bool,
-        #[arg(long = "github-command", default_value = "gh", value_name = "PROGRAM", help = super::PROGRAM)]
-        command: PathBuf,
         #[arg(
             long,
             default_value = "github",
-            help = "Delivery adaptor; only github on github.com is supported; command override does not select a platform"
+            help = "Delivery adaptor; only github on github.com is supported"
         )]
         forge: String,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
@@ -219,12 +199,10 @@ pub enum Delivery {
         authority: concord_core::issue_delivery::Mode,
         #[arg(long, value_name = "PATH|-", default_value = "-")]
         plan: PathBuf,
-        #[arg(long = "github-command", default_value = "gh", value_name = "PROGRAM", help = super::PROGRAM)]
-        command: PathBuf,
         #[arg(
             long,
             default_value = "github",
-            help = "Delivery adaptor; only github on github.com is supported; command override does not select a platform"
+            help = "Delivery adaptor; only github on github.com is supported"
         )]
         forge: String,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
@@ -271,8 +249,8 @@ impl Delivery {
     }
 }
 
-const DELIVERY: &str = "Prepare and land exact Issue-led pull requests through the qualified GitHub adaptor. Delivery defaults to the external gh program on PATH; --github-command overrides one executable, never the platform or host. Only --forge github and github.com origins are supported. API and pull commands explicitly bind github.com, overriding gh host defaults. No credentials are held by Concord.
+const DELIVERY: &str = "Prepare and land exact Issue-led pull requests through the qualified native Runseal GitHub adaptor. Only --forge github and github.com origins are supported. No credentials are held by Concord.
 
 New handoffs use envelope v2 with forge kind, host, repository coordinate and repository node. Legacy v1 handoffs retain their GitHub-only meaning and undergo the same current origin, proof, acceptance and provider checks; they cannot opt into another forge. Other or conflicting identities refuse before provider mutation. Existing estate identities are unchanged.
 
-The adaptor exposes bounded Issue/acceptance observations, exact pull facts, checks, mutation and independent readback. Missing platform capabilities refuse rather than appear empty or successful. Codehull, Forgejo and Gitee are unsupported; each requires its own identity namespace and qualification of Issue types/relations, checks, merge and readback. Project capability is separate; URL substitution or a different command executable does not supply a new adaptor. Unknown write outcomes require observation before resuming, never blind replay.";
+The adaptor exposes bounded Issue/acceptance observations, exact pull facts, checks, mutation and independent readback. Missing platform capabilities refuse rather than appear empty or successful. Codehull, Forgejo and Gitee are unsupported; each requires its own identity namespace and qualification of Issue types/relations, checks, merge and readback. Project capability is separate; URL substitution does not supply a new adaptor. Unknown write outcomes require observation before resuming, never blind replay.";

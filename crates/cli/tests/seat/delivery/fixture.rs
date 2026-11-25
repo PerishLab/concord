@@ -1,7 +1,7 @@
-use super::super::execution::unix::{self as execution, Facts, git, repository};
-use super::super::spawn;
-use super::provider::{observer, projection, tool};
-use super::unix::success;
+use super::super::execution::unix::{git, repository};
+use super::super::spawn::{self, Server};
+use super::provider::{serve, tool};
+use super::unix::{attached, success};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -10,9 +10,10 @@ pub(super) struct Native<'a> {
     pub space: &'a Path,
     pub source: PathBuf,
     pub member: PathBuf,
-    provider: PathBuf,
+    pub server: Server,
     pub issue: String,
     path: Option<std::ffi::OsString>,
+    offline: bool,
 }
 
 impl<'a> Native<'a> {
@@ -27,20 +28,8 @@ impl<'a> Native<'a> {
     fn build(space: &'a Path, coordinate: &str, stable: &str) -> Self {
         let issue = format!("{coordinate}#1");
         success(space, &["issue", "bootstrap"]);
-        let provider = tool(
-            space,
-            "provider",
-            projection(space)
-                .replace(r#"if [ "$1 $2" = "api -X" ]; then"#, &format!(r#"if [ "$1 $2" = "api -X" ]; then printf '%s\n' "$@" > '{}/status-call';"#, space.display()))
-                .replace("  commit=$(", &format!("  if [ -f '{}/lose-proof' ]; then message='receipt missing'; fi\n  commit=$(", space.display()))
-                .replace("PerishLab/probe", coordinate)
-                .replace("R_probe", stable),
-        );
-        let command = provider.to_str().expect("provider");
-        success(
-            space,
-            &["issue", "attach", &issue, "--github-command", command],
-        );
+        let server = serve(space, coordinate, stable);
+        attached(space, &server, &["issue", "attach", &issue]);
         let source = repository(space, coordinate);
         if coordinate == "PerishLab/.github" {
             std::fs::write(
@@ -59,37 +48,20 @@ impl<'a> Native<'a> {
         git(&source, &["add", "."]);
         git(&source, &["commit", "-m", "native checks"]);
         git(&source, &["push", "origin", "main"]);
-        let observer = tool(
+        attached(
             space,
-            "observer",
-            std::fs::read_to_string(observer(space))
-                .expect("observer")
-                .replace("PerishLab/probe", coordinate)
-                .replace("R_probe", stable),
-        );
-        success(
-            space,
+            &server,
             &[
                 "integration",
                 "register",
                 coordinate,
                 "--path",
                 source.to_str().expect("source"),
-                "--github-command",
-                observer.to_str().expect("observer"),
             ],
         );
-        let start = execution::provider(
+        attached(
             space,
-            Facts {
-                node: "I_delivery",
-                stable,
-                coordinate,
-                number: 1,
-            },
-        );
-        success(
-            space,
+            &server,
             &[
                 "member",
                 "start",
@@ -98,8 +70,6 @@ impl<'a> Native<'a> {
                 "topic.md",
                 "--revision",
                 "0",
-                "--github-command",
-                start.to_str().expect("start"),
             ],
         );
         let remote = space.join("remote.git");
@@ -142,10 +112,15 @@ impl<'a> Native<'a> {
             space,
             source,
             member,
-            provider,
+            server,
             issue,
             path: None,
+            offline: false,
         }
+    }
+
+    pub fn offline(&mut self) {
+        self.offline = true;
     }
 
     pub fn tools(&mut self) {
@@ -197,6 +172,10 @@ impl<'a> Native<'a> {
 
     pub fn command(&self, verb: &str, authority: &str) -> Command {
         let mut command = spawn::concord(self.space);
+        if !self.offline {
+            self.server.attach(&mut command);
+            command.env("GH_TOKEN", "native-test-sentinel");
+        }
         if let Some(path) = &self.path {
             command.env("PATH", path);
         }
@@ -211,10 +190,7 @@ impl<'a> Native<'a> {
                 &self.issue,
                 "--authority",
                 authority,
-                "--github-command",
-                self.provider.to_str().expect("provider"),
             ])
-            .env("GH_TOKEN", "native-test-sentinel")
             .env("CLOUDFLARE_API_TOKEN", "native-test-sentinel")
             .env("WHARF_TEST_SENTINEL", "native-test-sentinel")
             .stdout(Stdio::piped())

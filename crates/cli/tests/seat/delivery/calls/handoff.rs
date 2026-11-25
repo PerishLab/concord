@@ -1,16 +1,16 @@
-use super::super::spawn;
+use super::super::spawn::{self, Server};
 use super::provider::consume;
 use super::unix::prepare;
 use serde_json::Value;
 use std::path::Path;
 
-pub fn verify(space: &Path, provider: &str) {
-    let direct = prepare(space, provider, "1", false)
+pub fn verify(space: &Path, server: &Server) {
+    let direct = prepare(space, server, "1", false)
         .output()
         .expect("prepare direct refusal");
     refused(&direct, "concord.issue.stale");
     assert!(direct.stdout.is_empty());
-    let refusal = prepare(space, provider, "1", true)
+    let refusal = prepare(space, server, "1", true)
         .output()
         .expect("prepare refusal handoff");
     assert!(refusal.status.success());
@@ -19,33 +19,30 @@ pub fn verify(space: &Path, provider: &str) {
     carried(space, &refusal.stdout, &expected);
     for marker in ["provider-failure", "provider-delay"] {
         std::fs::write(space.join(marker), "one\n").expect("provider failure mode");
-        let refusal = prepare(space, provider, "2", true)
+        let refusal = prepare(space, server, "2", true)
             .output()
             .expect("prepare provider refusal handoff");
+        let _ = std::fs::remove_file(space.join(marker));
         assert!(refusal.status.success());
         assert!(refusal.stderr.is_empty());
         let expected: Value =
             serde_json::from_slice(&refusal.stdout).expect("provider refusal JSON");
         carried(space, &refusal.stdout, &expected);
     }
-    refused(
-        &consume(space, "/missing/provider", b""),
-        "concord.delivery.handoff",
-    );
+    refused(&consume(space, None, b""), "concord.delivery.handoff");
     let malformed = space.join("malformed-plan.json");
     std::fs::write(&malformed, b"").expect("malformed plan");
     let output = spawn::concord(space)
         .args(["--home", space.to_str().expect("root"), "--json"])
         .args(["issue", "delivery", "land", "PerishLab/probe#1"])
         .args(["--plan", malformed.to_str().expect("plan path")])
-        .args(["--github-command", "/missing/provider"])
         .output()
         .expect("consume malformed plan");
     refused(&output, "concord.input.json");
 }
 
 fn carried(space: &Path, handoff: &[u8], expected: &Value) {
-    let output = consume(space, "/missing/provider", handoff);
+    let output = consume(space, None, handoff);
     let actual: Value = serde_json::from_slice(&output.stderr).expect("carried refusal");
     assert!(!output.status.success());
     assert!(output.stdout.is_empty());
@@ -65,23 +62,12 @@ fn adaptor() {
     for legacy in [false, true] {
         let fixture = tempfile::tempdir().expect("fixture");
         let space = fixture.path();
-        let provider = super::settled::open(space);
-        let directory = space.join("bin");
-        std::fs::create_dir(&directory).expect("provider directory");
-        plumb::testing::link(Path::new(&provider), &directory.join("gh"));
-        let mut paths = vec![directory];
-        paths.extend(std::env::split_paths(
-            &std::env::var_os("PATH").expect("PATH"),
-        ));
-        let paths = std::env::join_paths(paths).expect("tool PATH");
+        let server = super::settled::open(space);
         let mut command = delivery(space, "prepare");
-        command.args(["--revision", &super::settled::revision(space)]);
+        server.attach(&mut command);
         command
-            .env("PATH", &paths)
+            .args(["--revision", &super::settled::revision(space)])
             .env("GH_HOST", "unsupported.example");
-        if legacy {
-            command.args(["--github-command", &provider]);
-        }
         let prepared = command.output().expect("prepare");
         assert!(
             prepared.status.success(),
@@ -100,7 +86,7 @@ fn adaptor() {
             refused(
                 &consume(
                     space,
-                    "/missing/provider",
+                    None,
                     &serde_json::to_vec(&changed).expect("changed plan"),
                 ),
                 "concord.delivery.adaptor",
@@ -123,7 +109,7 @@ fn adaptor() {
             ],
         );
         refused(
-            &consume(space, "/missing/provider", &prepared.stdout),
+            &consume(space, None, &prepared.stdout),
             "concord.delivery.adaptor",
         );
         super::super::execution::unix::git(
@@ -140,12 +126,8 @@ fn adaptor() {
             plan.as_object_mut().expect("envelope").remove("forge");
         }
         let mut command = delivery(space, "land");
-        command
-            .env("PATH", &paths)
-            .env("GH_HOST", "unsupported.example");
-        if legacy {
-            command.args(["--github-command", &provider]);
-        }
+        server.attach(&mut command);
+        command.env("GH_HOST", "unsupported.example");
         let landed = super::provider::feed(command, &serde_json::to_vec(&plan).expect("plan"))
             .wait_with_output()
             .expect("land");
@@ -164,7 +146,7 @@ fn adaptor() {
 fn programs() {
     let fixture = tempfile::tempdir().expect("fixture");
     let space = fixture.path();
-    super::settled::open(space);
+    let server = super::settled::open(space);
     let directory = space.join("bin");
     std::fs::create_dir(&directory).expect("tool directory");
     plumb::testing::executable(
@@ -173,24 +155,29 @@ fn programs() {
     );
     let blocked = directory.join("blocked");
     std::fs::write(&blocked, "no executable permission").expect("non executable");
-    for program in [
+    for token in [
         None,
         Some(blocked.as_path()),
-        Some(Path::new("/missing/gh")),
+        Some(Path::new("/missing/token")),
     ] {
         let mut command = delivery(space, "prepare");
         command
             .args(["--revision", &super::settled::revision(space)])
             .env("PATH", &directory);
-        if let Some(program) = program {
-            command.arg("--github-command").arg(program);
+        for credential in ["GH_TOKEN", "GITHUB_TOKEN", "GITHUB_TOKEN_FILE"] {
+            command.env_remove(credential);
         }
-        let result = command.output().expect("missing program refusal");
-        refused(&result, "concord.issue.projection.command");
+        if let Some(path) = token {
+            command.env("GITHUB_TOKEN_FILE", path);
+        }
+        let result = command.output().expect("missing credential refusal");
         let message = String::from_utf8_lossy(&result.stderr);
-        assert!(message.contains("did not start"), "{message}");
-        assert!(message.contains("one program"), "{message}");
+        refused(&result, "concord.issue.projection.provider");
+        if token.is_none() {
+            assert!(message.contains("GitHub token"), "{message}");
+        }
     }
+    drop(server);
     assert!(!space.join("pull-state").exists());
 }
 

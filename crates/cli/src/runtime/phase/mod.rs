@@ -16,7 +16,7 @@ pub(crate) async fn observe(
     binding: Option<&Binding>,
     target: &str,
     node: &str,
-    remote: (&Path, u64),
+    timeout: u64,
 ) -> Value {
     let Some(binding) = binding else {
         return json!({"status":"not-configured","observed_at":now(),"value":null,"semantics":"no explicit native Phase binding; unset is not Clarify"});
@@ -24,10 +24,7 @@ pub(crate) async fn observe(
     if node.is_empty() {
         return json!({"status":"unavailable","value":null,"reason":"Phase observation requires a qualified upstream Issue identity","binding":binding,"observed_at":now(),"authority":"issue"});
     }
-    let client = wire::Client {
-        command: remote.0,
-        timeout: remote.1,
-    };
+    let client = wire::Client { timeout };
     let result = read::observe(&client, binding, target)
         .await
         .and_then(|state| {
@@ -72,7 +69,6 @@ pub(crate) async fn run(command: Command, binding: Option<&Binding>, output: boo
                 "Phase intent: reason and explicit value (null clears)",
             )?;
             let client = wire::Client {
-                command: &remote.command,
                 timeout: remote.timeout,
             };
             let before = read::snapshot(&client, binding, &issue).await?;
@@ -94,7 +90,6 @@ pub(crate) async fn run(command: Command, binding: Option<&Binding>, output: boo
             crate::dispatch::explicit(apply, "Issue Phase mutation")?;
             let plan = plan(&input, binding)?;
             let client = wire::Client {
-                command: &remote.command,
                 timeout: remote.timeout,
             };
             change::apply(&client, &plan).await?
@@ -102,7 +97,6 @@ pub(crate) async fn run(command: Command, binding: Option<&Binding>, output: boo
         Command::Recover { input, remote } => {
             let plan = plan(&input, binding)?;
             let client = wire::Client {
-                command: &remote.command,
                 timeout: remote.timeout,
             };
             let current = read::snapshot(&client, binding, &plan.issue).await?;

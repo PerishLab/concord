@@ -1,6 +1,8 @@
 #[cfg(unix)]
 mod coverage;
 #[cfg(unix)]
+mod data;
+#[cfg(unix)]
 mod paging;
 #[cfg(unix)]
 mod provider;
@@ -85,15 +87,15 @@ fn refusals() {
     let root = tempfile::tempdir().unwrap();
     for (mode, code) in [
         ("permission", "provider"),
-        ("missing", "unavailable"),
-        ("identity", "identity"),
+        ("missing", "provider"),
+        ("identity", "provider"),
         ("changed", "changed"),
         ("final", "changed"),
         ("schema", "schema"),
         ("origin", "schema"),
         ("missing-connection", "schema"),
         ("repeat", "changed"),
-        ("cursor", "schema"),
+        ("cursor", "provider"),
     ] {
         let output = fixture::run(root.path(), mode, "20");
         assert!(!output.status.success(), "{mode}");
@@ -115,14 +117,7 @@ fn grammar() {
         "PerishLab/1/2",
     ] {
         let output = spawn::concord(scratch.path())
-            .args([
-                "project",
-                "show",
-                target,
-                "--github-command",
-                "missing-provider",
-                "--json",
-            ])
+            .args(["project", "show", target, "--json"])
             .output()
             .unwrap();
         assert!(!output.status.success());
@@ -143,18 +138,18 @@ fn grammar() {
 fn next() {
     let scratch = tempfile::tempdir().unwrap();
     for mode in ["ordinary", "permission", "identity", "repeat"] {
-        let provider = fixture::provider(scratch.path(), mode);
-        let output = spawn::concord(scratch.path())
+        let server = fixture::provider(mode);
+        let mut command = spawn::concord(scratch.path());
+        server.attach(&mut command);
+        let output = command
             .args([
                 "--home",
                 "/deliberately-unavailable-estate",
                 "project",
                 "next",
                 "PerishLab/1",
-                "--github-command",
+                "--json",
             ])
-            .arg(&provider)
-            .arg("--json")
             .output()
             .unwrap();
         if mode == "ordinary" {
@@ -166,16 +161,16 @@ fn next() {
             let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
             assert_eq!(result["next"]["schema"], "concord.project-next/v1");
             assert!(result["next"]["issue"].is_null());
-            let human = spawn::concord(scratch.path())
+            let mut command = spawn::concord(scratch.path());
+            server.attach(&mut command);
+            let human = command
                 .args([
                     "--home",
                     "/deliberately-unavailable-estate",
                     "project",
                     "next",
                     "PerishLab/1",
-                    "--github-command",
                 ])
-                .arg(provider)
                 .output()
                 .unwrap();
             assert!(human.status.success());

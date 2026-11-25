@@ -13,17 +13,11 @@ fn documents() {
     ] {
         let fixture = tempfile::tempdir().expect("fixture");
         bootstrap(fixture.path());
-        let command = tool(
-            fixture.path(),
-            &format!(
-                "touch '{}'; exit 99",
-                fixture.path().join("called").display()
-            ),
-        );
+        let mock = guard();
         let output = invoke(
             fixture.path(),
             Run {
-                command: &command,
+                server: &mock.server,
                 body,
                 environment: &[("CODEX_THREAD_ID", "thread")],
                 timeout: 10,
@@ -35,7 +29,7 @@ fn documents() {
             "{}",
             String::from_utf8_lossy(&output.stderr)
         );
-        assert!(!fixture.path().join("called").exists());
+        assert_eq!(mock.hits(), 0);
     }
 }
 
@@ -50,17 +44,17 @@ fn prose() {
         let fixture = tempfile::tempdir().expect("fixture");
         bootstrap(fixture.path());
         let expected = render::body(body, "codex", "thread", None);
-        let command = provider(fixture.path(), "OPEN", &expected, Reply::Exact);
+        let mock = provider("OPEN", &expected, Answer::Exact);
         success(invoke(
             fixture.path(),
             Run {
-                command: &command,
+                server: &mock.server,
                 body,
                 environment: &[("CODEX_THREAD_ID", "thread")],
                 timeout: 10,
             },
         ));
-        request(fixture.path(), &expected, "thread");
+        request(&mock, &expected);
     }
 }
 
@@ -118,11 +112,11 @@ fn validation() {
     {
         let fixture = tempfile::tempdir().expect("fixture");
         bootstrap(fixture.path());
-        let command = tool(fixture.path(), "touch called; exit 99");
+        let mock = guard();
         let output = invoke(
             fixture.path(),
             Run {
-                command: &command,
+                server: &mock.server,
                 body: "Declaration",
                 environment: &environment,
                 timeout: 10,
@@ -130,7 +124,7 @@ fn validation() {
         );
         assert!(!output.status.success(), "{name}");
         assert!(String::from_utf8_lossy(&output.stderr).contains(code));
-        assert!(!fixture.path().join("called").exists());
+        assert_eq!(mock.hits(), 0);
     }
 }
 

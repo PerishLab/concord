@@ -1,6 +1,6 @@
-use super::super::execution::unix::{Facts, git, provider, repository};
-use super::super::spawn;
-use serde_json::{Value, json};
+use super::super::execution::unix::{Facts, admission, git, record, repository, ticket};
+use super::super::spawn::{self, Reply, Server};
+use serde_json::Value;
 use std::path::{Path, PathBuf};
 
 pub(super) struct Seat<'a> {
@@ -14,63 +14,65 @@ impl Seat<'_> {
         git(&source, &["add", "Cargo.lock"]);
         git(&source, &["commit", "-m", "manifest fixture"]);
         git(&source, &["push", "origin", "main"]);
-        let command = self.tool(
-            "repository",
-            json!({"node":"R_concord", "coordinate":"PerishLab/concord", "branch":"main"}),
+        let server = Server::start(|_| Reply::json(record("R_concord", "PerishLab/concord")));
+        self.success(
+            Some(&server),
+            &[
+                "integration",
+                "register",
+                "PerishLab/concord",
+                "--path",
+                source.to_str().expect("source"),
+            ],
         );
-        self.success(&[
-            "integration",
-            "register",
-            "PerishLab/concord",
-            "--path",
-            source.to_str().expect("source"),
-            "--github-command",
-            command.to_str().expect("provider"),
-        ]);
         source
     }
 
     pub(super) fn attach(&self) {
-        let command = self.tool("human",
-            json!({"node":"I_human", "stable":"R_concord", "number":1, "url":"https://github.com/PerishLab/concord/issues/1", "state":"OPEN", "kind":"Feature", "updated_at":"now"}),
-        );
-        self.success(&[
-            "issue",
-            "attach",
-            "PerishLab/concord#1",
-            "--github-command",
-            command.to_str().expect("provider"),
-        ]);
+        let server = Server::start(|_| {
+            Reply::json(ticket(
+                &Facts {
+                    node: "I_human",
+                    stable: "R_concord",
+                    coordinate: "PerishLab/concord",
+                    number: 1,
+                },
+                "OPEN",
+                "Feature",
+                "now",
+            ))
+        });
+        self.success(Some(&server), &["issue", "attach", "PerishLab/concord#1"]);
     }
 
-    pub(super) fn start(&self) -> PathBuf {
-        provider(
-            self.space,
-            Facts {
-                node: "I_human",
-                stable: "R_concord",
-                coordinate: "PerishLab/concord",
-                number: 1,
-            },
-        )
+    pub(super) fn start(&self, kind: &str) -> Server {
+        let kind = kind.to_owned();
+        Server::start(move |_| {
+            Reply::json(admission(
+                &Facts {
+                    node: "I_human",
+                    stable: "R_concord",
+                    coordinate: "PerishLab/concord",
+                    number: 1,
+                },
+                &kind,
+            ))
+        })
     }
 
-    pub(super) fn tool(&self, name: &str, reply: Value) -> PathBuf {
-        let path = self.space.join(name);
-        plumb::testing::executable(&path, format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
-        path
-    }
-
-    pub(super) fn run(&self, args: &[&str]) -> std::process::Output {
-        spawn::concord(self.space)
+    pub(super) fn run(&self, server: Option<&Server>, args: &[&str]) -> std::process::Output {
+        let mut command = spawn::concord(self.space);
+        command
             .args(["--home", self.space.to_str().expect("self.space"), "--json"])
-            .args(args)
-            .output()
-            .expect("Concord")
+            .args(args);
+        if let Some(server) = server {
+            server.attach(&mut command);
+        }
+        command.output().expect("Concord")
     }
 
-    pub(super) fn success(&self, args: &[&str]) -> Value {
-        let output = self.run(args);
+    pub(super) fn success(&self, server: Option<&Server>, args: &[&str]) -> Value {
+        let output = self.run(server, args);
         assert!(
             output.status.success(),
             "{}",

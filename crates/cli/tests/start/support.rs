@@ -1,31 +1,46 @@
-use super::spawn;
+use super::spawn::{self, Reply, Server};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
 pub fn fact() -> Value {
-    json!({
-        "node": "I_execution", "stable": "R_concord",
-        "coordinate": "PerishLab/concord", "branch": "main", "number": 26,
+    let page = json!({"hasNextPage": false});
+    let labels = json!({"nodes": [], "pageInfo": page});
+    let issue = json!({
+        "id": "I_execution",
+        "number": 26,
         "url": "https://github.com/PerishLab/concord/issues/26",
-        "state": "OPEN", "kind": "Feature", "leaves": 0, "truncated": false,
-        "rulesets": [{
-            "enforcement": "ACTIVE", "target": "BRANCH",
-            "include": ["~DEFAULT_BRANCH"], "exclude": [], "bypass": 0,
-            "truncated": false,
-            "rules": ["DELETION", "NON_FAST_FORWARD", "PULL_REQUEST"],
-        }],
-        "labels": {"names": [], "truncated": false},
-    })
+        "state": "OPEN",
+        "issueType": {"name": "Feature"},
+        "subIssuesSummary": {"total": 0},
+        "labels": labels,
+    });
+    let names = json!({"include": ["~DEFAULT_BRANCH"], "exclude": []});
+    let nodes = json!([
+        {"type": "DELETION"},
+        {"type": "NON_FAST_FORWARD"},
+        {"type": "PULL_REQUEST"},
+    ]);
+    let rules = json!({"nodes": nodes, "pageInfo": page});
+    let policy = json!({
+        "enforcement": "ACTIVE",
+        "target": "BRANCH",
+        "conditions": {"refName": names},
+        "bypassActors": {"totalCount": 0},
+        "rules": rules,
+    });
+    let rulesets = json!({"nodes": [policy], "pageInfo": page});
+    let repository = json!({
+        "id": "R_concord",
+        "nameWithOwner": "PerishLab/concord",
+        "defaultBranchRef": {"name": "main"},
+        "issue": issue,
+        "rulesets": rulesets,
+    });
+    json!({"data": {"repository": repository}})
 }
 
-pub fn tool(root: &Path, name: &str, reply: Value) -> PathBuf {
-    let path = root.join(name);
-    executable(&path, &format!("#!/bin/sh\nprintf '%s\\n' '{reply}'\n"));
-    path
-}
-
-pub fn executable(path: &Path, body: &str) {
-    plumb::testing::executable(path, body);
+pub fn server(reply: Value) -> Server {
+    Server::start(move |_| Reply::json(reply.clone()))
 }
 
 pub fn repository(root: &Path, coordinate: &str) -> PathBuf {
@@ -69,12 +84,19 @@ pub fn git(root: &Path, arguments: &[&str]) {
     );
 }
 
-pub fn success(space: &Path, arguments: &[&str]) -> Value {
-    let output = spawn::concord(space)
+pub fn success(space: &Path, arguments: &[&str], server: Option<&Server>) -> Value {
+    let mut command = spawn::concord(space);
+    command
         .args(["--home", space.to_str().expect("Space"), "--json"])
-        .args(arguments)
-        .output()
-        .expect("run Concord");
-    assert!(output.status.success());
+        .args(arguments);
+    if let Some(server) = server {
+        server.attach(&mut command);
+    }
+    let output = command.output().expect("run Concord");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     serde_json::from_slice(&output.stdout).expect("Concord JSON")
 }

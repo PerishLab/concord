@@ -1,23 +1,13 @@
-use super::super::github::{envelope, provider};
+use super::super::github::provider;
 use super::{Fault, Projection, Pull};
+use crate::runtime::github;
 use concord_core::Coordinate;
 use plumb::seat::release::Authority;
-use serde::Deserialize;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 pub(in crate::dispatch::forge) type Repository = (String, String);
 
-#[derive(Deserialize)]
-struct Holder {
-    object: Option<Blob>,
-}
-
-#[derive(Deserialize)]
-struct Blob {
-    text: Option<String>,
-}
-
-impl Projection<'_> {
+impl Projection {
     pub(in crate::dispatch::forge) async fn authorities(
         &self,
         trusted: &BTreeSet<Repository>,
@@ -32,64 +22,18 @@ impl Projection<'_> {
                 ),
             ));
         }
-        let listed = trusted.iter().collect::<Vec<_>>();
+        let client = github::client(self.timeout).map_err(|error| provider("provider", error))?;
         let mut result = Vec::new();
-        for chunk in listed.chunks(size) {
-            let texts = self.manifests(chunk).await?;
-            for (repository, text) in chunk.iter().zip(texts) {
-                result.extend(declare(repository, text.as_deref())?);
-            }
+        for repository in trusted {
+            let found = github::call("pull.manifest", || {
+                client.manifest(&repository.0, &repository.1)
+            })
+            .map_err(|error| provider("provider", github::describe(error)))?
+            .value;
+            result.extend(declare(repository, found.text.as_deref())?);
         }
         Ok(result)
     }
-
-    async fn manifests(
-        &self,
-        chunk: &[&Repository],
-    ) -> std::result::Result<Vec<Option<String>>, Fault> {
-        let mut process = self
-            .request()
-            .args(["api", "graphql", "-f"])
-            .arg(format!("query={}", query(chunk.len())));
-        for (index, (owner, name)) in chunk.iter().enumerate() {
-            process = process
-                .args(["-f", &format!("o{index}={owner}")])
-                .args(["-f", &format!("n{index}={name}")]);
-        }
-        let body = self.run(process).await?;
-        let mut data = envelope::<BTreeMap<String, Option<Holder>>>(&body)?.unwrap_or_default();
-        chunk
-            .iter()
-            .enumerate()
-            .map(|(index, (owner, name))| {
-                data.remove(&format!("r{index}"))
-                    .flatten()
-                    .map(|holder| holder.object.and_then(|blob| blob.text))
-                    .ok_or_else(|| {
-                        provider(
-                            "missing",
-                            format!("GitHub repository {owner}/{name} is not readable"),
-                        )
-                    })
-            })
-            .collect()
-    }
-}
-
-fn query(count: usize) -> String {
-    let variables = (0..count)
-        .map(|index| format!("$o{index}: String!, $n{index}: String!"))
-        .collect::<Vec<_>>()
-        .join(", ");
-    let fields = (0..count)
-        .map(|index| {
-            format!(
-                "r{index}: repository(owner: $o{index}, name: $n{index}) {{ object(expression: \"HEAD:plumb.toml\") {{ ... on Blob {{ text }} }} }}"
-            )
-        })
-        .collect::<Vec<_>>()
-        .join(" ");
-    format!("query({variables}) {{ {fields} }}")
 }
 
 fn declare(
