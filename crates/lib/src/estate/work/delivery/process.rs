@@ -43,13 +43,13 @@ fn bounded(command: &mut Command, timeout: Duration) -> Result<String, Refusal> 
         }
         if let Some(status) = child.0.try_wait().map_err(fault)? {
             log.seek(SeekFrom::Start(0)).map_err(fault)?;
-            let mut output = String::new();
-            log.take(LIMIT + 1)
-                .read_to_string(&mut output)
-                .map_err(fault)?;
-            if output.len() as u64 > LIMIT {
+            let mut bytes = Vec::new();
+            log.take(LIMIT + 1).read_to_end(&mut bytes).map_err(fault)?;
+            if bytes.len() as u64 > LIMIT {
                 return Err(refuse("native gate exceeded its output budget"));
             }
+            let output = String::from_utf8(bytes)
+                .map_err(|error| refuse(format!("native gate output is not UTF-8: {error}")))?;
             if !status.success() {
                 return Err(refuse(format!("native gate failed ({status}): {output}")));
             }
@@ -141,5 +141,87 @@ mod tests {
             .env_clear()
             .args(["-B", "-c", "import time; time.sleep(2)"]);
         assert!(bounded(&mut command, Duration::from_millis(10)).is_err());
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows {
+    use super::{Duration, Instant, LIMIT, SUITE, TIMEOUT, bounded, run, suite};
+    use radicula_process::Tool;
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
+
+    fn python() -> PathBuf {
+        let search = crate::config::tools().expect("search");
+        search
+            .resolve("python3")
+            .and_then(Tool::at)
+            .or_else(|_| search.resolve("python").and_then(Tool::at))
+            .expect("python")
+            .path
+    }
+
+    fn command(program: &Path) -> Command {
+        let mut command = Command::new(program);
+        command
+            .env_clear()
+            .env("PYTHONUTF8", "1")
+            .env("PYTHONIOENCODING", "utf-8");
+        for name in ["SystemRoot", "SYSTEMROOT", "WINDIR", "TEMP", "TMP"] {
+            if let Some(value) = crate::config::variable(name) {
+                command.env(name, value);
+            }
+        }
+        command
+    }
+
+    #[test]
+    fn budget() {
+        let program = python();
+        let mut large = command(&program);
+        large.args(["-B", "-c", "print('x' * 2097152)"]);
+        assert!(
+            bounded(&mut large, Duration::from_secs(10))
+                .expect_err("large output")
+                .message
+                .contains("output budget")
+        );
+        let mut slow = command(&program);
+        slow.args(["-B", "-c", "import time; time.sleep(2)"]);
+        let before = Instant::now();
+        assert!(
+            bounded(&mut slow, Duration::from_millis(10))
+                .expect_err("timeout")
+                .message
+                .contains("time budget")
+        );
+        assert!(before.elapsed() < Duration::from_secs(1));
+    }
+
+    #[test]
+    fn capture() {
+        assert_eq!(TIMEOUT, Duration::from_secs(300));
+        assert_eq!(SUITE, Duration::from_secs(1800));
+        assert_eq!(LIMIT, 1_048_576);
+        let program = python();
+        let mut utf8 = command(&program);
+        utf8.args(["-B", "-c", "print('verified ✓ 中文')"]);
+        assert_eq!(suite(&mut utf8).expect("utf8").trim(), "verified ✓ 中文");
+        let mut version = command(&program);
+        version.args(["--version"]);
+        assert!(
+            run(&mut version)
+                .expect("version")
+                .trim()
+                .starts_with("Python 3.")
+        );
+        let mut failed = command(&program);
+        failed.args(["-B", "-c", "raise SystemExit(7)"]);
+        assert!(
+            suite(&mut failed)
+                .expect_err("exit")
+                .message
+                .contains("failed")
+        );
     }
 }

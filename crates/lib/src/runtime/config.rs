@@ -2,6 +2,10 @@ use crate::activity::{Agent, Operator};
 use crate::{Error, Result};
 use std::path::Path;
 
+pub(crate) fn variable(name: &str) -> Option<std::ffi::OsString> {
+    std::env::var_os(name)
+}
+
 pub(crate) fn search(
     paths: &[&Path],
 ) -> std::result::Result<std::ffi::OsString, std::env::JoinPathsError> {
