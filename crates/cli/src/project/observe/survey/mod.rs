@@ -67,17 +67,19 @@ fn emit(value: Value, output: bool) -> Result<()> {
     if output {
         crate::output::value(json!({"survey":value,"version":1}), true);
     } else {
-        println!(
+        if !crate::output::line(format_args!(
             "{}: {} observed open Issues; complete={}",
             value["owner"]["login"].as_str().unwrap_or(""),
             value["issues"].as_array().expect("observed issues").len(),
             value["complete"]
-        );
+        )) {
+            return Ok(());
+        }
         for project in value["coverage"]["projects"]
             .as_array()
             .expect("Project coverage")
         {
-            println!(
+            if !crate::output::line(format_args!(
                 "{}: planning={}, absent ordinary candidates={}",
                 project["url"].as_str().unwrap_or(""),
                 project["planning"]["status"].as_str().unwrap_or("unknown"),
@@ -85,7 +87,9 @@ fn emit(value: Value, output: bool) -> Result<()> {
                     .as_array()
                     .map(|items| items.len().to_string())
                     .unwrap_or_else(|| "unknown".into())
-            );
+            )) {
+                return Ok(());
+            }
         }
     }
     Ok(())

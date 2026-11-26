@@ -17,10 +17,12 @@ pub(crate) fn run(code: Option<&str>, json: bool) -> Result<()> {
         return crate::dispatch::emit(json!({"cookbook": {"entries": entries}}), true);
     }
     for (index, entry) in entries.iter().enumerate() {
-        if index > 0 {
-            println!();
+        if index > 0 && !super::blank() {
+            return Ok(());
         }
-        print(entry);
+        if !print(entry) {
+            return Ok(());
+        }
     }
     Ok(())
 }
@@ -197,12 +199,15 @@ fn entry(code: &str, trigger: &str, solution: &str, recovery: (&str, &str)) -> E
         .expect("compiled Concord Cookbook entry must be valid")
 }
 
-fn print(entry: &Entry) {
-    println!("{}", entry.code());
-    println!("  trigger: {}", entry.trigger());
-    println!("  solution: {}", entry.solution());
-    println!("  evidence: {}", entry.evidence().expect("entry evidence"));
-    println!("  exit: {}", entry.exit().expect("entry exit"));
+fn print(entry: &Entry) -> bool {
+    let lines = [
+        entry.code().text().to_string(),
+        format!("  trigger: {}", entry.trigger()),
+        format!("  solution: {}", entry.solution()),
+        format!("  evidence: {}", entry.evidence().expect("entry evidence")),
+        format!("  exit: {}", entry.exit().expect("entry exit")),
+    ];
+    lines.into_iter().all(super::line)
 }
 
 #[cfg(test)]

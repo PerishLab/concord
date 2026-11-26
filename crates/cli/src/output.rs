@@ -6,9 +6,22 @@ use concord_core::occupancy::Occupancy;
 use concord_core::{ClaimOverlap, CommittedEvidence, CommittedOverlap, Error, Result};
 use plumb::skill::{Done, Record, Report};
 use serde_json::json;
+use std::io::Write;
 
 pub use activity::{issue_activity, unavailable};
 pub use member::issue_status as issue_member_status;
+
+pub(crate) fn line(text: impl std::fmt::Display) -> bool {
+    match writeln!(std::io::stdout().lock(), "{text}") {
+        Ok(()) => true,
+        Err(error) if error.kind() == std::io::ErrorKind::BrokenPipe => false,
+        Err(error) => panic!("failed writing to stdout: {error}"),
+    }
+}
+
+pub(crate) fn blank() -> bool {
+    line("")
+}
 
 pub fn occupancy(occupancy: &Occupancy, output: bool) {
     if occupancy.conflicts.is_empty() {
@@ -103,19 +116,16 @@ fn evidence(reason: CommittedEvidence) -> &'static str {
 
 pub fn value(value: serde_json::Value, output: bool) {
     if output {
-        println!(
-            "{}",
-            serde_json::to_string(&value).expect("JSON value should encode")
-        );
+        let _ = line(serde_json::to_string(&value).expect("JSON value should encode"));
         return;
     }
     match value {
         serde_json::Value::Array(values) => {
-            for value in values {
-                println!("{}", plain(&value));
-            }
+            let _ = values.iter().all(|item| line(plain(item)));
         }
-        value => println!("{}", plain(&value)),
+        value => {
+            let _ = line(plain(&value));
+        }
     }
 }
 
@@ -142,13 +152,31 @@ pub fn done(action: &str, done: &Done, output: bool) -> Result<()> {
         return Ok(());
     }
     for seat in &done.kept {
-        println!("{action} {} {}", seat.agent, seat.path.display());
+        if !line(format_args!(
+            "{action} {} {}",
+            seat.agent,
+            seat.path.display()
+        )) {
+            return Ok(());
+        }
     }
     for seat in &done.same {
-        println!("unchanged {} {}", seat.agent, seat.path.display());
+        if !line(format_args!(
+            "unchanged {} {}",
+            seat.agent,
+            seat.path.display()
+        )) {
+            return Ok(());
+        }
     }
     for skip in &done.left {
-        println!("skipped {}: {}", skip.path.display(), skip.note);
+        if !line(format_args!(
+            "skipped {}: {}",
+            skip.path.display(),
+            skip.note
+        )) {
+            return Ok(());
+        }
     }
     Ok(())
 }
@@ -167,12 +195,17 @@ pub fn report(operation: &str, report: &Report, output: bool) -> Result<()> {
         );
         return Ok(());
     }
-    println!("target {} {}", report.channel, report.target.version);
-    if report.seats.is_empty() {
-        println!("unmanaged");
+    if !line(format_args!(
+        "target {} {}",
+        report.channel, report.target.version
+    )) {
+        return Ok(());
+    }
+    if report.seats.is_empty() && !line("unmanaged") {
+        return Ok(());
     }
     for status in &report.seats {
-        println!(
+        if !line(format_args!(
             "{} {} -> {} {} {} {}",
             status.agent,
             status.installed,
@@ -180,7 +213,9 @@ pub fn report(operation: &str, report: &Report, output: bool) -> Result<()> {
             status.state,
             status.action,
             status.path.display()
-        );
+        )) {
+            return Ok(());
+        }
     }
     Ok(())
 }
@@ -206,16 +241,18 @@ pub fn records(records: &[Record], output: bool) -> Result<()> {
         );
         return Ok(());
     }
-    if records.is_empty() {
-        println!("no managed Concord skill");
+    if records.is_empty() && !line("no managed Concord skill") {
+        return Ok(());
     }
     for record in records {
-        println!(
+        if !line(format_args!(
             "{} {} {}",
             record.agent,
             record.version,
             record.path.display()
-        );
+        )) {
+            return Ok(());
+        }
     }
     Ok(())
 }
