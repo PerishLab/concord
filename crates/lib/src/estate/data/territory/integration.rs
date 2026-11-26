@@ -1,5 +1,5 @@
 use super::super::work::Integration;
-use super::super::{Agreement, Estate, IssueWorktree, Scope};
+use super::super::{Agreement, Estate, Scope, Worktree};
 use crate::Result;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 #[locus::trace(with = crate::observation::view().as_ref().map(crate::observation::borrow), frame = frame)]
 pub(super) async fn survey(
     estate: &Estate,
-    members: &[IssueWorktree],
+    members: &[Worktree],
     report: &mut Agreement,
     scope: Scope<'_>,
 ) -> Result<()> {
@@ -46,7 +46,7 @@ pub(super) async fn survey(
 
 fn assess(
     space: &Path,
-    members: &[IssueWorktree],
+    members: &[Worktree],
     integration: &Integration,
     scope: Scope<'_>,
 ) -> Result<Agreement> {

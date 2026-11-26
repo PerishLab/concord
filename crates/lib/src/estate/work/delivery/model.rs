@@ -15,8 +15,10 @@ pub enum Check {
 pub enum Mode {
     #[default]
     Plumb,
-    WharfNative,
-    GovernanceManual,
+    #[serde(rename = "wharf-native")]
+    Wharf,
+    #[serde(rename = "governance-manual")]
+    Manual,
 }
 
 impl std::str::FromStr for Mode {
@@ -25,8 +27,8 @@ impl std::str::FromStr for Mode {
     fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
         match value {
             "plumb" => Ok(Self::Plumb),
-            "wharf-native" => Ok(Self::WharfNative),
-            "governance-manual" => Ok(Self::GovernanceManual),
+            "wharf-native" => Ok(Self::Wharf),
+            "governance-manual" => Ok(Self::Manual),
             _ => Err("authority must be plumb, wharf-native or governance-manual"),
         }
     }
@@ -39,10 +41,12 @@ pub enum Authority {
         warrant: Warrant,
         guard: plumb::landing::Guard,
     },
-    WharfNative {
+    #[serde(rename = "wharf-native")]
+    Wharf {
         evidence: plumb::delivery::native::Evidence,
     },
-    GovernanceManual {
+    #[serde(rename = "governance-manual")]
+    Manual {
         evidence: plumb::delivery::native::Evidence,
         review: super::Review,
     },
@@ -81,8 +85,8 @@ impl Authority {
     pub fn mode(&self) -> Mode {
         match self {
             Self::Plumb { .. } => Mode::Plumb,
-            Self::WharfNative { .. } => Mode::WharfNative,
-            Self::GovernanceManual { .. } => Mode::GovernanceManual,
+            Self::Wharf { .. } => Mode::Wharf,
+            Self::Manual { .. } => Mode::Manual,
         }
     }
 
@@ -94,7 +98,7 @@ impl Authority {
             Self::Plumb { warrant, .. } => {
                 authority::keep::<A>(warrant, "concord.delivery.authority")?;
             }
-            Self::GovernanceManual { evidence, review } => {
+            Self::Manual { evidence, review } => {
                 manual::admit(integration)?;
                 review.valid()?;
                 if evidence.authority != manual::AUTHORITY {
@@ -104,7 +108,7 @@ impl Authority {
                     ));
                 }
             }
-            Self::WharfNative { evidence } => {
+            Self::Wharf { evidence } => {
                 admit(integration)?;
                 if evidence.authority != gate::AUTHORITY {
                     return Err(Error::typed(
@@ -123,8 +127,8 @@ impl Authority {
     ) -> Result<()> {
         match self {
             Self::Plumb { .. } => Ok(()),
-            Self::WharfNative { .. } => admit(integration),
-            Self::GovernanceManual { .. } => manual::admit(integration),
+            Self::Wharf { .. } => admit(integration),
+            Self::Manual { .. } => manual::admit(integration),
         }
     }
 }

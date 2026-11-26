@@ -1,7 +1,7 @@
 use crate::path::at;
 use crate::{Error, Result};
+use keel::Core;
 use keel::adapt::db::Sqlite;
-use keel::{Core, Status};
 use radicula_lock::Mode;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -17,14 +17,12 @@ mod work;
 
 pub(in crate::estate) use agreement::Scope;
 pub use agreement::{Agreement, Finding};
-pub use forge::{Admission, Anchor, Coordinate, Reconcile};
-pub use forge::{Reference, ReferenceKind};
+pub use forge::{Admission, Anchor, Coordinate, Kind, Reconcile, Reference};
 pub use work::{
-    BoundaryState, CheckoutState, ClaimOverlap, CommittedEvidence, CommittedOverlap, Finish, Guard,
-    Integration, IntegrationState, IssueArtifact, IssueClaiming, IssueDeclaration, IssueImport,
-    IssueMemberChange, IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval,
-    IssueRetirement, IssueWithdrawal, IssueWorktree, Proof, Rebind, Recovery, Register, Rename,
-    Repository, Start, UpstreamState, authority, issue_delivery, landing,
+    Artifact, Boundary, Change, Checkout, Claiming, Committed, Declaration, Evidence, Finish,
+    Guard, Import, Integration, Narrowing, Overlap, Proof, Proving, Rebind, Recovery, Register,
+    Relation, Release, Removal, Rename, Repository, Retirement, Start, Status, Upstream,
+    Withdrawal, Worktree, authority, delivery, landing,
 };
 
 pub struct Estate {
@@ -107,12 +105,12 @@ impl Seat {
     async fn possession(
         &self,
         held: &mut keel::Bootstrap<Sqlite>,
-        status: Status,
+        status: keel::Status,
     ) -> Result<String> {
         if self.sudo().is_file() {
             return std::fs::read_to_string(self.sudo()).map_err(Into::into);
         }
-        if status == Status::Occupied {
+        if status == keel::Status::Occupied {
             return Err(Error::typed(
                 "concord.estate.sudo_absent",
                 "occupied Concord estate has no retained sudo possession",
@@ -154,7 +152,7 @@ impl Estate {
         crate::occupancy::record(&self.layout.root, operator, operation, subjects)
     }
 
-    pub fn write_surfaces(
+    pub fn surfaces(
         &self,
         source: &Path,
         claims: &[String],
@@ -175,14 +173,14 @@ impl Estate {
             .collect())
     }
 
-    pub fn touch_issue(
+    pub fn touch(
         &self,
         issue: &Anchor,
         operator: Option<&crate::activity::Operator>,
         operation: &str,
-    ) -> Result<crate::activity::IssueActivity> {
+    ) -> Result<crate::activity::Activity> {
         self.identify(&self.identity)?;
-        crate::activity::record_issue(&self.layout.root, issue, operator, operation)
+        crate::activity::record(&self.layout.root, issue, operator, operation)
     }
 
     pub fn activity(&self, issue: &Anchor) -> Result<crate::activity::Snapshot> {

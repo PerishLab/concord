@@ -30,18 +30,18 @@ impl Client<'_> {
     pub async fn mark(
         &mut self,
         candidate: &str,
-        authority: concord_core::issue_delivery::Mode,
+        authority: concord_core::delivery::Mode,
     ) -> Result<()> {
         let (context, description) = match authority {
-            concord_core::issue_delivery::Mode::Plumb => (
+            concord_core::delivery::Mode::Plumb => (
                 "guard / guard (pull_request)",
                 "Concord revalidated the exact Plumb Guard proof",
             ),
-            concord_core::issue_delivery::Mode::GovernanceManual => (
+            concord_core::delivery::Mode::Manual => (
                 "manual / governance (pull_request)",
                 "Concord revalidated exact manual review inputs, not automated tests",
             ),
-            concord_core::issue_delivery::Mode::WharfNative => (
+            concord_core::delivery::Mode::Wharf => (
                 "native / wharf (pull_request)",
                 "Concord revalidated the exact Wharf native proof",
             ),

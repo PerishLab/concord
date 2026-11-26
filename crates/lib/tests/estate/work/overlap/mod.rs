@@ -1,8 +1,8 @@
 mod scope;
 
 use concord_core::{
-    Admission, CommittedEvidence, CommittedOverlap, Coordinate, IssueClaiming, IssueProving,
-    Register, Repository, Seat, Start,
+    Admission, Claiming, Committed, Coordinate, Evidence, Proving, Register, Repository, Seat,
+    Start,
 };
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -23,26 +23,26 @@ async fn evidence() {
     commit(&b, "crates/b.rs", "right");
 
     let observed = world.claim(&right, 1, "docs").await;
-    assert_eq!(observed, CommittedOverlap::DeclaredOnly);
+    assert_eq!(observed, Committed::Declared);
 
     commit(&a, "crates/common.rs", "left common");
     commit(&b, "crates/common.rs", "right common");
     let observed = world.claim(&right, 2, "examples").await;
     assert_eq!(
         observed,
-        CommittedOverlap::Intersecting {
+        Committed::Intersecting {
             paths: vec!["crates/common.rs".to_string()]
         }
     );
 
     std::fs::write(a.join("dirty.rs"), "dirty\n").expect("dirty path");
     let observed = world.claim(&right, 3, "tools").await;
-    assert_eq!(observed, unavailable(&left, CommittedEvidence::Dirty));
+    assert_eq!(observed, unavailable(&left, Evidence::Dirty));
     std::fs::remove_file(a.join("dirty.rs")).expect("remove dirty path");
 
     world
         .estate
-        .prove_issue(&IssueProving {
+        .prove(&Proving {
             issue: left.clone(),
             revision: 1,
         })
@@ -50,7 +50,7 @@ async fn evidence() {
         .expect("prove left Member");
     commit(&a, "crates/later.rs", "move left HEAD");
     let observed = world.claim(&right, 4, "benches").await;
-    assert_eq!(observed, unavailable(&left, CommittedEvidence::Stale));
+    assert_eq!(observed, unavailable(&left, Evidence::Stale));
 
     let foreign = world.foreign().await;
     assert!(foreign.observations.is_empty());
@@ -132,10 +132,10 @@ impl World {
         issue
     }
 
-    async fn claim(&self, issue: &Coordinate, revision: i64, path: &str) -> CommittedOverlap {
+    async fn claim(&self, issue: &Coordinate, revision: i64, path: &str) -> Committed {
         let changed = self
             .estate
-            .claim_issue(&IssueClaiming {
+            .claim(&Claiming {
                 issue: issue.clone(),
                 claims: vec![path.to_string()],
                 revision,
@@ -148,7 +148,7 @@ impl World {
         observation.committed.clone()
     }
 
-    async fn foreign(&self) -> concord_core::IssueMemberChange {
+    async fn foreign(&self) -> concord_core::Change {
         let source = repository(self.temp.path(), "plumb", "PerishLab/plumb");
         self.estate
             .register(&Register {
@@ -224,8 +224,8 @@ fn repository(root: &Path, name: &str, coordinate: &str) -> PathBuf {
     source
 }
 
-fn unavailable(member: &Coordinate, reason: CommittedEvidence) -> CommittedOverlap {
-    CommittedOverlap::Unavailable {
+fn unavailable(member: &Coordinate, reason: Evidence) -> Committed {
+    Committed::Unavailable {
         member: member.identity(),
         reason,
     }

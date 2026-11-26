@@ -1,16 +1,16 @@
-use super::super::{BoundaryState, CheckoutState, Estate, IntegrationState, UpstreamState};
+use super::super::{Boundary, Checkout, Estate, Relation, Upstream};
 use crate::estate::Scope;
 mod cleanup;
 mod recovery;
 
-use super::{IssueWorktree, issue_stale};
+use super::{Worktree, stale};
 use crate::{Error, Reference, Result, git};
 use cleanup::Cleanup;
 pub use recovery::Recovery;
 use serde::Serialize;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IssueRelease {
+pub struct Release {
     pub issue: super::super::super::Coordinate,
     pub revision: i64,
 }
@@ -22,7 +22,7 @@ pub struct Finish {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IssueRetirement {
+pub struct Retirement {
     pub issue: super::super::super::Coordinate,
     pub artifacts: Vec<String>,
     pub revision: i64,
@@ -33,10 +33,10 @@ impl Estate {
         let _guard = self.guard()?;
         self.ensure(Scope::Issue(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
-        issue_stale(anchor.revision, request.revision)?;
-        let member = self.issue_member(&request.issue).await?;
-        let path = self.issue_path(&anchor)?;
-        let source = self.issue_source(&member)?;
+        stale(anchor.revision, request.revision)?;
+        let member = self.member(&request.issue).await?;
+        let path = self.seat(&anchor)?;
+        let source = self.source(&member)?;
         if !git::at(&path).clean()? {
             return Err(Error::typed(
                 "concord.member.dirty",
@@ -52,12 +52,7 @@ impl Estate {
                 "Member has committed changes and must use delivery or guarded retirement",
             ));
         }
-        if member.proof.is_some()
-            || !self
-                .issue_references(member.key, anchor.key)
-                .await?
-                .is_empty()
-        {
+        if member.proof.is_some() || !self.references(member.key, anchor.key).await?.is_empty() {
             return Err(Error::typed(
                 "concord.member.delivery_started",
                 "Member has delivery state and cannot complete as unchanged research",
@@ -99,17 +94,16 @@ impl Estate {
         Ok(revision)
     }
 
-    pub async fn release_issue(&self, request: &IssueRelease) -> Result<i64> {
-        self.finish_issue_member(&request.issue, request.revision, None)
+    pub async fn release(&self, request: &Release) -> Result<i64> {
+        self.settle(&request.issue, request.revision, None).await
+    }
+
+    pub async fn dismiss(&self, request: &Retirement) -> Result<i64> {
+        self.settle(&request.issue, request.revision, Some(&request.artifacts))
             .await
     }
 
-    pub async fn retire_issue(&self, request: &IssueRetirement) -> Result<i64> {
-        self.finish_issue_member(&request.issue, request.revision, Some(&request.artifacts))
-            .await
-    }
-
-    async fn finish_issue_member(
+    async fn settle(
         &self,
         issue: &super::super::super::Coordinate,
         revision: i64,
@@ -118,10 +112,10 @@ impl Estate {
         let _guard = self.guard()?;
         self.ensure(Scope::Issue(issue)).await?;
         let anchor = self.issue(issue).await?;
-        issue_stale(anchor.revision, revision)?;
-        let member = self.issue_member(issue).await?;
-        let path = self.issue_path(&anchor)?;
-        let source = self.issue_source(&member)?;
+        stale(anchor.revision, revision)?;
+        let member = self.member(issue).await?;
+        let path = self.seat(&anchor)?;
+        let source = self.source(&member)?;
         let head = git::at(&path).head()?;
         current(&member, &head)?;
         if !git::at(&path).clean()? {
@@ -137,7 +131,7 @@ impl Estate {
             ));
         }
         if let Some(patterns) = artifacts {
-            let held = self.issue_artifacts(issue).await?;
+            let held = self.artifacts(issue).await?;
             if !held.iter().any(|artifact| {
                 patterns
                     .iter()
@@ -211,7 +205,7 @@ fn prune(path: &std::path::Path) {
     }
 }
 
-fn current(member: &IssueWorktree, head: &str) -> Result<()> {
+fn current(member: &Worktree, head: &str) -> Result<()> {
     let proof = member.proof.as_ref().ok_or_else(|| {
         Error::typed(
             "concord.boundary.absent",
@@ -226,54 +220,53 @@ fn current(member: &IssueWorktree, head: &str) -> Result<()> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct IssueMemberStatus {
-    pub member: IssueWorktree,
+pub struct Status {
+    pub member: Worktree,
     pub references: Vec<Reference>,
-    pub worktree: CheckoutState,
-    pub integration_checkout: CheckoutState,
-    pub boundary: BoundaryState,
-    pub integration: IntegrationState,
-    pub local_upstream: Option<UpstreamState>,
-    pub local_tracking_refs: Vec<String>,
+    pub worktree: Checkout,
+    #[serde(rename = "integration_checkout")]
+    pub checkout: Checkout,
+    pub boundary: Boundary,
+    pub integration: Relation,
+    #[serde(rename = "local_upstream")]
+    pub upstream: Option<Upstream>,
+    #[serde(rename = "local_tracking_refs")]
+    pub tracking: Vec<String>,
 }
 
 impl Estate {
-    pub async fn issue_member_status(
-        &self,
-        issue: &super::super::super::Coordinate,
-    ) -> Result<IssueMemberStatus> {
+    pub async fn status(&self, issue: &super::super::super::Coordinate) -> Result<Status> {
         let anchor = self.issue(issue).await?;
-        let member = self.issue_member(issue).await?;
-        let references = self.issue_references(member.key, anchor.key).await?;
-        let path = self.issue_path(&anchor)?;
-        let source = self.issue_source(&member)?;
+        let member = self.member(issue).await?;
+        let references = self.references(member.key, anchor.key).await?;
+        let path = self.seat(&anchor)?;
+        let source = self.source(&member)?;
         let worktree = super::super::status::checkout(&path)?;
-        let integration_checkout = super::super::status::checkout(&source)?;
+        let checkout = super::super::status::checkout(&source)?;
         let boundary = boundary(&member, &worktree.head);
-        let integration =
-            super::super::status::integration(&path, &source, &worktree, &integration_checkout)?;
-        let local_upstream = super::super::status::upstream(&path, &member.branch)?;
-        let local_tracking_refs = git::at(&path).tracking(&worktree.head)?;
-        Ok(IssueMemberStatus {
+        let integration = super::super::status::integration(&path, &source, &worktree, &checkout)?;
+        let upstream = super::super::status::upstream(&path, &member.branch)?;
+        let tracking = git::at(&path).tracking(&worktree.head)?;
+        Ok(Status {
             member,
             references,
             worktree,
-            integration_checkout,
+            checkout,
             boundary,
             integration,
-            local_upstream,
-            local_tracking_refs,
+            upstream,
+            tracking,
         })
     }
 }
 
-fn boundary(member: &IssueWorktree, head: &str) -> BoundaryState {
+fn boundary(member: &Worktree, head: &str) -> Boundary {
     let Some(proof) = &member.proof else {
-        return BoundaryState::Absent;
+        return Boundary::Absent;
     };
     if proof.current(head, &crate::claim::digest(&member.claims)) {
-        BoundaryState::Current
+        Boundary::Current
     } else {
-        BoundaryState::Stale
+        Boundary::Stale
     }
 }

@@ -8,7 +8,7 @@ mod scope;
 
 use concord_core::authority::Plumb;
 use concord_core::{
-    Admission, Coordinate, Estate, IssueProving, Register, Repository, Seat, Start, issue_delivery,
+    Admission, Coordinate, Estate, Proving, Register, Repository, Seat, Start, delivery,
 };
 use plumb::guard::{Action, Authority, Descriptor};
 use serde::Serialize;
@@ -37,9 +37,9 @@ pub(super) fn released() -> Authority {
     Authority::released().expect("compiled Plumb authority")
 }
 
-pub(super) fn request(issue: &Coordinate) -> issue_delivery::Request {
-    issue_delivery::Request {
-        authority: issue_delivery::Mode::Plumb,
+pub(super) fn request(issue: &Coordinate) -> delivery::Request {
+    delivery::Request {
+        authority: delivery::Mode::Plumb,
         review: None,
         issue: issue.clone(),
         revision: 2,
@@ -146,7 +146,7 @@ pub(super) async fn fixture(producer: &str, depot: &str) -> Fixture {
         ],
     );
     estate
-        .prove_issue(&IssueProving {
+        .prove(&Proving {
             issue: issue.clone(),
             revision: 1,
         })
@@ -168,10 +168,10 @@ async fn exact() {
         _temp,
     } = fixture(compiled.producer(), compiled.depot()).await;
     let snapshot = snapshot();
-    let plan = issue_delivery::prepare::<Plumb>(&estate, &request(&issue))
+    let plan = delivery::prepare::<Plumb>(&estate, &request(&issue))
         .await
         .expect("prepare delivery");
-    let issue_delivery::Authority::Plumb { warrant, .. } = &plan.authority else {
+    let delivery::Authority::Plumb { warrant, .. } = &plan.authority else {
         panic!("expected Guard authority");
     };
     assert_eq!(warrant.producer, compiled.producer());
@@ -187,7 +187,7 @@ async fn exact() {
         assert!(plan.delivery.pull.body.contains(section), "{section}");
     }
     assert!(!plan.delivery.pull.body.contains("Closes"));
-    let decoded: issue_delivery::Plan =
+    let decoded: delivery::Plan =
         serde_json::from_slice(&serde_json::to_vec(&plan).expect("encode")).expect("decode");
     assert_eq!(decoded, plan);
     let boundary = serde_json::to_value(&plan.boundary).expect("boundary");
@@ -202,22 +202,22 @@ async fn exact() {
         plan.boundary
             .current(&plan.boundary.head, &plan.boundary.claim)
     );
-    let execute = issue_delivery::Check::Execute;
-    let ready = issue_delivery::revalidate::<Plumb>(&estate, &plan, (&snapshot, 2), execute)
+    let execute = delivery::Check::Execute;
+    let ready = delivery::revalidate::<Plumb>(&estate, &plan, (&snapshot, 2), execute)
         .await
         .expect("revalidate delivery");
     assert_eq!(ready.preparation.candidate, plan.delivery.candidate);
 
     let mut drifted = snapshot.clone();
     drifted.updated.push_str("-drift");
-    let error = issue_delivery::revalidate::<Plumb>(&estate, &plan, (&drifted, 3), execute)
+    let error = delivery::revalidate::<Plumb>(&estate, &plan, (&drifted, 3), execute)
         .await
         .expect_err("Issue drift");
     assert_eq!(error.code(), "concord.delivery.stale");
 
     let member = _temp.path().join("workspace/issues/I_delivery/worktree");
     std::fs::rename(&member, _temp.path().join("displaced")).expect("displace Member");
-    let error = issue_delivery::revalidate::<Plumb>(&estate, &plan, (&snapshot, 3), execute)
+    let error = delivery::revalidate::<Plumb>(&estate, &plan, (&snapshot, 3), execute)
         .await
         .expect_err("estate disagreement");
     assert_eq!(error.code(), "concord.audit.refused");

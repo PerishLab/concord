@@ -1,5 +1,5 @@
-use super::super::projection::{PageRequest, Projection, fault};
-use super::{Fault, RawIssue, identity, provider};
+use super::super::projection::{Projection, Request, fault};
+use super::{Fault, Node, Snapshot, identity, provider};
 use crate::runtime::github;
 use concord_core::acceptance::{Report, Target};
 use concord_core::{Coordinate, Error, Result};
@@ -13,12 +13,9 @@ pub struct Observation {
 
 impl Projection {
     pub async fn delivery(&self, coordinate: &Coordinate) -> Result<Observation> {
-        let request = PageRequest::first(100);
+        let request = Request::first(100);
         let raw = self.query(coordinate, &request).await.map_err(fault)?;
-        if raw.sub_issues.page_info.has_next_page
-            || raw.blocked_by.page_info.has_next_page
-            || raw.blocking.page_info.has_next_page
-        {
+        if raw.children.info.more || raw.blockers.info.more || raw.blocking.info.more {
             return Err(Error::typed(
                 "concord.delivery.snapshot",
                 "Issue delivery snapshot exceeds the native relationship bound",
@@ -27,7 +24,7 @@ impl Projection {
         let issue = super::super::shape::root(coordinate, &raw).map_err(fault)?;
         let target = Target::select(&self.labels(coordinate, &issue.node).await?)?;
         let kind = raw
-            .issue_type
+            .kind
             .as_ref()
             .map(|kind| kind.name.trim())
             .filter(|kind| !kind.is_empty())
@@ -59,7 +56,7 @@ impl Projection {
                 coordinate.owner, coordinate.repository, coordinate.number
             ),
             timeout: self.timeout,
-            pages: usize::from(self.max_pages),
+            pages: usize::from(self.pages),
         };
         let reviewed = crate::dispatch::acceptance::review(&args).await?;
         if !reviewed.current(&issue.node, &kind, &raw.body) || reviewed.evaluation.target != target
@@ -82,10 +79,10 @@ impl Projection {
                 title: issue.title,
                 state: issue.state.to_ascii_uppercase(),
                 kind,
-                updated: raw.updated_at,
+                updated: raw.updated,
                 parent: raw.parent.as_ref().map(reference).transpose()?,
-                children: references(&raw.sub_issues.nodes)?,
-                blockers: references(&raw.blocked_by.nodes)?,
+                children: references(&raw.children.nodes)?,
+                blockers: references(&raw.blockers.nodes)?,
                 blocking: references(&raw.blocking.nodes)?,
             },
             outcome,
@@ -124,8 +121,8 @@ impl Projection {
     pub(super) fn snapshot(
         &self,
         coordinate: &Coordinate,
-        request: &PageRequest,
-    ) -> std::result::Result<RawIssue, Fault> {
+        request: &Request,
+    ) -> std::result::Result<Snapshot, Fault> {
         use runseal::github::{Target, snapshot::Cursors};
         let scope = format!("{}/{}", coordinate.owner, coordinate.repository);
         let native = identity::Native::open(&scope, self.timeout)
@@ -137,11 +134,11 @@ impl Projection {
         let target = Target::new(&coordinate.owner, &coordinate.repository, number)
             .map_err(|error| provider("malformed", error.to_string()))?;
         let cursors = Cursors {
-            children: request.sub_issues_after.clone(),
-            blockers: request.blocked_by_after.clone(),
-            blocking: request.blocking_after.clone(),
-            pulls: request.pulls_after.clone(),
-            comments: request.comments_after.clone(),
+            children: request.children.clone(),
+            blockers: request.blockers.clone(),
+            blocking: request.blocking.clone(),
+            pulls: request.pulls.clone(),
+            comments: request.comments.clone(),
         };
         let receipt = github::call("issue.snapshot", || {
             native.client.snapshot(&target, size, &cursors)
@@ -183,15 +180,13 @@ fn needs(names: impl Iterator<Item = String>) -> Result<()> {
     ))
 }
 
-fn references(
-    raw: &[super::super::github::RawIssueNode],
-) -> Result<Vec<plumb::delivery::Reference>> {
+fn references(raw: &[Node]) -> Result<Vec<plumb::delivery::Reference>> {
     let mut held = raw.iter().map(reference).collect::<Result<Vec<_>>>()?;
     held.sort();
     Ok(held)
 }
 
-fn reference(raw: &super::super::github::RawIssueNode) -> Result<plumb::delivery::Reference> {
+fn reference(raw: &Node) -> Result<plumb::delivery::Reference> {
     let issue = super::super::shape::issue(raw).map_err(fault)?;
     Ok(plumb::delivery::Reference {
         repository: format!("{}/{}", issue.coordinate.owner, issue.coordinate.repository),

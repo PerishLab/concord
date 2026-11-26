@@ -1,6 +1,7 @@
-use super::reference::Anchor;
-use keel::atom::{int, string};
+use keel::atom::{Kind as Atom, string};
+use keel::bond::Kind as Bond;
 use keel::resource;
+use keel::spec::{Resource, Rule, Spec};
 
 #[resource]
 pub(super) struct Integration {
@@ -20,58 +21,76 @@ pub(super) struct Integration {
     branch: string,
 }
 
-#[resource]
-pub(super) struct IssueMember {
-    #[field(string)]
-    branch: string,
-    #[field(string)]
-    base: string,
-    #[relation(Anchor, one2one, root)]
-    anchor: Anchor,
-    #[relation(Integration, many2one)]
-    integration: Integration,
+pub(super) struct Member;
+
+impl Resource for Member {
+    fn name() -> &'static str {
+        "IssueMember"
+    }
+
+    fn spec() -> Spec {
+        Spec::build("IssueMember")
+            .field("branch", Atom::Text)
+            .field("base", Atom::Text)
+            .root("anchor", Bond::One2one, "Anchor")
+            .bond("integration", Bond::Many2one, "Integration", &[])
+            .seal()
+    }
 }
 
-#[resource]
-pub(super) struct IssueClaim {
-    #[field(string, unique = member)]
-    path: string,
-    #[relation(IssueMember, many2one, root)]
-    member: IssueMember,
-    #[relation(Anchor, many2one)]
-    anchor: Anchor,
+pub(super) struct Claim;
+
+impl Resource for Claim {
+    fn name() -> &'static str {
+        "IssueClaim"
+    }
+
+    fn spec() -> Spec {
+        Spec::build("IssueClaim")
+            .per("path", Atom::Text, &["member"])
+            .root("member", Bond::Many2one, "IssueMember")
+            .bond("anchor", Bond::Many2one, "Anchor", &[])
+            .seal()
+    }
 }
 
-#[resource(frozen)]
-pub(super) struct IssueBoundary {
-    #[field(string)]
-    schema: string,
-    #[field(string)]
-    plumb: string,
-    #[field(string)]
-    base: string,
-    #[field(string)]
-    head: string,
-    #[field(string)]
-    claim: string,
-    #[relation(IssueMember, one2one, root)]
-    member: IssueMember,
-    #[relation(Anchor, many2one)]
-    anchor: Anchor,
+pub(super) struct Boundary;
+
+impl Resource for Boundary {
+    fn name() -> &'static str {
+        "IssueBoundary"
+    }
+
+    fn spec() -> Spec {
+        Spec::build("IssueBoundary")
+            .field("schema", Atom::Text)
+            .field("plumb", Atom::Text)
+            .field("base", Atom::Text)
+            .field("head", Atom::Text)
+            .field("claim", Atom::Text)
+            .root("member", Bond::One2one, "IssueMember")
+            .bond("anchor", Bond::Many2one, "Anchor", &[])
+            .freeze()
+            .seal()
+    }
 }
 
-#[resource]
-pub(super) struct IssueChange {
-    #[field(string)]
-    provider: string,
-    #[field(string)]
-    owner: string,
-    #[field(string)]
-    repository: string,
-    #[field(int, min = 1)]
-    number: int,
-    #[relation(IssueMember, many2one, root)]
-    member: IssueMember,
-    #[relation(Anchor, many2one)]
-    anchor: Anchor,
+pub(super) struct Change;
+
+impl Resource for Change {
+    fn name() -> &'static str {
+        "IssueChange"
+    }
+
+    fn spec() -> Spec {
+        Spec::build("IssueChange")
+            .field("provider", Atom::Text)
+            .field("owner", Atom::Text)
+            .field("repository", Atom::Text)
+            .field("number", Atom::Int)
+            .rule("number", Rule::new().min(1))
+            .root("member", Bond::Many2one, "IssueMember")
+            .bond("anchor", Bond::Many2one, "Anchor", &[])
+            .seal()
+    }
 }

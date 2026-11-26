@@ -3,8 +3,8 @@ use super::{SHAPE, branches, handoff::Refusal, pull, settle, version};
 use crate::args::issue::Delivery;
 use crate::dispatch::{Completion, emit, input};
 use concord_core::authority::Plumb;
-use concord_core::issue_delivery::{Check, Preparation, Resume, recall, resume};
-use concord_core::{Coordinate, Error, Estate, IssueDeclaration, Result, issue_delivery};
+use concord_core::delivery::{Check, Preparation, Resume, recall, resume};
+use concord_core::{Coordinate, Declaration, Error, Estate, Result, delivery};
 use plumb::delivery::Snapshot;
 use serde::Deserialize;
 use serde_json::json;
@@ -17,14 +17,14 @@ struct Envelope {
     #[serde(default)]
     forge: Option<adaptor::Identity>,
     #[serde(default)]
-    plan: Option<issue_delivery::Plan>,
+    plan: Option<delivery::Plan>,
     #[serde(default)]
     error: Option<Refusal>,
 }
 
 struct Flow<'a> {
     estate: &'a Estate,
-    plan: issue_delivery::Plan,
+    plan: delivery::Plan,
     timeout: u64,
 }
 
@@ -73,7 +73,7 @@ pub async fn land(estate: &Estate, command: Delivery, output: bool) -> Result<Co
             "land authority does not match the explicitly prepared plan",
         ));
     }
-    let permit = issue_delivery::execution::acquire(estate, &plan).await?;
+    let permit = delivery::execution::acquire(estate, &plan).await?;
     let flow = Flow {
         estate,
         plan,
@@ -153,7 +153,7 @@ impl Flow<'_> {
             .estate
             .complete(
                 &integration,
-                &issue_delivery::Settlement {
+                &delivery::Settlement {
                     space: self.plan.space.clone(),
                     authority: self.plan.authority.clone(),
                     issue: self.plan.issue.clone(),
@@ -234,7 +234,7 @@ impl Flow<'_> {
         }
     }
 
-    async fn mutation(&self, check: Check) -> Result<issue_delivery::Ready> {
+    async fn mutation(&self, check: Check) -> Result<delivery::Ready> {
         pull::fetch(&self.plan.delivery.root).await?;
         pull::sync(
             &self.plan.delivery.root,
@@ -242,7 +242,7 @@ impl Flow<'_> {
         )
         .await?;
         let observed = self.observe().await?;
-        let ready = issue_delivery::revalidate::<Plumb>(
+        let ready = delivery::revalidate::<Plumb>(
             self.estate,
             &self.plan,
             (&observed.snapshot, observed.observed),
@@ -266,7 +266,7 @@ impl Flow<'_> {
     }
 
     async fn attach(&self, pull: &pull::Pull, revision: i64) -> Result<i64> {
-        let status = self.estate.issue_member_status(&self.plan.issue).await?;
+        let status = self.estate.status(&self.plan.issue).await?;
         let reference = adaptor::reference(&self.plan.delivery.repository, pull.number)?;
         if status.references.iter().any(|held| held == &reference) {
             return Ok(self.estate.issue(&self.plan.issue).await?.revision);
@@ -278,7 +278,7 @@ impl Flow<'_> {
             ));
         }
         self.estate
-            .refer_issue(&IssueDeclaration {
+            .refer(&Declaration {
                 issue: self.plan.issue.clone(),
                 provider: reference.provider,
                 owner: reference.owner,

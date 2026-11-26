@@ -1,6 +1,6 @@
 use super::{Fixture, fixture, released, request, snapshot};
 use concord_core::authority::Plumb;
-use concord_core::{Estate, Guard, IssueDeclaration, Reference, ReferenceKind, issue_delivery};
+use concord_core::{Declaration, Estate, Guard, Kind, Reference, delivery};
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -18,7 +18,7 @@ async fn completion() {
         _temp,
     } = fixture(compiled.producer(), compiled.depot()).await;
     let snapshot = snapshot();
-    let plan = issue_delivery::prepare::<Plumb>(&estate, &request(&issue))
+    let plan = delivery::prepare::<Plumb>(&estate, &request(&issue))
         .await
         .expect("prepare delivery");
     let (settlement, integration) = merged(&estate, &issue, &plan, _temp.path()).await;
@@ -27,7 +27,7 @@ async fn completion() {
     let wrong = estate
         .complete(
             &integration,
-            &issue_delivery::Settlement {
+            &delivery::Settlement {
                 merge: plan.delivery.candidate.clone(),
                 ..settlement.clone()
             },
@@ -68,13 +68,13 @@ async fn completion() {
     assert_eq!(text(&source, &["rev-parse", "HEAD"]), completed.head);
     assert_eq!(
         estate
-            .issue_member(&issue)
+            .member(&issue)
             .await
             .expect_err("Member released")
             .code(),
         "concord.member.absent"
     );
-    let resumed = issue_delivery::resume::<Plumb>(&estate, &plan, &snapshot)
+    let resumed = delivery::resume::<Plumb>(&estate, &plan, &snapshot)
         .await
         .expect("derive released delivery");
     assert!(resumed.released);
@@ -82,7 +82,7 @@ async fn completion() {
     let replay = estate
         .complete(
             &integration,
-            &issue_delivery::Settlement {
+            &delivery::Settlement {
                 revision: 4,
                 ..settlement
             },
@@ -96,9 +96,9 @@ async fn completion() {
 pub(super) async fn merged(
     estate: &Estate,
     issue: &concord_core::Coordinate,
-    plan: &issue_delivery::Plan,
+    plan: &delivery::Plan,
     space: &Path,
-) -> (issue_delivery::Settlement, Guard) {
+) -> (delivery::Settlement, Guard) {
     let source = space.join("source");
     let remote = space.join("remote.git");
     let ssh = space.join("ssh");
@@ -144,14 +144,14 @@ pub(super) async fn merged(
         &["push", "origin", &format!("{merge}:refs/heads/main")],
     );
     let reference = Reference {
-        kind: ReferenceKind::Change,
+        kind: Kind::Change,
         provider: "github".into(),
         owner: "PerishLab".into(),
         repository: "probe".into(),
         number: 7,
     };
     estate
-        .refer_issue(&IssueDeclaration {
+        .refer(&Declaration {
             issue: issue.clone(),
             provider: reference.provider.clone(),
             owner: reference.owner.clone(),
@@ -163,7 +163,7 @@ pub(super) async fn merged(
         .expect("record pull");
     git(&source, &["fetch", "origin", "main"]);
     git(&source, &["merge", "--ff-only", "origin/main"]);
-    let settlement = issue_delivery::Settlement {
+    let settlement = delivery::Settlement {
         space: plan.space.clone(),
         authority: plan.authority.clone(),
         issue: issue.clone(),

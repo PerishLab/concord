@@ -1,6 +1,6 @@
 use super::{emit, explicit};
 use crate::args::artifact::{Command, Import};
-use concord_core::{Coordinate, Estate, IssueImport, IssueRemoval, Result};
+use concord_core::{Coordinate, Estate, Removal, Result};
 use serde_json::json;
 
 pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> {
@@ -8,20 +8,20 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
         Command::List { issue } => {
             let issue = Coordinate::parse(&issue)?;
             emit(
-                json!({"issue": issue, "artifacts": estate.issue_artifacts(&issue).await?}),
+                json!({"issue": issue, "artifacts": estate.artifacts(&issue).await?}),
                 output,
             )
         }
         Command::Show { issue, name } => emit(
-            json!({"artifact": estate.issue_artifact(&Coordinate::parse(&issue)?, &name).await?}),
+            json!({"artifact": estate.artifact(&Coordinate::parse(&issue)?, &name).await?}),
             output,
         ),
         Command::Preflight(import) => emit(
-            json!({"preflight": estate.preflight_issue(&request(import)?).await?}),
+            json!({"preflight": estate.preflight(&request(import)?).await?}),
             output,
         ),
         Command::Import(import) => emit(
-            json!({"artifact": estate.import_issue(&request(import)?).await?}),
+            json!({"artifact": estate.import(&request(import)?).await?}),
             output,
         ),
         Command::Remove {
@@ -32,7 +32,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
         } => {
             explicit(apply, "artifact remove")?;
             let revision = estate
-                .remove_issue(&IssueRemoval {
+                .remove(&Removal {
                     issue: Coordinate::parse(&issue)?,
                     name,
                     revision,
@@ -43,14 +43,14 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
     }
 }
 
-fn request(import: Import) -> Result<IssueImport> {
+fn request(import: Import) -> Result<concord_core::Import> {
     let Import {
         issue,
         name,
         source,
         revision,
     } = import;
-    Ok(IssueImport {
+    Ok(concord_core::Import {
         issue: Coordinate::parse(&issue)?,
         name,
         source,

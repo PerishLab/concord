@@ -12,13 +12,13 @@ impl Projection {
         &self,
         trusted: &BTreeSet<Repository>,
     ) -> std::result::Result<Vec<Authority>, Fault> {
-        let size = usize::from(self.page_size);
-        if trusted.len() > size * usize::from(self.max_pages) {
+        let size = usize::from(self.size);
+        if trusted.len() > size * usize::from(self.pages) {
             return Err(provider(
                 "page-limit",
                 format!(
                     "GitHub release declarations exceed the {} page limit",
-                    self.max_pages
+                    self.pages
                 ),
             ));
         }
@@ -118,7 +118,7 @@ mod tests {
             url: format!("https://github.com/{owner}/{name}/pull/{number}"),
             title: "Deliver".to_string(),
             state: "merged".to_string(),
-            merged_at: None,
+            merged: None,
             updated: "2026-09-29T00:00:00Z".to_string(),
         }
     }

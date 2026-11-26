@@ -23,7 +23,7 @@ pub(crate) fn operator() -> Option<Operator> {
         (Agent::Claude, "CLAUDE_CODE_SESSION_ID"),
         (Agent::Grok, "GROK_SESSION_ID"),
         (Agent::Codex, "CODEX_THREAD_ID"),
-        (Agent::GrokBot, "GROK_BOT_IDENTITY"),
+        (Agent::Grokbot, "GROK_BOT_IDENTITY"),
         (Agent::Agy, "ANTIGRAVITY_CONVERSATION_ID"),
     ];
     let mut found = Vec::new();

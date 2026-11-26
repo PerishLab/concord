@@ -36,11 +36,7 @@ async fn unchanged() {
         &["worktree", "remove", path.to_str().expect("path")],
     );
     std::fs::remove_dir(path.parent().expect("Issue seat")).expect("absent Issue seat");
-    let before = world
-        .estate
-        .issue_member(&request.issue)
-        .await
-        .expect("Member");
+    let before = world.estate.member(&request.issue).await.expect("Member");
     let error = world
         .estate
         .finish(&Finish {
@@ -53,11 +49,7 @@ async fn unchanged() {
     assert_eq!(world.estate.recover(&request).await.expect("recover"), 1);
     assert_eq!(world.estate.recover(&request).await.expect("repeat"), 1);
     assert_eq!(
-        world
-            .estate
-            .issue_member(&request.issue)
-            .await
-            .expect("Member"),
+        world.estate.member(&request.issue).await.expect("Member"),
         before
     );
     assert!(world.estate.inspect().await.expect("audit").agrees());

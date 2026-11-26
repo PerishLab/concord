@@ -1,5 +1,5 @@
 use crate::dispatch::Completion;
-use concord_core::issue_delivery::execution::{Failure, Permit};
+use concord_core::delivery::execution::{Failure, Permit};
 use concord_core::{Error, Result};
 use serde_json::json;
 use std::future::Future;

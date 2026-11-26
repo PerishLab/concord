@@ -1,5 +1,5 @@
 use super::*;
-use concord_core::{IssueImport, IssueRemoval};
+use concord_core::{Import, Removal};
 
 #[tokio::test(flavor = "current_thread")]
 async fn repositories() {
@@ -19,7 +19,7 @@ async fn repositories() {
         let issue = world.start(41, "I_local", "R_concord").await;
         world
             .estate
-            .claim_issue(&IssueClaiming {
+            .claim(&Claiming {
                 issue: issue.clone(),
                 claims: vec!["docs".into()],
                 revision: 1,
@@ -29,7 +29,7 @@ async fn repositories() {
         commit(&world.path("I_local"), "crates/probe.rs", "local");
         world
             .estate
-            .prove_issue(&IssueProving {
+            .prove(&Proving {
                 issue: issue.clone(),
                 revision: 2,
             })
@@ -39,7 +39,7 @@ async fn repositories() {
         std::fs::write(&input, "retained evidence").unwrap();
         world
             .estate
-            .import_issue(&IssueImport {
+            .import(&Import {
                 issue,
                 name: "evidence".into(),
                 source: input,
@@ -79,7 +79,7 @@ async fn auxiliary() {
     commit(&world.path("I_local"), "crates/probe.rs", "local");
     world
         .estate
-        .prove_issue(&IssueProving { issue, revision: 1 })
+        .prove(&Proving { issue, revision: 1 })
         .await
         .unwrap();
     assert!(extra.join("README.md").is_file());
@@ -105,7 +105,7 @@ async fn siblings() {
     commit(&world.path("I_local"), "crates/probe.rs", "local");
     world
         .estate
-        .prove_issue(&IssueProving { issue, revision: 1 })
+        .prove(&Proving { issue, revision: 1 })
         .await
         .unwrap();
     assert_eq!(
@@ -129,7 +129,7 @@ async fn target() {
     std::fs::write(source.join("foreign"), "preserve").unwrap();
     let error = world
         .estate
-        .prove_issue(&IssueProving {
+        .prove(&Proving {
             issue: issue.clone(),
             revision: 1,
         })
@@ -141,7 +141,7 @@ async fn target() {
     std::fs::write(&input, "evidence").unwrap();
     world
         .estate
-        .import_issue(&IssueImport {
+        .import(&Import {
             issue: issue.clone(),
             name: "evidence".into(),
             source: input,
@@ -151,7 +151,7 @@ async fn target() {
         .unwrap();
     world
         .estate
-        .remove_issue(&IssueRemoval {
+        .remove(&Removal {
             issue,
             name: "evidence".into(),
             revision: 2,
@@ -182,7 +182,7 @@ async fn collision() {
     );
     let error = world
         .estate
-        .prove_issue(&IssueProving { issue, revision: 1 })
+        .prove(&Proving { issue, revision: 1 })
         .await
         .unwrap_err();
     assert_eq!(error.code(), "concord.audit.refused");

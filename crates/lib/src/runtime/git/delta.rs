@@ -2,7 +2,7 @@ use super::{Checkout, command, native};
 use crate::{Error, Result};
 
 impl Checkout<'_> {
-    pub fn commit_exists(&self, revision: &str) -> Result<bool> {
+    pub fn commit(&self, revision: &str) -> Result<bool> {
         let root = native(self.root);
         let object = format!("{revision}^{{commit}}");
         let output = command()
@@ -18,7 +18,7 @@ impl Checkout<'_> {
         }
     }
 
-    pub fn changed_paths(&self, base: &str, head: &str) -> Result<Vec<String>> {
+    pub fn delta(&self, base: &str, head: &str) -> Result<Vec<String>> {
         let root = native(self.root);
         let output = command()
             .arg("-C")

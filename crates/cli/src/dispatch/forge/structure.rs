@@ -1,20 +1,22 @@
-use super::projection::{self, Connection, Diagnostic, Edge, EdgeKind, Graph, Issue, Projection};
+use super::projection::{
+    self, Complete, Connection, Diagnostic, Edge, Graph, Issue, Link, Projection,
+};
 use concord_core::Coordinate;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::time::Instant;
 
 impl Projection {
-    pub async fn graph(&self, coordinate: &Coordinate, max_nodes: u16) -> Graph {
+    pub async fn graph(&self, coordinate: &Coordinate, limit: u16) -> Graph {
         let started = Instant::now();
-        let mut walk = Walk::new(coordinate, max_nodes);
+        let mut walk = Walk::new(coordinate, limit);
         while let Some(current) = walk.queue.pop_front() {
             let subject = projection::key(&current);
             let held = self
                 .complete(
                     &current,
                     BTreeSet::from([
-                        Connection::SubIssues,
-                        Connection::BlockedBy,
+                        Connection::Children,
+                        Connection::Blockers,
                         Connection::Blocking,
                     ]),
                 )
@@ -51,7 +53,7 @@ impl Projection {
 }
 
 struct Walk {
-    max_nodes: u16,
+    limit: u16,
     queue: VecDeque<Coordinate>,
     queued: BTreeSet<String>,
     nodes: BTreeMap<String, Issue>,
@@ -60,9 +62,9 @@ struct Walk {
 }
 
 impl Walk {
-    fn new(root: &Coordinate, max_nodes: u16) -> Self {
+    fn new(root: &Coordinate, limit: u16) -> Self {
         Self {
-            max_nodes,
+            limit,
             queue: VecDeque::from([root.clone()]),
             queued: BTreeSet::from([projection::key(root)]),
             nodes: BTreeMap::new(),
@@ -86,11 +88,11 @@ impl Walk {
             self.edges.insert(edge);
             return;
         }
-        if self.queued.len() >= usize::from(self.max_nodes) {
+        if self.queued.len() >= usize::from(self.limit) {
             self.fault(
                 key,
                 "node-limit",
-                format!("Issue graph exceeds the {} node limit", self.max_nodes),
+                format!("Issue graph exceeds the {} node limit", self.limit),
             );
             return;
         }
@@ -110,38 +112,30 @@ impl Walk {
             edges: self.edges.into_iter().collect(),
             complete: self.diagnostics.is_empty(),
             diagnostics: self.diagnostics.into_iter().collect(),
-            observed_at: projection::now(),
+            observed: projection::now(),
         }
     }
 }
 
-fn relationships(current: &str, held: projection::CompleteIssue) -> Vec<(Issue, Edge)> {
+fn relationships(current: &str, held: Complete) -> Vec<(Issue, Edge)> {
     let mut related = Vec::new();
     if let Some(parent) = held.parent {
         related.push((
             parent.clone(),
-            edge(
-                EdgeKind::Parent,
-                &projection::key(&parent.coordinate),
-                current,
-            ),
+            edge(Link::Parent, &projection::key(&parent.coordinate), current),
         ));
     }
-    for child in held.sub_issues {
+    for child in held.children {
         related.push((
             child.clone(),
-            edge(
-                EdgeKind::Parent,
-                current,
-                &projection::key(&child.coordinate),
-            ),
+            edge(Link::Parent, current, &projection::key(&child.coordinate)),
         ));
     }
-    for blocker in held.blocked_by {
+    for blocker in held.blockers {
         related.push((
             blocker.clone(),
             edge(
-                EdgeKind::Blocking,
+                Link::Blocking,
                 &projection::key(&blocker.coordinate),
                 current,
             ),
@@ -151,7 +145,7 @@ fn relationships(current: &str, held: projection::CompleteIssue) -> Vec<(Issue, 
         related.push((
             blocked.clone(),
             edge(
-                EdgeKind::Blocking,
+                Link::Blocking,
                 current,
                 &projection::key(&blocked.coordinate),
             ),
@@ -160,7 +154,7 @@ fn relationships(current: &str, held: projection::CompleteIssue) -> Vec<(Issue, 
     related
 }
 
-fn edge(kind: EdgeKind, source: &str, target: &str) -> Edge {
+fn edge(kind: Link, source: &str, target: &str) -> Edge {
     Edge {
         kind,
         source: source.to_string(),
@@ -171,7 +165,7 @@ fn edge(kind: EdgeKind, source: &str, target: &str) -> Edge {
 fn cycles(edges: &BTreeSet<Edge>, diagnostics: &mut BTreeSet<Diagnostic>) {
     let mut degree = BTreeMap::<String, usize>::new();
     let mut next = BTreeMap::<String, BTreeSet<String>>::new();
-    for edge in edges.iter().filter(|edge| edge.kind == EdgeKind::Blocking) {
+    for edge in edges.iter().filter(|edge| edge.kind == Link::Blocking) {
         degree.entry(edge.source.clone()).or_default();
         *degree.entry(edge.target.clone()).or_default() += 1;
         next.entry(edge.source.clone())
@@ -221,7 +215,7 @@ fn settle(
 #[cfg(test)]
 mod tests {
     use super::cycles as detect;
-    use crate::dispatch::forge::projection::{Diagnostic, Edge, EdgeKind};
+    use crate::dispatch::forge::projection::{Diagnostic, Edge, Link};
     use std::collections::BTreeSet;
 
     #[test]
@@ -229,17 +223,17 @@ mod tests {
         let mut diagnostics = BTreeSet::<Diagnostic>::new();
         let edges = BTreeSet::from([
             Edge {
-                kind: EdgeKind::Parent,
+                kind: Link::Parent,
                 source: "a".into(),
                 target: "b".into(),
             },
             Edge {
-                kind: EdgeKind::Blocking,
+                kind: Link::Blocking,
                 source: "b".into(),
                 target: "c".into(),
             },
             Edge {
-                kind: EdgeKind::Blocking,
+                kind: Link::Blocking,
                 source: "c".into(),
                 target: "b".into(),
             },

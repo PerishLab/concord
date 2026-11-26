@@ -1,6 +1,6 @@
 use super::super::delivery::pull::stale;
 use concord_core::Result;
-use concord_core::issue_delivery::Preparation;
+use concord_core::delivery::Preparation;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -181,7 +181,7 @@ fn failed(state: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{Checks, Commit, Pull, Rollup, State, contract};
-    use concord_core::issue_delivery::Preparation;
+    use concord_core::delivery::Preparation;
     use std::path::PathBuf;
 
     #[test]

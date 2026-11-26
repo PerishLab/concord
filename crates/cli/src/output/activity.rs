@@ -1,8 +1,8 @@
 use concord_core::Error;
-use concord_core::activity::IssueActivity;
+use concord_core::activity::Activity;
 use serde_json::json;
 
-pub fn issue_activity(activity: &IssueActivity, output: bool) {
+pub fn activity(activity: &Activity, output: bool) {
     if activity.recent.is_empty() {
         return;
     }

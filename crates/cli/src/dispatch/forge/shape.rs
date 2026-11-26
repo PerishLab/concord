@@ -1,10 +1,10 @@
-use super::github::{RawConnection, RawEvent, RawIssue, RawIssueNode, RawSource};
+use super::github::{Connection, Event, Node, Snapshot, Source};
 use super::projection::{Fault, Issue, Page, Pull};
 use concord_core::{Coordinate, Result};
 use std::collections::BTreeMap;
 
-pub(super) fn root(coordinate: &Coordinate, raw: &RawIssue) -> std::result::Result<Issue, Fault> {
-    let issue = issue(&RawIssueNode {
+pub(super) fn root(coordinate: &Coordinate, raw: &Snapshot) -> std::result::Result<Issue, Fault> {
+    let issue = issue(&Node {
         id: raw.id.clone(),
         number: raw.number,
         url: raw.url.clone(),
@@ -18,7 +18,7 @@ pub(super) fn root(coordinate: &Coordinate, raw: &RawIssue) -> std::result::Resu
             "GitHub Issue reply does not match the requested coordinate",
         ));
     }
-    if raw.updated_at.is_empty() {
+    if raw.updated.is_empty() {
         return Err(super::github::provider(
             "malformed",
             "GitHub Issue has no update time",
@@ -27,10 +27,10 @@ pub(super) fn root(coordinate: &Coordinate, raw: &RawIssue) -> std::result::Resu
     Ok(issue)
 }
 
-pub(super) fn issue(raw: &RawIssueNode) -> std::result::Result<Issue, Fault> {
+pub(super) fn issue(raw: &Node) -> std::result::Result<Issue, Fault> {
     let (owner, repository) = raw
         .repository
-        .name_with_owner
+        .full
         .split_once('/')
         .filter(|(owner, repository)| !owner.is_empty() && !repository.is_empty())
         .ok_or_else(|| {
@@ -55,7 +55,7 @@ pub(super) fn issue(raw: &RawIssueNode) -> std::result::Result<Issue, Fault> {
     })
 }
 
-fn validate(raw: &RawIssueNode, coordinate: &Coordinate) -> std::result::Result<(), Fault> {
+fn validate(raw: &Node, coordinate: &Coordinate) -> std::result::Result<(), Fault> {
     let expected = format!(
         "https://github.com/{}/{}/issues/{}",
         coordinate.owner, coordinate.repository, coordinate.number
@@ -89,7 +89,7 @@ fn validate(raw: &RawIssueNode, coordinate: &Coordinate) -> std::result::Result<
 
 pub(super) fn issues(
     target: &mut BTreeMap<String, Issue>,
-    raw: &[RawIssueNode],
+    raw: &[Node],
 ) -> std::result::Result<(), Fault> {
     for raw in raw {
         let issue = issue(raw)?;
@@ -98,15 +98,12 @@ pub(super) fn issues(
     Ok(())
 }
 
-pub(super) fn page(
-    raw: &RawConnection<RawIssueNode>,
-    after: Option<String>,
-) -> Result<Page<Issue>> {
+pub(super) fn page(raw: &Connection<Node>, after: Option<String>) -> Result<Page<Issue>> {
     Ok(Page {
-        requested_after: after,
-        end_cursor: raw.page_info.end_cursor.clone(),
-        has_next_page: raw.page_info.has_next_page,
-        provider_total: raw.total_count,
+        after,
+        cursor: raw.info.cursor.clone(),
+        more: raw.info.more,
+        total: raw.total,
         nodes: raw
             .nodes
             .iter()
@@ -116,7 +113,7 @@ pub(super) fn page(
     })
 }
 
-pub(super) fn pulls(raw: &RawConnection<RawEvent>, after: Option<String>) -> Result<Page<Pull>> {
+pub(super) fn pulls(raw: &Connection<Event>, after: Option<String>) -> Result<Page<Pull>> {
     let mut nodes = raw
         .nodes
         .iter()
@@ -133,17 +130,17 @@ pub(super) fn pulls(raw: &RawConnection<RawEvent>, after: Option<String>) -> Res
         ))
     });
     Ok(Page {
-        requested_after: after,
-        end_cursor: raw.page_info.end_cursor.clone(),
-        has_next_page: raw.page_info.has_next_page,
-        provider_total: raw.total_count,
+        after,
+        cursor: raw.info.cursor.clone(),
+        more: raw.info.more,
+        total: raw.total,
         nodes,
     })
 }
 
-pub(super) fn insert_pulls(
+pub(super) fn collect(
     target: &mut BTreeMap<String, Pull>,
-    raw: &[RawEvent],
+    raw: &[Event],
 ) -> std::result::Result<(), Fault> {
     for source in raw
         .iter()
@@ -156,13 +153,13 @@ pub(super) fn insert_pulls(
     Ok(())
 }
 
-fn pull(raw: &RawSource) -> std::result::Result<Pull, Fault> {
+fn pull(raw: &Source) -> std::result::Result<Pull, Fault> {
     let repository = raw
         .repository
         .as_ref()
         .ok_or_else(|| malformed("GitHub pull reference has no repository"))?;
     let (owner, repository) = repository
-        .name_with_owner
+        .full
         .split_once('/')
         .ok_or_else(|| malformed("GitHub pull repository coordinate is malformed"))?;
     let number = raw
@@ -174,7 +171,7 @@ fn pull(raw: &RawSource) -> std::result::Result<Pull, Fault> {
     let state =
         required(raw.state.as_deref(), "GitHub pull reference has no state")?.to_ascii_lowercase();
     let updated = required(
-        raw.updated_at.as_deref(),
+        raw.updated.as_deref(),
         "GitHub pull reference has no update time",
     )?;
     let expected = format!("https://github.com/{owner}/{repository}/pull/{number}");
@@ -189,7 +186,7 @@ fn pull(raw: &RawSource) -> std::result::Result<Pull, Fault> {
         url: url.to_string(),
         title: title.to_string(),
         state,
-        merged_at: raw.merged_at.clone(),
+        merged: raw.merged.clone(),
         updated: updated.to_string(),
     })
 }

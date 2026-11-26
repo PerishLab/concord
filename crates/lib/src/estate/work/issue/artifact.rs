@@ -1,6 +1,6 @@
 use super::super::Estate;
 use super::super::artifact::preflight;
-use super::issue_stale;
+use super::stale;
 use crate::estate::Scope;
 use crate::path::at;
 use crate::{Error, Result, component};
@@ -8,7 +8,7 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct IssueArtifact {
+pub struct Artifact {
     pub issue: super::super::super::Coordinate,
     pub node: String,
     pub name: String,
@@ -16,7 +16,7 @@ pub struct IssueArtifact {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IssueImport {
+pub struct Import {
     pub issue: super::super::super::Coordinate,
     pub name: String,
     pub source: PathBuf,
@@ -24,19 +24,19 @@ pub struct IssueImport {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IssueRemoval {
+pub struct Removal {
     pub issue: super::super::super::Coordinate,
     pub name: String,
     pub revision: i64,
 }
 
 impl Estate {
-    pub async fn issue_artifacts(
+    pub async fn artifacts(
         &self,
         issue: &super::super::super::Coordinate,
-    ) -> Result<Vec<IssueArtifact>> {
+    ) -> Result<Vec<Artifact>> {
         let anchor = self.issue(issue).await?;
-        let root = self.issue_artifact_root(&anchor)?;
+        let root = self.shelf(&anchor)?;
         if !root.exists() {
             return Ok(Vec::new());
         }
@@ -54,7 +54,7 @@ impl Estate {
                 .into_string()
                 .map_err(|_| Error::typed("concord.artifact.name", "Artifact name is not UTF-8"))?;
             component("artifact name", &name)?;
-            found.push(IssueArtifact {
+            found.push(Artifact {
                 issue: anchor.coordinate.clone(),
                 node: anchor.node.clone(),
                 name,
@@ -65,13 +65,13 @@ impl Estate {
         Ok(found)
     }
 
-    pub async fn issue_artifact(
+    pub async fn artifact(
         &self,
         issue: &super::super::super::Coordinate,
         name: &str,
-    ) -> Result<IssueArtifact> {
+    ) -> Result<Artifact> {
         component("artifact name", name)?;
-        self.issue_artifacts(issue)
+        self.artifacts(issue)
             .await?
             .into_iter()
             .find(|artifact| artifact.name == name)
@@ -83,24 +83,24 @@ impl Estate {
             })
     }
 
-    pub async fn preflight_issue(&self, request: &IssueImport) -> Result<preflight::Survey> {
+    pub async fn preflight(&self, request: &Import) -> Result<preflight::Survey> {
         component("artifact name", &request.name)?;
         let _guard = self.guard()?;
         self.ensure(Scope::Seat(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
-        issue_stale(anchor.revision, request.revision)?;
-        let target = self.issue_artifact_root(&anchor)?.join(&request.name);
+        stale(anchor.revision, request.revision)?;
+        let target = self.shelf(&anchor)?.join(&request.name);
         vacant(&target)?;
         preflight::inspect(&request.source, &target, &self.layout.root)
     }
 
-    pub async fn import_issue(&self, request: &IssueImport) -> Result<IssueArtifact> {
+    pub async fn import(&self, request: &Import) -> Result<Artifact> {
         component("artifact name", &request.name)?;
         let _guard = self.guard()?;
         self.ensure(Scope::Seat(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
-        issue_stale(anchor.revision, request.revision)?;
-        let root = self.issue_artifact_root(&anchor)?;
+        stale(anchor.revision, request.revision)?;
+        let root = self.shelf(&anchor)?;
         let target = root.join(&request.name);
         vacant(&target)?;
         let checked = preflight::inspect(&request.source, &target, &self.layout.root)?;
@@ -130,7 +130,7 @@ impl Estate {
             prune(&root);
             return Err(super::super::fault(error));
         }
-        Ok(IssueArtifact {
+        Ok(Artifact {
             issue: anchor.coordinate,
             node: anchor.node,
             name: request.name.clone(),
@@ -138,13 +138,13 @@ impl Estate {
         })
     }
 
-    pub async fn remove_issue(&self, request: &IssueRemoval) -> Result<i64> {
+    pub async fn remove(&self, request: &Removal) -> Result<i64> {
         component("artifact name", &request.name)?;
         let _guard = self.guard()?;
         self.ensure(Scope::Seat(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
-        issue_stale(anchor.revision, request.revision)?;
-        let root = self.issue_artifact_root(&anchor)?;
+        stale(anchor.revision, request.revision)?;
+        let root = self.shelf(&anchor)?;
         let target = root.join(&request.name);
         if !direct(&target) {
             return Err(Error::typed(
@@ -166,10 +166,7 @@ impl Estate {
         Ok(revision)
     }
 
-    pub(super) fn issue_artifact_root(
-        &self,
-        anchor: &super::super::super::Anchor,
-    ) -> Result<PathBuf> {
+    pub(super) fn shelf(&self, anchor: &super::super::super::Anchor) -> Result<PathBuf> {
         component("issue node", &anchor.node)?;
         Ok(self.layout.issue(&anchor.node).join("artifacts"))
     }

@@ -1,7 +1,7 @@
-use super::github::{RawIssue, RawRepository, RawType};
+use super::github::{Entry, Kind, Repository};
 use super::{Bounds, Diagnostic};
 use crate::runtime::github;
-use concord_core::{Coordinate, Estate, IssueWorktree, automation};
+use concord_core::{Coordinate, Estate, Worktree, automation};
 use runseal::github::records;
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -27,7 +27,7 @@ pub(super) async fn observe(
     estate: &Estate,
     coordinate: &Coordinate,
     bounds: &Bounds,
-    members: &[IssueWorktree],
+    members: &[Worktree],
 ) -> Observed {
     let mut observed = Observed {
         observations: Vec::new(),
@@ -95,13 +95,8 @@ pub(super) async fn observe(
     observed
 }
 
-fn append(
-    target: &mut Vec<Observation>,
-    raw: RawIssue,
-    members: &[&IssueWorktree],
-    paths: &[String],
-) {
-    let kind = raw.issue_type.map(|kind| kind.name).unwrap_or_default();
+fn append(target: &mut Vec<Observation>, raw: Entry, members: &[&Worktree], paths: &[String]) {
+    let kind = raw.kind.map(|kind| kind.name).unwrap_or_default();
     let Some(automation) = automation::held(&kind, &raw.body, &raw.state) else {
         return;
     };
@@ -130,7 +125,7 @@ fn slice(
     coordinate: &Coordinate,
     bounds: &Bounds,
     page: u32,
-) -> Result<(Vec<RawIssue>, Option<u32>), Diagnostic> {
+) -> Result<(Vec<Entry>, Option<u32>), Diagnostic> {
     let client = github::client(bounds.timeout).map_err(fault)?;
     let size = u8::try_from(bounds.first).map_err(|_| fault("invalid page size"))?;
     let listing = github::call("issue.list", || {
@@ -148,22 +143,22 @@ fn slice(
     Ok((rows, listing.next))
 }
 
-fn convert(record: records::Record, repository: &str) -> RawIssue {
+fn convert(record: records::Record, repository: &str) -> Entry {
     let state = match record.state {
         records::State::Open => "OPEN",
         records::State::Closed => "CLOSED",
     };
-    RawIssue {
+    Entry {
         id: record.node,
         number: i64::from(record.number),
         url: record.url,
         title: record.title,
         body: record.body.unwrap_or_default(),
         state: state.into(),
-        updated_at: record.updated,
-        issue_type: record.kind.map(|kind| RawType { name: kind.name }),
-        repository: RawRepository {
-            name_with_owner: repository.into(),
+        updated: record.updated,
+        kind: record.kind.map(|kind| Kind { name: kind.name }),
+        repository: Repository {
+            name: repository.into(),
         },
     }
 }
@@ -175,9 +170,9 @@ fn fault(message: impl std::fmt::Display) -> Diagnostic {
     }
 }
 
-fn validate(raw: &RawIssue, expected: &str) -> Result<(), Diagnostic> {
+fn validate(raw: &Entry, expected: &str) -> Result<(), Diagnostic> {
     let url = format!("https://github.com/{expected}/issues/{}", raw.number);
-    if raw.repository.name_with_owner != expected || raw.url != url {
+    if raw.repository.name != expected || raw.url != url {
         return Err(fault("Auto observation contains a foreign Issue"));
     }
     if raw.number < 1 || raw.id.trim().is_empty() {

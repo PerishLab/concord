@@ -1,7 +1,7 @@
 use super::super::projection::{self, Connection, Issue, Pull};
 use super::{Diagnostic, Execution, Member, matches};
 use crate::args::issue::Relations;
-use concord_core::{Anchor, Coordinate, Estate, IssueWorktree, Result};
+use concord_core::{Anchor, Coordinate, Estate, Result, Worktree};
 use serde::Serialize;
 use std::collections::BTreeSet;
 
@@ -13,7 +13,8 @@ pub enum Relation {
     Parent,
     #[serde(rename = "sub-issue")]
     Child,
-    BlockedBy,
+    #[serde(rename = "blocked-by")]
+    Blocker,
     Blocking,
     #[serde(rename = "linked-pull")]
     Pull,
@@ -35,7 +36,7 @@ pub struct Relationship {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct PullRelation {
+pub struct Linked {
     pub kind: Relation,
     pub pull: Pull,
 }
@@ -51,25 +52,25 @@ pub struct Existing {
     pub kind: String,
     pub execution: Execution,
     pub relationships: Vec<Relationship>,
-    pub pulls: Vec<PullRelation>,
+    pub pulls: Vec<Linked>,
     pub diagnostics: Vec<Diagnostic>,
     pub complete: bool,
-    pub observed_at: u64,
+    #[serde(rename = "observed_at")]
+    pub observed: u64,
 }
 
 pub async fn run(estate: &Estate, request: &Relations) -> Result<Existing> {
     let coordinate = Coordinate::parse(&request.issue)?;
     let mut connections = BTreeSet::new();
     connections.extend([
-        Connection::SubIssues,
-        Connection::BlockedBy,
+        Connection::Children,
+        Connection::Blockers,
         Connection::Blocking,
         Connection::Pulls,
     ]);
-    let projected =
-        projection::Projection::new(request.page_size, request.max_pages, request.timeout)
-            .complete(&coordinate, connections)
-            .await;
+    let projected = projection::Projection::new(request.size, request.pages, request.timeout)
+        .complete(&coordinate, connections)
+        .await;
     let complete = match projected {
         Ok(complete) => complete,
         Err(fault) => {
@@ -87,18 +88,18 @@ pub async fn run(estate: &Estate, request: &Relations) -> Result<Existing> {
                     message: fault.message,
                 }],
                 complete: false,
-                observed_at: projection::now(),
+                observed: projection::now(),
             });
         }
     };
     let anchors = estate.issues().await?;
-    let members = estate.issue_worktrees().await?;
+    let members = estate.worktrees().await?;
     let observed = super::automation::observe(
         estate,
         &coordinate,
         &super::Bounds {
-            first: request.page_size,
-            pages: request.max_pages,
+            first: request.size,
+            pages: request.pages,
             timeout: request.timeout,
         },
         &members,
@@ -118,14 +119,14 @@ pub async fn run(estate: &Estate, request: &Relations) -> Result<Existing> {
     add(&mut relationships, complete.parent, Relation::Parent, &view)?;
     add(
         &mut relationships,
-        complete.sub_issues,
+        complete.children,
         Relation::Child,
         &view,
     )?;
     add(
         &mut relationships,
-        complete.blocked_by,
-        Relation::BlockedBy,
+        complete.blockers,
+        Relation::Blocker,
         &view,
     )?;
     add(
@@ -155,23 +156,23 @@ pub async fn run(estate: &Estate, request: &Relations) -> Result<Existing> {
         pulls: complete
             .pulls
             .into_iter()
-            .map(|pull| PullRelation {
+            .map(|pull| Linked {
                 kind: Relation::Pull,
                 pull,
             })
             .collect(),
         diagnostics,
         complete: observed.complete,
-        observed_at: projection::now(),
+        observed: projection::now(),
     })
 }
 
 struct View<'a> {
     estate: &'a Estate,
     anchors: &'a [Anchor],
-    members: &'a [IssueWorktree],
+    members: &'a [Worktree],
     occupancy: &'a concord_core::occupancy::Snapshot,
-    root: &'a [&'a IssueWorktree],
+    root: &'a [&'a Worktree],
 }
 
 fn add(
@@ -192,7 +193,7 @@ fn add(
     Ok(())
 }
 
-fn execution(view: &View<'_>, members: &[&IssueWorktree], node: &str) -> Result<Execution> {
+fn execution(view: &View<'_>, members: &[&Worktree], node: &str) -> Result<Execution> {
     let activity = view
         .anchors
         .iter()
@@ -220,13 +221,13 @@ fn execution(view: &View<'_>, members: &[&IssueWorktree], node: &str) -> Result<
 
 fn intersections(
     estate: &Estate,
-    root: &[&IssueWorktree],
-    related: &[&IssueWorktree],
+    root: &[&Worktree],
+    related: &[&Worktree],
 ) -> Result<Vec<Overlap>> {
     let mut found = Vec::new();
     for left in root {
         for right in related {
-            let paths = estate.claim_intersections(left, right)?;
+            let paths = estate.intersections(left, right)?;
             if !paths.is_empty() {
                 found.push(Overlap {
                     root: left.issue.identity(),
@@ -239,7 +240,7 @@ fn intersections(
     Ok(found)
 }
 
-fn held<'a>(members: &'a [IssueWorktree], node: &str) -> Vec<&'a IssueWorktree> {
+fn held<'a>(members: &'a [Worktree], node: &str) -> Vec<&'a Worktree> {
     members
         .iter()
         .filter(|member| member.node == node)

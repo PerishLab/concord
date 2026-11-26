@@ -81,7 +81,7 @@ pub async fn entry(args: Vec<OsString>) -> Result<()> {
 
 async fn validate(home: &Path) -> Result<String> {
     let estate = Seat::new(home).open().await?;
-    if !estate.issue_worktrees().await?.is_empty() {
+    if !estate.worktrees().await?.is_empty() {
         return Err(refuse(
             "live Members refuse offline cutover; restore the frozen source with abort, then drain through its owning version",
         ));

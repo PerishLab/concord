@@ -163,7 +163,7 @@ impl Estate {
             ));
         }
         let member = self
-            .issue_worktrees()
+            .worktrees()
             .await?
             .into_iter()
             .find(|member| member.node == held.node);

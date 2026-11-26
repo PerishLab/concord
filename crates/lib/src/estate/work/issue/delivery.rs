@@ -1,6 +1,6 @@
 use super::super::{Estate, Proof};
 use super::authority::Authorities;
-use super::{IssueWorktree, issue_stale};
+use super::{Worktree, stale};
 use crate::estate::Scope;
 use crate::{Error, Reference, Result, claim, git};
 use serde::{Deserialize, Serialize};
@@ -81,13 +81,13 @@ struct Context {
     issue: super::super::super::Coordinate,
     node: String,
     revision: i64,
-    member: IssueWorktree,
+    member: Worktree,
     boundary: Proof,
     path: PathBuf,
 }
 
 pub async fn prepare<A: Authorities>(estate: &Estate, request: &Request) -> Result<Plan> {
-    if (request.authority == Mode::GovernanceManual) != request.review.is_some() {
+    if (request.authority == Mode::Manual) != request.review.is_some() {
         return Err(Error::typed(
             "concord.delivery.review",
             "governance-manual requires --review; other authorities refuse review input",
@@ -145,16 +145,16 @@ async fn context(
 ) -> Result<Context> {
     estate.agreed(Scope::Issue(issue)).await?;
     let anchor = estate.issue(issue).await?;
-    issue_stale(anchor.revision, revision)?;
-    let member = estate.issue_member(issue).await?;
+    stale(anchor.revision, revision)?;
+    let member = estate.member(issue).await?;
     let boundary = member.proof.clone().ok_or_else(|| {
         Error::typed(
             "concord.delivery.boundary",
             "Member has no current Boundary proof",
         )
     })?;
-    let path = estate.issue_path(&anchor)?;
-    let source = estate.issue_source(&member)?;
+    let path = estate.seat(&anchor)?;
+    let source = estate.source(&member)?;
     agreement(&source, &path, &member, &boundary)?;
     Ok(Context {
         issue: anchor.coordinate,
@@ -200,7 +200,7 @@ fn narrative(context: &Context, request: &Request) -> Result<plumb::delivery::Na
     let acceptance = request.acceptance.as_ref().map(crate::acceptance::Report::render)
         .unwrap_or_else(|| "## Acceptance\n\nTarget: not adopted. Remaining obligations: review every current Issue condition and record any source, release or consumer evidence it requires before manual closure. Merge alone is not acceptance completion.".into());
     pull.body.push_str(&format!("\n\n{acceptance}"));
-    if request.authority == Mode::WharfNative {
+    if request.authority == Mode::Wharf {
         pull.body.push_str(&format!(
             "\n\nRepository authority: `{}`\n\nFixed native gate: `python3 -B -m scripts.selfcheck` and `python3 -B -m unittest discover -s tests -t . -q`, with no inherited provider environment. Exact source/tree and Python/Git identities are carried by native candidate evidence; this is not a Plumb Guard proof.",
             gate::AUTHORITY,
@@ -239,7 +239,7 @@ impl Member {
 pub(super) fn agreement(
     source: &Path,
     path: &Path,
-    member: &IssueWorktree,
+    member: &Worktree,
     proof: &Proof,
 ) -> Result<()> {
     if !git::at(source).registered(path)? {
@@ -268,7 +268,7 @@ pub(super) fn agreement(
     Ok(())
 }
 
-pub(super) fn member(member: &IssueWorktree) -> Member {
+pub(super) fn member(member: &Worktree) -> Member {
     Member {
         key: member.key,
         integration: member.integration.clone(),

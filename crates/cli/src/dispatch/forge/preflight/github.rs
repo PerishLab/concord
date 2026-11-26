@@ -9,32 +9,32 @@ pub(super) struct Request<'a> {
 }
 
 pub(super) struct Search {
-    pub issues: Vec<RawIssue>,
+    pub issues: Vec<Entry>,
     pub diagnostics: Vec<Diagnostic>,
     pub complete: bool,
 }
 
 #[derive(Clone)]
-pub(super) struct RawIssue {
+pub(super) struct Entry {
     pub id: String,
     pub number: i64,
     pub url: String,
     pub title: String,
     pub body: String,
     pub state: String,
-    pub updated_at: String,
-    pub issue_type: Option<RawType>,
-    pub repository: RawRepository,
+    pub updated: String,
+    pub kind: Option<Kind>,
+    pub repository: Repository,
 }
 
 #[derive(Clone)]
-pub(super) struct RawType {
+pub(super) struct Kind {
     pub name: String,
 }
 
 #[derive(Clone)]
-pub(super) struct RawRepository {
-    pub name_with_owner: String,
+pub(super) struct Repository {
+    pub name: String,
 }
 
 pub(super) async fn search(request: Request<'_>) -> Search {
@@ -91,18 +91,18 @@ fn page(
         .map_err(translate)
 }
 
-fn convert(entry: runseal::github::search::Entry) -> RawIssue {
-    RawIssue {
+fn convert(entry: runseal::github::search::Entry) -> Entry {
+    Entry {
         id: entry.id,
         number: i64::from(entry.number),
         url: entry.url,
         title: entry.title,
         body: entry.body,
         state: entry.state,
-        updated_at: entry.updated,
-        issue_type: entry.kind.map(|kind| RawType { name: kind.name }),
-        repository: RawRepository {
-            name_with_owner: entry.repository.name,
+        updated: entry.updated,
+        kind: entry.kind.map(|kind| Kind { name: kind.name }),
+        repository: Repository {
+            name: entry.repository.name,
         },
     }
 }

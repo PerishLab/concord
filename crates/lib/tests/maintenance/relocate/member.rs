@@ -20,7 +20,7 @@ pub(super) struct Member {
 
 pub(super) async fn capture(estate: &Estate, source: &Path) -> Result<Vec<Member>> {
     let mut members = Vec::new();
-    for held in estate.issue_worktrees().await? {
+    for held in estate.worktrees().await? {
         let path = source.join(".issues").join(&held.node).join("worktree");
         files::directory(&path)?;
         let directory = PathBuf::from(

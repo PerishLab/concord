@@ -1,7 +1,7 @@
 use super::super::delivery::pull::{provider, stale};
 use super::pull::{Commit, Pull, State};
 use crate::runtime::github;
-use concord_core::{Error, Reference, ReferenceKind, Result};
+use concord_core::{Error, Kind, Reference, Result};
 use runseal::github::{
     Client, Compare, Edit, Number, Proposal, Signal, Target, Verdict, lifecycle,
 };
@@ -212,7 +212,7 @@ pub(crate) async fn repository(root: &std::path::Path) -> Result<String> {
 pub fn reference(repository: &str, number: i64) -> Result<Reference> {
     let (owner, repository) = coordinate(repository)?;
     Ok(Reference {
-        kind: ReferenceKind::Change,
+        kind: Kind::Change,
         provider: "github".to_string(),
         owner: owner.to_string(),
         repository: repository.to_string(),
@@ -230,7 +230,7 @@ pub fn coordinate(repository: &str) -> Result<(&str, &str)> {
 }
 
 pub(crate) fn validate(reference: &Reference, repository: &str) -> Result<()> {
-    if reference.kind != ReferenceKind::Change
+    if reference.kind != Kind::Change
         || reference.provider != "github"
         || format!("{}/{}", reference.owner, reference.repository) != repository
     {

@@ -84,7 +84,7 @@ pub(super) async fn validate(home: &Path, ready: &Ready) -> Result<()> {
     if estate.identity() != ready.space || !estate.structure().await?.agrees() {
         return Err(refuse("target identity/model changed"));
     }
-    if estate.issue_worktrees().await?.len() != ready.members.len() {
+    if estate.worktrees().await?.len() != ready.members.len() {
         return Err(refuse("target Member catalogue changed"));
     }
     Ok(())

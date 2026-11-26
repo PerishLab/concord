@@ -2,7 +2,7 @@ use super::adaptor::Checks;
 use super::adaptor::Client;
 use super::git::Git;
 use super::pull::{Pull, State, stale};
-use concord_core::issue_delivery::Preparation;
+use concord_core::delivery::Preparation;
 use concord_core::{Error, Result};
 use plumb::delivery::Squash;
 use std::time::Duration;

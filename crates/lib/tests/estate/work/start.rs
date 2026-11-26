@@ -111,7 +111,7 @@ async fn unchanged() {
     assert_eq!(
         world
             .estate
-            .issue_member(&issue)
+            .member(&issue)
             .await
             .expect_err("Member removed")
             .code(),

@@ -5,36 +5,38 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct ClaimOverlap {
+pub struct Overlap {
     pub code: String,
     pub peer: String,
     pub paths: Vec<String>,
-    pub committed: CommittedOverlap,
+    pub committed: Committed,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case", tag = "state")]
-pub enum CommittedOverlap {
-    DeclaredOnly,
+pub enum Committed {
+    #[serde(rename = "declared-only")]
+    Declared,
     Intersecting {
         paths: Vec<String>,
     },
     Unavailable {
         member: String,
-        reason: CommittedEvidence,
+        reason: Evidence,
     },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum CommittedEvidence {
+pub enum Evidence {
     Dirty,
     Stale,
-    MissingBase,
+    #[serde(rename = "missing-base")]
+    Missing,
     Unavailable,
 }
 
-pub(super) struct OverlapMember {
+pub(super) struct Subject {
     pub(super) key: Option<i64>,
     pub(super) identity: String,
     pub(super) path: PathBuf,
@@ -43,28 +45,24 @@ pub(super) struct OverlapMember {
     pub(super) proof: Option<Proof>,
 }
 
-pub(super) fn same_repository(
-    identities: &mut git::Identities,
-    left: &Path,
-    right: &Path,
-) -> Result<bool> {
+pub(super) fn same(identities: &mut git::Identities, left: &Path, right: &Path) -> Result<bool> {
     Ok(identities.read(left)? == identities.read(right)?)
 }
 
-pub(super) fn committed_overlap(left: &OverlapMember, right: &OverlapMember) -> CommittedOverlap {
-    let left = match committed_delta(left) {
+pub(super) fn committed(left: &Subject, right: &Subject) -> Committed {
+    let left = match delta(left) {
         Ok(paths) => paths,
         Err(reason) => {
-            return CommittedOverlap::Unavailable {
+            return Committed::Unavailable {
                 member: left.identity.clone(),
                 reason,
             };
         }
     };
-    let right = match committed_delta(right) {
+    let right = match delta(right) {
         Ok(paths) => paths,
         Err(reason) => {
-            return CommittedOverlap::Unavailable {
+            return Committed::Unavailable {
                 member: right.identity.clone(),
                 reason,
             };
@@ -76,45 +74,40 @@ pub(super) fn committed_overlap(left: &OverlapMember, right: &OverlapMember) -> 
         .filter(|path| right.contains(path))
         .collect::<Vec<_>>();
     if paths.is_empty() {
-        CommittedOverlap::DeclaredOnly
+        Committed::Declared
     } else {
-        CommittedOverlap::Intersecting { paths }
+        Committed::Intersecting { paths }
     }
 }
 
-fn committed_delta(member: &OverlapMember) -> std::result::Result<Vec<String>, CommittedEvidence> {
+fn delta(member: &Subject) -> std::result::Result<Vec<String>, Evidence> {
     let checkout = git::at(&member.path);
     match checkout.clean() {
         Ok(true) => {}
-        Ok(false) => return Err(CommittedEvidence::Dirty),
-        Err(_) => return Err(CommittedEvidence::Unavailable),
+        Ok(false) => return Err(Evidence::Dirty),
+        Err(_) => return Err(Evidence::Unavailable),
     }
-    let head = checkout
-        .head()
-        .map_err(|_| CommittedEvidence::Unavailable)?;
+    let head = checkout.head().map_err(|_| Evidence::Unavailable)?;
     let base = if let Some(proof) = &member.proof {
         if !proof.current(&head, &crate::claim::digest(&member.claims)) {
-            return Err(CommittedEvidence::Stale);
+            return Err(Evidence::Stale);
         }
         proof.base.as_str()
     } else {
         member.base.as_str()
     };
-    if !checkout
-        .commit_exists(base)
-        .map_err(|_| CommittedEvidence::Unavailable)?
-    {
-        return Err(CommittedEvidence::MissingBase);
+    if !checkout.commit(base).map_err(|_| Evidence::Unavailable)? {
+        return Err(Evidence::Missing);
     }
     if !checkout
         .ancestor(base, &head)
-        .map_err(|_| CommittedEvidence::Unavailable)?
+        .map_err(|_| Evidence::Unavailable)?
     {
-        return Err(CommittedEvidence::Stale);
+        return Err(Evidence::Stale);
     }
     checkout
-        .changed_paths(base, &head)
-        .map_err(|_| CommittedEvidence::Unavailable)
+        .delta(base, &head)
+        .map_err(|_| Evidence::Unavailable)
 }
 
 #[cfg(test)]
@@ -136,10 +129,10 @@ mod tests {
         let left = member(root, "0000000000000000000000000000000000000000");
         let right = member(root, &base);
         assert_eq!(
-            committed_overlap(&left, &right),
-            CommittedOverlap::Unavailable {
+            committed(&left, &right),
+            Committed::Unavailable {
                 member: "member".to_string(),
-                reason: CommittedEvidence::MissingBase,
+                reason: Evidence::Missing,
             }
         );
     }
@@ -158,16 +151,16 @@ mod tests {
         let left = member(&root.join("absent"), &base);
         let right = member(root, &base);
         assert_eq!(
-            committed_overlap(&left, &right),
-            CommittedOverlap::Unavailable {
+            committed(&left, &right),
+            Committed::Unavailable {
                 member: "member".to_string(),
-                reason: CommittedEvidence::Unavailable,
+                reason: Evidence::Unavailable,
             }
         );
     }
 
-    fn member(root: &Path, base: &str) -> OverlapMember {
-        OverlapMember {
+    fn member(root: &Path, base: &str) -> Subject {
+        Subject {
             key: None,
             identity: "member".to_string(),
             path: root.to_path_buf(),

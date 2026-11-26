@@ -1,5 +1,5 @@
 use super::projection::authority::{evidence, trust};
-use super::projection::{self, Connection, Fault, Projection, Readiness, ReadinessChecks};
+use super::projection::{self, Checks, Complete, Connection, Fault, Projection, Readiness};
 use concord_core::acceptance::{Verdict, checkboxes, sections};
 use concord_core::{Coordinate, Error, Result};
 use std::collections::{BTreeMap, BTreeSet};
@@ -12,8 +12,8 @@ impl Projection {
             .complete(
                 coordinate,
                 BTreeSet::from([
-                    Connection::SubIssues,
-                    Connection::BlockedBy,
+                    Connection::Children,
+                    Connection::Blockers,
                     Connection::Pulls,
                     Connection::Comments,
                 ]),
@@ -35,7 +35,7 @@ impl Projection {
                 coordinate.owner, coordinate.repository, coordinate.number
             ),
             timeout: self.timeout,
-            pages: usize::from(self.max_pages),
+            pages: usize::from(self.pages),
         };
         let reviewed = crate::dispatch::acceptance::review(&args).await?;
         if !reviewed.current(&held.issue.node, &held.kind, &held.body) {
@@ -75,18 +75,18 @@ impl Projection {
             acceptance: Some(reviewed.evaluation),
             automation: None,
             reasons,
-            distribution_evidence: distribution,
-            observed_at: projection::now(),
+            evidence: distribution,
+            observed: projection::now(),
         };
         projection::record("issue.ready", started.elapsed(), "fresh");
         Ok(readiness)
     }
 }
 
-fn automation(held: projection::CompleteIssue) -> Readiness {
+fn automation(held: Complete) -> Readiness {
     let automation = concord_core::automation::held(&held.kind, &held.body, &held.issue.state);
-    let children = held.sub_issues.iter().all(|issue| issue.state == "closed");
-    let blockers = held.blocked_by.iter().all(|issue| issue.state == "closed");
+    let children = held.children.iter().all(|issue| issue.state == "closed");
+    let blockers = held.blockers.iter().all(|issue| issue.state == "closed");
     let (checks, mut reasons) = conditions(&held.body, &held.kind, children, blockers);
     reasons.push("Auto is automation-held: Plumb owns verification and closure; Concord projects current facts read-only".to_string());
     Readiness {
@@ -98,8 +98,8 @@ fn automation(held: projection::CompleteIssue) -> Readiness {
         acceptance: None,
         automation,
         reasons,
-        distribution_evidence: Vec::new(),
-        observed_at: projection::now(),
+        evidence: Vec::new(),
+        observed: projection::now(),
     }
 }
 
@@ -108,7 +108,7 @@ pub(in crate::dispatch) fn conditions(
     kind: &str,
     children: bool,
     blockers: bool,
-) -> (ReadinessChecks, Vec<String>) {
+) -> (Checks, Vec<String>) {
     let sections = sections(body);
     let missing = missing(&sections, kind);
     let acceptance = sections
@@ -116,21 +116,21 @@ pub(in crate::dispatch) fn conditions(
         .map(String::as_str)
         .unwrap_or_default();
     let (total, open) = checkboxes(acceptance);
-    let checks = ReadinessChecks {
-        required_sections: missing.is_empty(),
-        acceptance_nonempty: total > 0,
-        acceptance_settled: total > 0 && open == 0,
-        acceptance_total: total,
-        acceptance_open: open,
-        sub_issues_closed: children,
-        blockers_closed: blockers,
+    let checks = Checks {
+        sections: missing.is_empty(),
+        nonempty: total > 0,
+        settled: total > 0 && open == 0,
+        total,
+        open,
+        children,
+        blockers,
     };
     let reasons = reasons(&missing, &checks);
     (checks, reasons)
 }
 
 fn missing(sections: &BTreeMap<String, String>, kind: &str) -> Vec<&'static str> {
-    required_sections(kind)
+    required(kind)
         .iter()
         .filter(|name| {
             sections
@@ -159,23 +159,20 @@ fn refuse(started: Instant, error: Fault) -> Error {
     projection::fault(error)
 }
 
-fn reasons(missing: &[&str], checks: &ReadinessChecks) -> Vec<String> {
+fn reasons(missing: &[&str], checks: &Checks) -> Vec<String> {
     let mut reasons = Vec::new();
     if !missing.is_empty() {
         reasons.push(format!("missing required sections: {}", missing.join(", ")));
     }
-    if !checks.acceptance_nonempty {
+    if !checks.nonempty {
         reasons.push("Acceptance has no checklist items".to_string());
-    } else if !checks.acceptance_settled {
-        reasons.push(format!(
-            "Acceptance has {} unsettled item(s)",
-            checks.acceptance_open
-        ));
+    } else if !checks.settled {
+        reasons.push(format!("Acceptance has {} unsettled item(s)", checks.open));
     }
-    if !checks.sub_issues_closed {
+    if !checks.children {
         reasons.push("one or more sub-issues are open".to_string());
     }
-    if !checks.blockers_closed {
+    if !checks.blockers {
         reasons.push("one or more blockers are open".to_string());
     }
     reasons
@@ -194,7 +191,7 @@ pub(super) fn heading(kind: &str) -> &'static str {
     }
 }
 
-fn required_sections(kind: &str) -> &'static [&'static str] {
+fn required(kind: &str) -> &'static [&'static str] {
     match kind.to_ascii_lowercase().as_str() {
         "auto" => &["operation", "target", "change", "acceptance", "non-goals"],
         "feature" => &["problem", "outcome", "acceptance", "non-goals"],

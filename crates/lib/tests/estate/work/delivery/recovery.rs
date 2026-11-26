@@ -1,16 +1,12 @@
 use super::{fixture, released};
-use concord_core::{IssueRelease, Recovery};
+use concord_core::{Recovery, Release};
 use std::process::Command;
 
 #[tokio::test(flavor = "current_thread")]
 async fn recovery() {
     let authority = released();
     let fixture = fixture(authority.producer(), authority.depot()).await;
-    let member = fixture
-        .estate
-        .issue_member(&fixture.issue)
-        .await
-        .expect("Member");
+    let member = fixture.estate.member(&fixture.issue).await.expect("Member");
     let source = fixture._temp.path().join("source");
     let path = fixture
         ._temp
@@ -18,7 +14,7 @@ async fn recovery() {
         .join("workspace/issues/I_delivery/worktree");
     let before = fixture
         .estate
-        .issue_member_status(&fixture.issue)
+        .status(&fixture.issue)
         .await
         .expect("status")
         .references;
@@ -77,17 +73,13 @@ async fn recovery() {
         .expect("restore proven landed source");
     fixture.estate.recover(&request).await.expect("repeat");
     assert_eq!(
-        fixture
-            .estate
-            .issue_member(&fixture.issue)
-            .await
-            .expect("Member"),
+        fixture.estate.member(&fixture.issue).await.expect("Member"),
         member
     );
     assert_eq!(
         fixture
             .estate
-            .issue_member_status(&fixture.issue)
+            .status(&fixture.issue)
             .await
             .expect("restored status")
             .references,
@@ -96,7 +88,7 @@ async fn recovery() {
     assert_eq!(
         fixture
             .estate
-            .release_issue(&IssueRelease {
+            .release(&Release {
                 issue: fixture.issue,
                 revision: 2
             })

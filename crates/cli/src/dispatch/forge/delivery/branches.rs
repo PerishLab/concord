@@ -44,7 +44,7 @@ enum Verdict {
 
 pub(super) async fn clean(estate: &Estate, integration: &Integration, timeout: u64) -> Result<()> {
     let live = estate
-        .issue_worktrees()
+        .worktrees()
         .await?
         .into_iter()
         .filter(|member| member.integration.node == integration.node)

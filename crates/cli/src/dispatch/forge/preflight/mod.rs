@@ -73,7 +73,8 @@ pub struct Preflight {
     pub candidates: Vec<Candidate>,
     pub diagnostics: Vec<Diagnostic>,
     pub complete: bool,
-    pub observed_at: u64,
+    #[serde(rename = "observed_at")]
+    pub observed: u64,
 }
 
 pub async fn run(estate: &Estate, request: Request<'_>) -> Result<Preflight> {
@@ -85,7 +86,7 @@ pub async fn run(estate: &Estate, request: Request<'_>) -> Result<Preflight> {
     })
     .await;
     let anchors = estate.issues().await?;
-    let members = estate.issue_worktrees().await?;
+    let members = estate.worktrees().await?;
     let occupancy = estate.occupancy()?;
     let title = terms(&proposal.title);
     let outcome = terms(&proposal.outcome);
@@ -127,7 +128,7 @@ pub async fn run(estate: &Estate, request: Request<'_>) -> Result<Preflight> {
         candidates,
         diagnostics: found.diagnostics,
         complete: found.complete,
-        observed_at: projection::now(),
+        observed: projection::now(),
     })
 }
 
@@ -172,10 +173,10 @@ fn candidate(
     proposal: &Proposal,
     title: &BTreeSet<String>,
     outcome: &BTreeSet<String>,
-    raw: github::RawIssue,
+    raw: github::Entry,
 ) -> Option<Candidate> {
     let expected = format!("{}/{}", proposal.owner, proposal.repository);
-    if raw.repository.name_with_owner != expected || !raw.state.eq_ignore_ascii_case("open") {
+    if raw.repository.name != expected || !raw.state.eq_ignore_ascii_case("open") {
         return None;
     }
     let words = terms(&format!("{} {}", raw.title, raw.body));
@@ -192,7 +193,7 @@ fn candidate(
     if signals.is_empty() {
         return None;
     }
-    let kind = raw.issue_type.map(|kind| kind.name).unwrap_or_default();
+    let kind = raw.kind.map(|kind| kind.name).unwrap_or_default();
     let automation = concord_core::automation::held(&kind, &raw.body, &raw.state);
     Some(Candidate {
         automation,
@@ -209,7 +210,7 @@ fn candidate(
             state: raw.state.to_ascii_lowercase(),
         },
         kind,
-        updated: raw.updated_at,
+        updated: raw.updated,
         signals,
         execution: Execution {
             members: Vec::new(),
@@ -225,7 +226,7 @@ fn matches(observation: &occupancy::Observation, expected: &str) -> bool {
         .subjects
         .iter()
         .any(|subject| match subject {
-            Subject::Issue { node } | Subject::IssueMember { node } => node == expected,
+            Subject::Issue { node } | Subject::Member { node } => node == expected,
             Subject::Surface { .. } => false,
         })
 }

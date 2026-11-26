@@ -18,7 +18,8 @@ pub enum Agent {
     Grok,
     Codex,
     Santi,
-    GrokBot,
+    #[serde(rename = "grok-bot")]
+    Grokbot,
     Agy,
 }
 
@@ -39,7 +40,7 @@ pub struct Touch {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct IssueActivity {
+pub struct Activity {
     pub issue: crate::estate::Coordinate,
     pub node: String,
     pub current: Touch,
@@ -57,7 +58,8 @@ pub struct Observation {
 pub struct Snapshot {
     pub observations: Vec<Observation>,
     pub window: u64,
-    pub observed_at: u64,
+    #[serde(rename = "observed_at")]
+    pub observed: u64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -82,7 +84,7 @@ impl Agent {
             Self::Grok => "grok",
             Self::Codex => "codex",
             Self::Santi => "santi",
-            Self::GrokBot => "grok-bot",
+            Self::Grokbot => "grok-bot",
             Self::Agy => "agy",
         }
     }
@@ -95,7 +97,7 @@ impl Operator {
 
     pub(crate) fn valid(&self) -> bool {
         let session = self.session.as_str();
-        if self.agent == Agent::GrokBot {
+        if self.agent == Agent::Grokbot {
             return crate::config::identity(session);
         }
         !session.is_empty()
@@ -170,14 +172,14 @@ fn persist(
     Ok((current, recent))
 }
 
-pub(crate) fn record_issue(
+pub(crate) fn record(
     space: &Path,
     issue: &Anchor,
     operator: Option<&Operator>,
     operation: &str,
-) -> Result<IssueActivity> {
+) -> Result<Activity> {
     let (current, recent) = persist(space, &format!("issue-{}", issue.key), operator, operation)?;
-    Ok(IssueActivity {
+    Ok(Activity {
         issue: issue.coordinate.clone(),
         node: issue.node.clone(),
         current,
@@ -187,9 +189,9 @@ pub(crate) fn record_issue(
 }
 
 pub(crate) fn snapshot(space: &Path, issue: &Anchor) -> Result<Snapshot> {
-    let observed_at = now()?;
+    let observed = now()?;
     let ledger = read(&space.join(format!("activity/issue-{}.json", issue.key)))?;
-    let earliest = observed_at.saturating_sub(WINDOW);
+    let earliest = observed.saturating_sub(WINDOW);
     Ok(Snapshot {
         observations: ledger
             .touches
@@ -200,7 +202,7 @@ pub(crate) fn snapshot(space: &Path, issue: &Anchor) -> Result<Snapshot> {
             })
             .collect(),
         window: WINDOW,
-        observed_at,
+        observed,
     })
 }
 

@@ -1,8 +1,8 @@
 use super::{emit, explicit};
 use crate::args::member::Command;
 use concord_core::{
-    Coordinate, Estate, Finish, IssueClaiming, IssueMemberChange, IssueNarrowing, IssueProving,
-    IssueRelease, IssueRetirement, Recovery, Result, Start,
+    Change, Claiming, Coordinate, Estate, Finish, Narrowing, Proving, Recovery, Release, Result,
+    Retirement, Start,
 };
 use serde_json::json;
 
@@ -30,7 +30,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
         } => {
             let issue = Coordinate::parse(&issue)?;
             let observed = start::observe(&issue, timeout).await?;
-            issue_changed(
+            changed(
                 estate
                     .start(&Start {
                         issue,
@@ -48,9 +48,9 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             issue,
             claim,
             revision,
-        } => issue_changed(
+        } => changed(
             estate
-                .claim_issue(&IssueClaiming {
+                .claim(&Claiming {
                     issue: Coordinate::parse(&issue)?,
                     claims: claim,
                     revision,
@@ -65,9 +65,9 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
             apply,
         } => {
             explicit(apply, "member narrow")?;
-            issue_changed(
+            changed(
                 estate
-                    .narrow_issue(&IssueNarrowing {
+                    .narrow(&Narrowing {
                         issue: Coordinate::parse(&issue)?,
                         claims: claim,
                         revision,
@@ -78,7 +78,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
         }
         Command::Prove { issue, revision } => emit(
             json!({"member":
-            estate.prove_issue(&IssueProving {
+            estate.prove(&Proving {
                 issue: Coordinate::parse(&issue)?, revision,
             }).await?}),
             output,
@@ -92,7 +92,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
         } => {
             explicit(apply, "member release")?;
             let revision = estate
-                .release_issue(&IssueRelease {
+                .release(&Release {
                     issue: Coordinate::parse(&issue)?,
                     revision,
                 })
@@ -137,7 +137,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
         } => {
             explicit(apply, "member retire")?;
             let revision = estate
-                .retire_issue(&IssueRetirement {
+                .dismiss(&Retirement {
                     issue: Coordinate::parse(&issue)?,
                     artifacts,
                     revision,
@@ -149,7 +149,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
 }
 
 async fn list(estate: &Estate, issue: Option<String>, output: bool) -> Result<()> {
-    let mut members = estate.issue_worktrees().await?;
+    let mut members = estate.worktrees().await?;
     if let Some(issue) = issue {
         let node = estate.issue(&Coordinate::parse(&issue)?).await?.node;
         members.retain(|member| member.node == node);
@@ -157,7 +157,7 @@ async fn list(estate: &Estate, issue: Option<String>, output: bool) -> Result<()
     emit(json!({"members": members}), output)
 }
 
-fn issue_changed(change: IssueMemberChange, output: bool) -> Result<()> {
+fn changed(change: Change, output: bool) -> Result<()> {
     if !output {
         super::output::observations(&change.observations);
     }

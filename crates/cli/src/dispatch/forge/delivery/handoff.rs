@@ -1,7 +1,7 @@
 use super::super::super::emit;
 use super::adaptor;
 use concord_core::authority::Plumb;
-use concord_core::{Coordinate, Error, Estate, Result, issue_delivery};
+use concord_core::{Coordinate, Error, Estate, Result, delivery};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::path::Path;
@@ -15,7 +15,7 @@ pub struct Refusal {
 }
 
 pub struct Parameters<'a> {
-    pub authority: issue_delivery::Mode,
+    pub authority: delivery::Mode,
     pub review: Option<&'a Path>,
     pub issue: &'a str,
     pub revision: i64,
@@ -39,25 +39,25 @@ pub async fn prepare(estate: &Estate, parameters: Parameters<'_>, output: bool) 
     }
 }
 
-async fn request(estate: &Estate, parameters: &Parameters<'_>) -> Result<issue_delivery::Plan> {
+async fn request(estate: &Estate, parameters: &Parameters<'_>) -> Result<delivery::Plan> {
     let review = parameters
         .review
-        .map(|path| crate::dispatch::input::read(path, issue_delivery::Review::SHAPE))
+        .map(|path| crate::dispatch::input::read(path, delivery::Review::SHAPE))
         .transpose()?;
-    if (parameters.authority == issue_delivery::Mode::GovernanceManual) != review.is_some() {
+    if (parameters.authority == delivery::Mode::Manual) != review.is_some() {
         return Err(Error::typed(
             "concord.delivery.review",
             "governance-manual requires --review; other authorities refuse review input",
         ));
     }
     let issue = Coordinate::parse(parameters.issue)?;
-    let member = estate.issue_member(&issue).await?;
+    let member = estate.member(&issue).await?;
     adaptor::integration(&member.integration).await?;
     let observed = adaptor::observe(parameters.timeout, &issue).await?;
     super::branches::clean(estate, &member.integration, parameters.timeout).await?;
-    issue_delivery::prepare::<Plumb>(
+    delivery::prepare::<Plumb>(
         estate,
-        &issue_delivery::Request {
+        &delivery::Request {
             authority: parameters.authority,
             review,
             issue,

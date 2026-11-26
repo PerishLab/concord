@@ -1,6 +1,6 @@
 use super::{fixture, git, released, request, snapshot};
 use concord_core::authority::Plumb;
-use concord_core::{Register, Repository, issue_delivery};
+use concord_core::{Register, Repository, delivery};
 
 async fn foreign(estate: &concord_core::Estate) -> super::super::start::World {
     let peer = super::super::start::world().await;
@@ -30,28 +30,28 @@ async fn reentry() {
     let world = fixture(authority.producer(), authority.depot()).await;
     let peer = foreign(&world.estate).await;
     std::fs::write(peer.source.join("foreign"), "preserve").unwrap();
-    let plan = issue_delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
+    let plan = delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
         .await
         .unwrap();
     std::fs::rename(&peer.source, peer.temp.path().join("retained")).unwrap();
-    issue_delivery::resume::<Plumb>(&world.estate, &plan, &snapshot())
+    delivery::resume::<Plumb>(&world.estate, &plan, &snapshot())
         .await
         .unwrap();
-    issue_delivery::revalidate::<Plumb>(
+    delivery::revalidate::<Plumb>(
         &world.estate,
         &plan,
         (&snapshot(), 2),
-        issue_delivery::Check::Confirm,
+        delivery::Check::Confirm,
     )
     .await
     .unwrap();
     let source = world._temp.path().join("source");
     std::fs::write(source.join("changed"), "preserve target").unwrap();
-    let error = issue_delivery::revalidate::<Plumb>(
+    let error = delivery::revalidate::<Plumb>(
         &world.estate,
         &plan,
         (&snapshot(), 3),
-        issue_delivery::Check::Confirm,
+        delivery::Check::Confirm,
     )
     .await
     .unwrap_err();
@@ -67,7 +67,7 @@ async fn reentry() {
 async fn completion() {
     let authority = released();
     let world = fixture(authority.producer(), authority.depot()).await;
-    let plan = issue_delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
+    let plan = delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
         .await
         .unwrap();
     let peer = foreign(&world.estate).await;
@@ -82,7 +82,7 @@ async fn completion() {
     assert!(completed.released);
     assert_eq!(completed.head, settlement.merge);
     assert!(
-        issue_delivery::resume::<Plumb>(&world.estate, &plan, &snapshot())
+        delivery::resume::<Plumb>(&world.estate, &plan, &snapshot())
             .await
             .unwrap()
             .released

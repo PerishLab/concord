@@ -1,13 +1,9 @@
 use super::adaptor;
 use crate::dispatch::Completion;
-use concord_core::issue_delivery::Resume;
+use concord_core::delivery::{Plan, Resume};
 use concord_core::{Error, Result};
 
-pub(super) fn pending(
-    plan: &concord_core::issue_delivery::Plan,
-    pull: i64,
-    output: bool,
-) -> Result<Completion> {
+pub(super) fn pending(plan: &Plan, pull: i64, output: bool) -> Result<Completion> {
     crate::dispatch::emit(
         serde_json::json!({
             "schema": "concord.issue-delivery-pending/v1",
