@@ -1,5 +1,5 @@
 use super::super::github;
-use concord_core::{Coordinate, Error, Integration, Result, issue_delivery};
+use concord_core::{Coordinate, Error, Integration, Result, delivery};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -30,7 +30,7 @@ pub(super) fn select(kind: &str) -> Result<()> {
 }
 
 impl Identity {
-    pub(super) fn of(plan: &issue_delivery::Plan) -> Self {
+    pub(super) fn of(plan: &delivery::Plan) -> Self {
         Self {
             kind: "github".into(),
             host: "github.com".into(),
@@ -42,7 +42,7 @@ impl Identity {
     pub(super) fn validate(
         version: u64,
         identity: Option<&Self>,
-        plan: &issue_delivery::Plan,
+        plan: &delivery::Plan,
     ) -> Result<()> {
         match (version, identity) {
             (1, None) => Ok(()),

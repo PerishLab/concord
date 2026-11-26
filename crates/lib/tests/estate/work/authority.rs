@@ -1,6 +1,6 @@
-use super::issue_delivery::{Fixture, fixture, released, request, snapshot};
+use super::delivery::{Fixture, fixture, released, request, snapshot};
 use concord_core::authority::{Authorities, Plumb};
-use concord_core::issue_delivery;
+use concord_core::delivery;
 use plumb::guard::Authority;
 
 const POINTER: &str = "https://releases.plumb.perish.uk/v1/channels/stable.json";
@@ -71,22 +71,17 @@ async fn stable() {
         issue,
         _temp,
     } = fixture(authority.producer(), authority.depot()).await;
-    let plan = issue_delivery::prepare::<Stable>(&estate, &request(&issue))
+    let plan = delivery::prepare::<Stable>(&estate, &request(&issue))
         .await
         .expect("stable authority accepts the proof");
-    let issue_delivery::Authority::Plumb { warrant, .. } = &plan.authority else {
+    let delivery::Authority::Plumb { warrant, .. } = &plan.authority else {
         panic!("expected Guard authority");
     };
     assert_eq!(warrant.producer, authority.producer());
     assert_eq!(warrant.depot, authority.depot());
-    issue_delivery::revalidate::<Stable>(
-        &estate,
-        &plan,
-        (&snapshot(), 2),
-        issue_delivery::Check::Execute,
-    )
-    .await
-    .expect("stable authority remains accepted");
+    delivery::revalidate::<Stable>(&estate, &plan, (&snapshot(), 2), delivery::Check::Execute)
+        .await
+        .expect("stable authority remains accepted");
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -97,7 +92,7 @@ async fn unknown() {
         issue,
         _temp,
     } = fixture(UNKNOWN, compiled.depot()).await;
-    let error = issue_delivery::prepare::<Pinned>(&estate, &request(&issue))
+    let error = delivery::prepare::<Pinned>(&estate, &request(&issue))
         .await
         .expect_err("unknown producer");
     assert_eq!(error.code(), "concord.delivery.authority");
@@ -115,7 +110,7 @@ async fn offline() {
         issue,
         _temp,
     } = fixture(UNKNOWN, compiled.depot()).await;
-    let error = issue_delivery::prepare::<Compiled>(&estate, &request(&issue))
+    let error = delivery::prepare::<Compiled>(&estate, &request(&issue))
         .await
         .expect_err("compiled mismatch while stable is unreachable");
     assert_eq!(error.code(), "concord.delivery.authority");
@@ -137,17 +132,13 @@ async fn moved() {
         issue,
         _temp,
     } = fixture(authority.producer(), authority.depot()).await;
-    let plan = issue_delivery::prepare::<Stable>(&estate, &request(&issue))
+    let plan = delivery::prepare::<Stable>(&estate, &request(&issue))
         .await
         .expect("prepared under stable");
-    let error = issue_delivery::revalidate::<Offline>(
-        &estate,
-        &plan,
-        (&snapshot(), 2),
-        issue_delivery::Check::Execute,
-    )
-    .await
-    .expect_err("stable moved after preparation");
+    let error =
+        delivery::revalidate::<Offline>(&estate, &plan, (&snapshot(), 2), delivery::Check::Execute)
+            .await
+            .expect_err("stable moved after preparation");
     assert_eq!(error.code(), "concord.delivery.authority");
     assert!(error.message().contains("re-guard"), "{}", error.message());
     assert!(error.message().contains(authority.producer()));
@@ -164,21 +155,17 @@ async fn stale() {
         issue,
         _temp,
     } = fixture(authority.producer(), authority.depot()).await;
-    let mut plan = issue_delivery::prepare::<Pinned>(&estate, &request(&issue))
+    let mut plan = delivery::prepare::<Pinned>(&estate, &request(&issue))
         .await
         .expect("prepared under the compiled authority");
-    let issue_delivery::Authority::Plumb { warrant, .. } = &mut plan.authority else {
+    let delivery::Authority::Plumb { warrant, .. } = &mut plan.authority else {
         panic!("expected Guard authority");
     };
     warrant.producer = UNKNOWN.into();
-    let error = issue_delivery::revalidate::<Pinned>(
-        &estate,
-        &plan,
-        (&snapshot(), 2),
-        issue_delivery::Check::Execute,
-    )
-    .await
-    .expect_err("no readable authority names the warrant");
+    let error =
+        delivery::revalidate::<Pinned>(&estate, &plan, (&snapshot(), 2), delivery::Check::Execute)
+            .await
+            .expect_err("no readable authority names the warrant");
     assert_eq!(error.code(), "concord.delivery.authority");
     assert!(
         error

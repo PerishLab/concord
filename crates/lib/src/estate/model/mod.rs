@@ -7,9 +7,9 @@ pub(super) fn graph() -> Graph {
     graph
         .plug::<reference::Anchor>()
         .plug::<execution::Integration>()
-        .plug::<execution::IssueMember>()
-        .plug::<execution::IssueClaim>()
-        .plug::<execution::IssueBoundary>()
-        .plug::<execution::IssueChange>();
+        .plug::<execution::Member>()
+        .plug::<execution::Claim>()
+        .plug::<execution::Boundary>()
+        .plug::<execution::Change>();
     graph
 }

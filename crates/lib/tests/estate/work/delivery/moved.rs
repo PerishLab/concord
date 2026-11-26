@@ -1,7 +1,7 @@
 use super::completion::merged;
 use super::{Fixture, fixture, released, request, snapshot};
 use concord_core::authority::{Authorities, Plumb};
-use concord_core::issue_delivery;
+use concord_core::delivery;
 
 const UNKNOWN: &str = "v9.9.9@0000000000000000000000000000000000000009";
 
@@ -26,30 +26,21 @@ async fn moved() {
         _temp,
     } = fixture(compiled.producer(), compiled.depot()).await;
     let snapshot = snapshot();
-    let plan = issue_delivery::prepare::<Pinned>(&estate, &request(&issue))
+    let plan = delivery::prepare::<Pinned>(&estate, &request(&issue))
         .await
         .expect("prepare delivery");
-    issue_delivery::revalidate::<Pinned>(
-        &estate,
-        &plan,
-        (&snapshot, 2),
-        issue_delivery::Check::Confirm,
-    )
-    .await
-    .expect("Confirm accepts the prepared warrant");
+    delivery::revalidate::<Pinned>(&estate, &plan, (&snapshot, 2), delivery::Check::Confirm)
+        .await
+        .expect("Confirm accepts the prepared warrant");
     let mut moved = plan.clone();
-    let issue_delivery::Authority::Plumb { warrant, .. } = &mut moved.authority else {
+    let delivery::Authority::Plumb { warrant, .. } = &mut moved.authority else {
         panic!("expected Guard authority");
     };
     warrant.producer = UNKNOWN.into();
-    let refused = issue_delivery::revalidate::<Pinned>(
-        &estate,
-        &moved,
-        (&snapshot, 2),
-        issue_delivery::Check::Confirm,
-    )
-    .await
-    .expect_err("a moved warrant refuses before any merge");
+    let refused =
+        delivery::revalidate::<Pinned>(&estate, &moved, (&snapshot, 2), delivery::Check::Confirm)
+            .await
+            .expect_err("a moved warrant refuses before any merge");
     assert_eq!(refused.code(), "concord.delivery.authority");
     assert!(
         refused
@@ -68,7 +59,7 @@ async fn moved() {
     assert!(completed.released);
     assert_eq!(
         estate
-            .issue_member(&issue)
+            .member(&issue)
             .await
             .expect_err("Member released")
             .code(),

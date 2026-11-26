@@ -2,7 +2,7 @@ pub(super) mod authority;
 mod page;
 mod readiness;
 
-pub use readiness::{Readiness, ReadinessChecks};
+pub use readiness::{Checks, Readiness};
 
 use concord_core::{Coordinate, Error, Result};
 use serde::Serialize;
@@ -14,44 +14,44 @@ pub(super) const GRAPH: &str = "concord.issue-graph/v1";
 pub(super) const READINESS: &str = "concord.issue-readiness/v1";
 
 #[derive(Clone, Debug)]
-pub struct PageRequest {
+pub struct Request {
     pub size: u16,
-    pub sub_issues_after: Option<String>,
-    pub blocked_by_after: Option<String>,
-    pub blocking_after: Option<String>,
-    pub pulls_after: Option<String>,
-    pub comments_after: Option<String>,
+    pub children: Option<String>,
+    pub blockers: Option<String>,
+    pub blocking: Option<String>,
+    pub pulls: Option<String>,
+    pub comments: Option<String>,
 }
 
-impl PageRequest {
+impl Request {
     pub(super) fn first(size: u16) -> Self {
         Self {
             size,
-            sub_issues_after: None,
-            blocked_by_after: None,
-            blocking_after: None,
-            pulls_after: None,
-            comments_after: None,
+            children: None,
+            blockers: None,
+            blocking: None,
+            pulls: None,
+            comments: None,
         }
     }
 }
 
 pub struct Projection {
-    pub(super) page_size: u16,
-    pub(super) max_pages: u16,
+    pub(super) size: u16,
+    pub(super) pages: u16,
     pub(super) timeout: u64,
 }
 
 impl Projection {
-    pub fn new(page_size: u16, max_pages: u16, timeout: u64) -> Self {
+    pub fn new(size: u16, pages: u16, timeout: u64) -> Self {
         Self {
-            page_size,
-            max_pages,
+            size,
+            pages,
             timeout,
         }
     }
 
-    pub async fn brief(&self, coordinate: &Coordinate, request: PageRequest) -> Result<Brief> {
+    pub async fn brief(&self, coordinate: &Coordinate, request: Request) -> Result<Brief> {
         let started = Instant::now();
         let reply = self.query(coordinate, &request).await;
         match reply {
@@ -75,12 +75,12 @@ impl Projection {
 
 fn brief(
     coordinate: &Coordinate,
-    raw: super::github::RawIssue,
-    request: &PageRequest,
+    raw: super::github::Snapshot,
+    request: &Request,
 ) -> Result<Brief> {
     let issue = super::shape::root(coordinate, &raw).map_err(fault)?;
     let kind = raw
-        .issue_type
+        .kind
         .as_ref()
         .map(|kind| kind.name.trim())
         .filter(|kind| !kind.is_empty())
@@ -97,23 +97,23 @@ fn brief(
         schema: BRIEF,
         issue,
         kind,
-        updated: raw.updated_at.clone(),
+        updated: raw.updated.clone(),
         parent: raw
             .parent
             .as_ref()
             .map(super::shape::issue)
             .transpose()
             .map_err(fault)?,
-        sub_issue_summary: SubIssueSummary {
-            total: raw.sub_issues_summary.total,
-            completed: raw.sub_issues_summary.completed,
-            percent_completed: raw.sub_issues_summary.percent_completed,
+        summary: Summary {
+            total: raw.summary.total,
+            completed: raw.summary.completed,
+            percent: raw.summary.percent,
         },
-        sub_issues: super::shape::page(&raw.sub_issues, request.sub_issues_after.clone())?,
-        blocked_by: super::shape::page(&raw.blocked_by, request.blocked_by_after.clone())?,
-        blocking: super::shape::page(&raw.blocking, request.blocking_after.clone())?,
-        pulls: super::shape::pulls(&raw.timeline_items, request.pulls_after.clone())?,
-        observed_at: now(),
+        children: super::shape::page(&raw.children, request.children.clone())?,
+        blockers: super::shape::page(&raw.blockers, request.blockers.clone())?,
+        blocking: super::shape::page(&raw.blocking, request.blocking.clone())?,
+        pulls: super::shape::pulls(&raw.timeline, request.pulls.clone())?,
+        observed: now(),
     })
 }
 
@@ -138,24 +138,30 @@ pub struct Pull {
     pub url: String,
     pub title: String,
     pub state: String,
-    pub merged_at: Option<String>,
+    #[serde(rename = "merged_at")]
+    pub merged: Option<String>,
     pub updated: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Page<T> {
-    pub requested_after: Option<String>,
-    pub end_cursor: Option<String>,
-    pub has_next_page: bool,
-    pub provider_total: usize,
+    #[serde(rename = "requested_after")]
+    pub after: Option<String>,
+    #[serde(rename = "end_cursor")]
+    pub cursor: Option<String>,
+    #[serde(rename = "has_next_page")]
+    pub more: bool,
+    #[serde(rename = "provider_total")]
+    pub total: usize,
     pub nodes: Vec<T>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct SubIssueSummary {
+pub struct Summary {
     pub total: usize,
     pub completed: usize,
-    pub percent_completed: usize,
+    #[serde(rename = "percent_completed")]
+    pub percent: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -167,24 +173,28 @@ pub struct Brief {
     pub kind: String,
     pub updated: String,
     pub parent: Option<Issue>,
-    pub sub_issue_summary: SubIssueSummary,
-    pub sub_issues: Page<Issue>,
-    pub blocked_by: Page<Issue>,
+    #[serde(rename = "sub_issue_summary")]
+    pub summary: Summary,
+    #[serde(rename = "sub_issues")]
+    pub children: Page<Issue>,
+    #[serde(rename = "blocked_by")]
+    pub blockers: Page<Issue>,
     pub blocking: Page<Issue>,
     pub pulls: Page<Pull>,
-    pub observed_at: u64,
+    #[serde(rename = "observed_at")]
+    pub observed: u64,
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum EdgeKind {
+pub enum Link {
     Parent,
     Blocking,
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct Edge {
-    pub kind: EdgeKind,
+    pub kind: Link,
     pub source: String,
     pub target: String,
 }
@@ -204,26 +214,27 @@ pub struct Graph {
     pub edges: Vec<Edge>,
     pub diagnostics: Vec<Diagnostic>,
     pub complete: bool,
-    pub observed_at: u64,
+    #[serde(rename = "observed_at")]
+    pub observed: u64,
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct CompleteIssue {
+pub(super) struct Complete {
     pub issue: Issue,
     pub kind: String,
     pub body: String,
     pub parent: Option<Issue>,
-    pub sub_issues: Vec<Issue>,
-    pub blocked_by: Vec<Issue>,
+    pub children: Vec<Issue>,
+    pub blockers: Vec<Issue>,
     pub blocking: Vec<Issue>,
     pub pulls: Vec<Pull>,
-    pub comments: Vec<super::github::RawComment>,
+    pub comments: Vec<super::github::Comment>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(super) enum Connection {
-    SubIssues,
-    BlockedBy,
+    Children,
+    Blockers,
     Blocking,
     Pulls,
     Comments,

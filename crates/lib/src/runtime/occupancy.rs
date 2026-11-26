@@ -13,9 +13,17 @@ const CAPACITY: usize = 64;
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum Subject {
-    Issue { node: String },
-    IssueMember { node: String },
-    Surface { repository: String, path: String },
+    Issue {
+        node: String,
+    },
+    #[serde(rename = "issue-member")]
+    Member {
+        node: String,
+    },
+    Surface {
+        repository: String,
+        path: String,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -50,7 +58,8 @@ pub struct Observation {
 pub struct Snapshot {
     pub observations: Vec<Observation>,
     pub lease: u64,
-    pub observed_at: u64,
+    #[serde(rename = "observed_at")]
+    pub observed: u64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -256,11 +265,11 @@ pub(crate) fn readable(space: &Path) -> Result<()> {
 }
 
 pub(crate) fn inspect(path: &Path) -> Result<Snapshot> {
-    let observed_at = SystemTime::now()
+    let observed = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|error| Error::typed("concord.occupancy.clock", error.to_string()))?
         .as_secs();
-    let earliest = observed_at.saturating_sub(LEASE);
+    let earliest = observed.saturating_sub(LEASE);
     let ledger = read(path)?;
     Ok(Snapshot {
         observations: ledger
@@ -272,7 +281,7 @@ pub(crate) fn inspect(path: &Path) -> Result<Snapshot> {
             })
             .collect(),
         lease: LEASE,
-        observed_at,
+        observed,
     })
 }
 

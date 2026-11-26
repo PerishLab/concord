@@ -1,6 +1,6 @@
 use super::super::{emit, explicit};
 use crate::args::member::Reference;
-use concord_core::{Coordinate, Estate, IssueDeclaration, IssueWithdrawal, Result};
+use concord_core::{Coordinate, Declaration, Estate, Result, Withdrawal};
 use serde_json::json;
 
 pub(super) async fn run(estate: &Estate, command: Reference, output: bool) -> Result<()> {
@@ -14,7 +14,7 @@ pub(super) async fn run(estate: &Estate, command: Reference, output: bool) -> Re
             revision,
         } => {
             estate
-                .refer_issue(&IssueDeclaration {
+                .refer(&Declaration {
                     issue: Coordinate::parse(&issue)?,
                     provider,
                     owner,
@@ -34,7 +34,7 @@ pub(super) async fn run(estate: &Estate, command: Reference, output: bool) -> Re
         } => {
             explicit(apply, "member reference remove")?;
             estate
-                .unrefer_issue(&IssueWithdrawal {
+                .unrefer(&Withdrawal {
                     issue: Coordinate::parse(&issue)?,
                     owner,
                     repository,

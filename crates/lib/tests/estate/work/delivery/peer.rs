@@ -1,6 +1,5 @@
 use concord_core::{
-    Admission, Agreement, Coordinate, Estate, IssueProving, IssueRelease, Register, Repository,
-    Seat, Start,
+    Admission, Agreement, Coordinate, Estate, Proving, Register, Release, Repository, Seat, Start,
 };
 use std::path::Path;
 use std::process::Command;
@@ -65,7 +64,7 @@ async fn peer() {
     std::fs::write(path.join("crates/note.md"), "peer\n").expect("peer delta");
     git(&path, &["add", "crates/note.md"]);
     git(&path, &["commit", "-m", "peer delta"]);
-    far.prove_issue(&IssueProving {
+    far.prove(&Proving {
         issue: issue.clone(),
         revision: 1,
     })
@@ -73,7 +72,7 @@ async fn peer() {
     .expect("prove peer");
     git(&source, &["merge", "--ff-only", "task/41"]);
     git(&source, &["push", "origin", "main"]);
-    far.release_issue(&IssueRelease { issue, revision: 2 })
+    far.release(&Release { issue, revision: 2 })
         .await
         .expect("release peer");
     agrees(&late.settled().await.expect("after peer release"));

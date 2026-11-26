@@ -18,7 +18,7 @@ pub(crate) enum Intent {
 enum Seed<'a> {
     Issue(&'a str),
     Member(&'a str),
-    MemberSurfaces(&'a str, Option<&'a [String]>),
+    Surfaces(&'a str, Option<&'a [String]>),
     Addition(&'a str, &'a [String]),
 }
 
@@ -69,20 +69,20 @@ async fn resolve(estate: &Estate, seeds: Vec<Seed<'_>>) -> Result<Vec<Subject>> 
             }
             Seed::Member(issue) => {
                 let anchor = estate.issue(&Coordinate::parse(issue)?).await?;
-                vec![Subject::IssueMember { node: anchor.node }]
+                vec![Subject::Member { node: anchor.node }]
             }
-            Seed::MemberSurfaces(issue, additions) => {
+            Seed::Surfaces(issue, additions) => {
                 let coordinate = Coordinate::parse(issue)?;
-                let held = estate.issue_member(&coordinate).await?;
+                let held = estate.member(&coordinate).await?;
                 let mut claims = held.claims;
                 claims.extend(additions.into_iter().flatten().cloned());
-                let source = estate.issue_source_path(&coordinate).await?;
-                estate.write_surfaces(&source, &claims)?
+                let source = estate.origin(&coordinate).await?;
+                estate.surfaces(&source, &claims)?
             }
             Seed::Addition(issue, claims) => {
                 let coordinate = Coordinate::parse(issue)?;
                 let integration = estate.integration(&coordinate).await?;
-                estate.write_surfaces(Path::new(&integration.path), claims)?
+                estate.surfaces(Path::new(&integration.path), claims)?
             }
         };
         subjects.extend(found);
@@ -113,7 +113,7 @@ fn issue(command: &args::issue::Command) -> Option<Vec<Seed<'_>>> {
         } => Some(vec![
             Seed::Issue(issue),
             Seed::Member(issue),
-            Seed::MemberSurfaces(issue, None),
+            Seed::Surfaces(issue, None),
         ]),
         _ => None,
     }
@@ -137,9 +137,9 @@ fn member(command: &args::member::Command) -> Option<Vec<Seed<'_>>> {
     match command {
         Command::Start { claim, .. } => seeds.push(Seed::Addition(issue, claim)),
         Command::Claim { claim, .. } | Command::Narrow { claim, .. } => {
-            seeds.push(Seed::MemberSurfaces(issue, Some(claim)))
+            seeds.push(Seed::Surfaces(issue, Some(claim)))
         }
-        _ => seeds.push(Seed::MemberSurfaces(issue, None)),
+        _ => seeds.push(Seed::Surfaces(issue, None)),
     }
     Some(seeds)
 }

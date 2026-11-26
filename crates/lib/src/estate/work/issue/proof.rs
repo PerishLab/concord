@@ -1,23 +1,23 @@
 use super::super::{Estate, Proof};
-use super::{IssueWorktree, issue_stale};
+use super::{Worktree, stale};
 use crate::estate::Scope;
 use crate::{Error, Result, git};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IssueProving {
+pub struct Proving {
     pub issue: super::super::super::Coordinate,
     pub revision: i64,
 }
 
 impl Estate {
-    pub async fn prove_issue(&self, request: &IssueProving) -> Result<IssueWorktree> {
+    pub async fn prove(&self, request: &Proving) -> Result<Worktree> {
         let _guard = self.guard()?;
         self.ensure(Scope::Issue(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
-        issue_stale(anchor.revision, request.revision)?;
-        let member = self.issue_member(&request.issue).await?;
-        let source = self.issue_source(&member)?;
-        let path = self.issue_path(&anchor)?;
+        stale(anchor.revision, request.revision)?;
+        let member = self.member(&request.issue).await?;
+        let source = self.source(&member)?;
+        let path = self.seat(&anchor)?;
         if !git::at(&source).clean()? {
             return Err(Error::typed(
                 "concord.member.source",
@@ -48,18 +48,12 @@ impl Estate {
             head,
             claim: crate::claim::digest(&member.claims),
         };
-        self.keep_issue_boundary(anchor.key, member.key, anchor.revision + 1, &proof)
+        self.keep(anchor.key, member.key, anchor.revision + 1, &proof)
             .await?;
-        self.issue_member(&request.issue).await
+        self.member(&request.issue).await
     }
 
-    async fn keep_issue_boundary(
-        &self,
-        anchor: i64,
-        member: i64,
-        revision: i64,
-        proof: &Proof,
-    ) -> Result<()> {
+    async fn keep(&self, anchor: i64, member: i64, revision: i64, proof: &Proof) -> Result<()> {
         let held = self
             .core
             .live("IssueBoundary")
@@ -100,7 +94,7 @@ impl Estate {
 pub(super) mod delivery {
     use super::super::super::integration::{self, TRACKING};
     use super::super::delivery::{Authority, Member, member};
-    use super::super::{IssueRelease, issue_stale};
+    use super::super::{Release, stale as expired};
     use crate::estate::Scope;
     use crate::estate::{Estate, Guard, Proof};
     use crate::{Error, Reference, Result, git};
@@ -138,7 +132,7 @@ pub(super) mod delivery {
             self.identify(&guard.space)?;
             self.agreed(Scope::Issue(&request.issue)).await?;
             let anchor = self.issue(&request.issue).await?;
-            issue_stale(anchor.revision, request.revision)?;
+            expired(anchor.revision, request.revision)?;
             let held = self.integration(&request.issue).await?;
             if held != request.member.integration || held != guard.integration {
                 return Err(disagreement());
@@ -146,15 +140,15 @@ pub(super) mod delivery {
             if request.base != held.branch {
                 return Err(disagreement());
             }
-            let active = match self.issue_member(&request.issue).await {
-                Ok(held_member) => {
-                    if member(&held_member) != request.member {
+            let active = match self.member(&request.issue).await {
+                Ok(held) => {
+                    if member(&held) != request.member {
                         return Err(stale());
                     }
-                    if held_member.proof.as_ref() != Some(&request.boundary) {
+                    if held.proof.as_ref() != Some(&request.boundary) {
                         return Err(stale());
                     }
-                    let references = self.issue_references(held_member.key, anchor.key).await?;
+                    let references = self.references(held.key, anchor.key).await?;
                     if references.as_slice() != [request.reference.clone()] {
                         return Err(Error::typed(
                             "concord.delivery.reference",
@@ -202,7 +196,7 @@ pub(super) mod delivery {
                 Authority::Plumb { .. } => {
                     plumb::delivery::landed(&source, &request.candidate, &request.merge)
                 }
-                Authority::WharfNative { .. } | Authority::GovernanceManual { .. } => {
+                Authority::Wharf { .. } | Authority::Manual { .. } => {
                     plumb::delivery::native::landed(&source, &request.candidate, &request.merge)
                 }
             }
@@ -217,7 +211,7 @@ pub(super) mod delivery {
                 ));
             }
             let revision = if active {
-                self.release_issue(&IssueRelease {
+                self.release(&Release {
                     issue: request.issue.clone(),
                     revision: request.revision,
                 })

@@ -1,5 +1,5 @@
 use super::cleanup::Cleanup;
-use super::{Estate, issue_stale};
+use super::{Estate, stale};
 use crate::estate::Scope;
 use crate::{Coordinate, Error, Result};
 
@@ -14,8 +14,8 @@ impl Estate {
     pub async fn recover(&self, request: &Recovery) -> Result<i64> {
         let _guard = self.guard()?;
         let anchor = self.issue(&request.issue).await?;
-        issue_stale(anchor.revision, request.revision)?;
-        let member = self.issue_member(&request.issue).await?;
+        stale(anchor.revision, request.revision)?;
+        let member = self.member(&request.issue).await?;
         if member.integration.repository.owner != request.issue.owner
             || member.integration.repository.name != request.issue.repository
         {
@@ -24,8 +24,8 @@ impl Estate {
                 "Member Integration coordinate disagrees",
             ));
         }
-        let path = self.issue_path(&anchor)?;
-        let source = self.issue_source(&member)?;
+        let path = self.seat(&anchor)?;
+        let source = self.source(&member)?;
         let expected = member
             .proof
             .as_ref()

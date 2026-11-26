@@ -1,7 +1,7 @@
 use super::adaptor::Client;
 pub(super) use super::adaptor::Merge;
 use super::git::Git;
-use concord_core::issue_delivery::{Mode, Preparation};
+use concord_core::delivery::{Mode, Preparation};
 use concord_core::{Error, Reference, Result};
 use std::path::Path;
 
@@ -183,7 +183,7 @@ pub(super) use super::adaptor::reference;
 mod tests {
     use super::{Service, sync};
     use crate::dispatch::forge::delivery::adaptor::Client;
-    use concord_core::issue_delivery::Preparation;
+    use concord_core::delivery::Preparation;
     use std::path::Path;
     use std::process::Command;
 

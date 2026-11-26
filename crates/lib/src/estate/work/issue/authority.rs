@@ -116,7 +116,7 @@ pub(super) mod delivery {
     use serde::Serialize;
 
     use super::super::delivery::{Plan, SCHEMA, agreement, member};
-    use super::super::{IssueWorktree, issue_stale};
+    use super::super::{Worktree, stale as expired};
 
     #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
     pub struct Resume {
@@ -174,7 +174,7 @@ pub(super) mod delivery {
         }
         .validate()?;
         authority(&integration)?;
-        match estate.issue_member(&plan.issue).await {
+        match estate.member(&plan.issue).await {
             Ok(held) => active(estate, plan, &anchor, held).await,
             Err(error) if error.code() == "concord.member.absent" => released(plan, &anchor),
             Err(error) => Err(error),
@@ -185,10 +185,10 @@ pub(super) mod delivery {
         estate: &Estate,
         plan: &Plan,
         anchor: &Anchor,
-        held: IssueWorktree,
+        held: Worktree,
     ) -> Result<Resume> {
-        let path = estate.issue_path(anchor)?;
-        let source = estate.issue_source(&held)?;
+        let path = estate.seat(anchor)?;
+        let source = estate.source(&held)?;
         let proof = held.proof.as_ref().ok_or_else(|| {
             Error::typed(
                 "concord.delivery.boundary",
@@ -199,7 +199,7 @@ pub(super) mod delivery {
         if member(&held) != plan.member || proof != &plan.boundary {
             return Err(stale());
         }
-        let references = estate.issue_references(held.key, anchor.key).await?;
+        let references = estate.references(held.key, anchor.key).await?;
         if references.len() > 1 {
             return Err(Error::typed(
                 "concord.delivery.reference",
@@ -209,7 +209,7 @@ pub(super) mod delivery {
         let reference = references.into_iter().next();
         let replay = anchor.revision == plan.revision + 1 && reference.is_some();
         if anchor.revision != plan.revision && !replay {
-            issue_stale(anchor.revision, plan.revision)?;
+            expired(anchor.revision, plan.revision)?;
         }
         Ok(Resume {
             revision: anchor.revision,
@@ -242,7 +242,7 @@ pub(super) mod delivery {
     impl Contract<'_> {
         fn validate(&self) -> Result<()> {
             let repository = self.integration.repository.identity();
-            let path = self.estate.issue_path(self.anchor)?;
+            let path = self.estate.seat(self.anchor)?;
             if self.plan.node != self.anchor.node || self.plan.issue != self.anchor.coordinate {
                 return Err(stale());
             }

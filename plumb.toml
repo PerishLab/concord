@@ -37,7 +37,7 @@ targets = [
 [workflow.hash.guard]
 "rust" = ["suite://cargo"]
 "test" = ["*"]
-"ectropy" = ["ectropy.toml", "crates"]
+"ectropy" = ["plumb.toml", "crates"]
 "plumb" = ["*"]
 
 [windtun]
@@ -48,3 +48,22 @@ image = "ghcr.io/perishlab/images:stable"
 authority = "https://depot.seatrial.perish.uk"
 product = "seatrial"
 channel = "stable"
+
+[[ectropy.boundary]]
+allow = ["shadow"]
+note = "Concord's proof-neutral provider projection translates two externally owned Plumb plan types; retaining either external proof carrier would fabricate Guard evidence for native delivery"
+paths = ["crates/lib/src/estate/work/delivery/model.rs"]
+
+[[ectropy.grant]]
+paths = [
+    "crates/lib/src/runtime/build.rs",
+    "crates/lib/src/runtime/config.rs",
+    "crates/cli/src/runtime/config/legacy.rs",
+]
+syntax = "environment"
+
+[[ectropy.grant]]
+paths = [
+    "crates/lib/src/runtime/build.rs",
+]
+syntax = "embed"

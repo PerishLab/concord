@@ -1,11 +1,10 @@
 use super::super::Estate;
-use super::issue_stale;
+use super::stale;
 use crate::estate::Scope;
-use crate::{Error, Result, component};
-use crate::{Reference, ReferenceKind};
+use crate::{Error, Kind, Reference, Result, component};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IssueDeclaration {
+pub struct Declaration {
     pub issue: super::super::super::Coordinate,
     pub provider: String,
     pub owner: String,
@@ -15,7 +14,7 @@ pub struct IssueDeclaration {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IssueWithdrawal {
+pub struct Withdrawal {
     pub issue: super::super::super::Coordinate,
     pub owner: String,
     pub repository: String,
@@ -24,7 +23,7 @@ pub struct IssueWithdrawal {
 }
 
 impl Estate {
-    pub async fn refer_issue(&self, request: &IssueDeclaration) -> Result<i64> {
+    pub async fn refer(&self, request: &Declaration) -> Result<i64> {
         validate(
             &request.provider,
             &request.owner,
@@ -34,8 +33,8 @@ impl Estate {
         let _guard = self.guard()?;
         self.ensure(Scope::Issue(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
-        issue_stale(anchor.revision, request.revision)?;
-        let member = self.issue_member(&request.issue).await?;
+        stale(anchor.revision, request.revision)?;
+        let member = self.member(&request.issue).await?;
         let rows = self
             .core
             .live("IssueChange")
@@ -75,12 +74,12 @@ impl Estate {
         Ok(revision)
     }
 
-    pub async fn unrefer_issue(&self, request: &IssueWithdrawal) -> Result<i64> {
+    pub async fn unrefer(&self, request: &Withdrawal) -> Result<i64> {
         let _guard = self.guard()?;
         self.ensure(Scope::Issue(&request.issue)).await?;
         let anchor = self.issue(&request.issue).await?;
-        issue_stale(anchor.revision, request.revision)?;
-        let member = self.issue_member(&request.issue).await?;
+        stale(anchor.revision, request.revision)?;
+        let member = self.member(&request.issue).await?;
         let row = self
             .core
             .live("IssueChange")
@@ -108,11 +107,7 @@ impl Estate {
         Ok(revision)
     }
 
-    pub(super) async fn issue_references(
-        &self,
-        member: i64,
-        anchor: i64,
-    ) -> Result<Vec<Reference>> {
+    pub(super) async fn references(&self, member: i64, anchor: i64) -> Result<Vec<Reference>> {
         let mut references = self
             .core
             .live("IssueChange")
@@ -135,7 +130,7 @@ impl Estate {
                 })?;
                 validate(&provider, &owner, &repository, number)?;
                 Ok(Reference {
-                    kind: ReferenceKind::Change,
+                    kind: Kind::Change,
                     provider,
                     owner,
                     repository,
@@ -154,7 +149,7 @@ impl Estate {
     }
 }
 
-fn declared(row: &keel::Row, member: i64, request: &IssueDeclaration) -> bool {
+fn declared(row: &keel::Row, member: i64, request: &Declaration) -> bool {
     [
         row.int("member") == Some(member),
         row.text("provider") == Some(request.provider.as_str()),
@@ -166,7 +161,7 @@ fn declared(row: &keel::Row, member: i64, request: &IssueDeclaration) -> bool {
     .all(|same| same)
 }
 
-fn withdrawn(row: &keel::Row, member: i64, request: &IssueWithdrawal) -> bool {
+fn withdrawn(row: &keel::Row, member: i64, request: &Withdrawal) -> bool {
     [
         row.int("member") == Some(member),
         row.text("owner") == Some(request.owner.as_str()),

@@ -32,21 +32,21 @@ pub(super) fn prepare<A: Authorities>(
             };
             Ok((authority, plan.into()))
         }
-        Mode::GovernanceManual => {
+        Mode::Manual => {
             let review = request.review.as_ref().expect("review checked");
             review.check(context)?;
             let plan = plumb::delivery::native::prepare(input, &manual::Governance(review))
                 .map_err(refused)?;
-            let authority = Authority::GovernanceManual {
+            let authority = Authority::Manual {
                 evidence: plan.evidence.clone(),
                 review: review.clone(),
             };
             Ok((authority, plan.into()))
         }
-        Mode::WharfNative => {
+        Mode::Wharf => {
             model::admit(&context.member.integration)?;
             let plan = plumb::delivery::native::prepare(input, &gate::Wharf).map_err(refused)?;
-            let authority = Authority::WharfNative {
+            let authority = Authority::Wharf {
                 evidence: plan.evidence.clone(),
             };
             Ok((authority, plan.into()))
@@ -75,7 +75,7 @@ pub(super) fn revalidate<A: Authorities>(
             plumb::delivery::revalidate(input, &plan.delivery.guard(guard), &accepted)
                 .map_err(refused)?;
         }
-        Authority::GovernanceManual { evidence, review } => {
+        Authority::Manual { evidence, review } => {
             review.check(context)?;
             let expected = plan.delivery.native(evidence);
             let gate = manual::Governance(review);
@@ -85,7 +85,7 @@ pub(super) fn revalidate<A: Authorities>(
             }
             .map_err(refused)?;
         }
-        Authority::WharfNative { evidence } => {
+        Authority::Wharf { evidence } => {
             model::admit(&context.member.integration)?;
             native(input, &plan.delivery.native(evidence), check).map_err(refused)?;
         }

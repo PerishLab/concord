@@ -32,24 +32,24 @@ pub async fn run(
         Command::Bootstrap => unreachable!("handled before estate open"),
         Command::Brief {
             issue,
-            page_size,
-            sub_issues_after,
-            blocked_by_after,
-            blocking_after,
-            pulls_after,
+            size,
+            children,
+            blockers,
+            blocking,
+            pulls,
             timeout,
         } => {
             let coordinate = Coordinate::parse(&issue)?;
-            let brief = projection::Projection::new(page_size, 1, timeout)
+            let brief = projection::Projection::new(size, 1, timeout)
                 .brief(
                     &coordinate,
-                    projection::PageRequest {
-                        size: page_size,
-                        sub_issues_after,
-                        blocked_by_after,
-                        blocking_after,
-                        pulls_after,
-                        comments_after: None,
+                    projection::Request {
+                        size,
+                        children,
+                        blockers,
+                        blocking,
+                        pulls,
+                        comments: None,
                     },
                 )
                 .await?;
@@ -61,26 +61,23 @@ pub async fn run(
         Command::Preflight { command } => preflight(estate, command, output, phase).await,
         Command::Graph {
             issue,
-            page_size,
-            max_nodes,
-            max_pages,
+            size,
+            nodes,
+            pages,
             timeout,
         } => {
             let coordinate = Coordinate::parse(&issue)?;
-            let graph = projection::Projection::new(page_size, max_pages, timeout)
-                .graph(&coordinate, max_nodes)
+            let graph = projection::Projection::new(size, pages, timeout)
+                .graph(&coordinate, nodes)
                 .await;
             emit(json!({"graph": graph}), output)
         }
         Command::Ready(relations) => {
             let coordinate = Coordinate::parse(&relations.issue)?;
-            let readiness = projection::Projection::new(
-                relations.page_size,
-                relations.max_pages,
-                relations.timeout,
-            )
-            .ready(&coordinate)
-            .await?;
+            let readiness =
+                projection::Projection::new(relations.size, relations.pages, relations.timeout)
+                    .ready(&coordinate)
+                    .await?;
             emit(json!({"readiness": readiness}), output)
         }
         Command::Comment {
@@ -191,8 +188,8 @@ async fn preflight(
             kind,
             title,
             outcome,
-            page_size,
-            max_pages,
+            size,
+            pages,
             timeout,
         } => {
             let report = super::preflight::run(
@@ -203,8 +200,8 @@ async fn preflight(
                     title: &title,
                     outcome: &outcome,
                     bounds: super::preflight::Bounds {
-                        first: page_size,
-                        pages: max_pages,
+                        first: size,
+                        pages,
                         timeout,
                     },
                 },

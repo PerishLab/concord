@@ -1,6 +1,6 @@
 use super::super::{Estate, Proof};
 use super::authority::{self, Authorities, Warrant};
-use super::{IssueWorktree, issue_stale};
+use super::{Worktree, stale};
 use crate::estate::Scope;
 use crate::{Error, Result, claim, git};
 use plumb::guard::{Authority, Expected};
@@ -64,7 +64,7 @@ struct Context {
     issue: super::super::super::Coordinate,
     node: String,
     revision: i64,
-    member: IssueWorktree,
+    member: Worktree,
     boundary: Proof,
     path: PathBuf,
 }
@@ -146,16 +146,16 @@ async fn context(
 ) -> Result<Context> {
     estate.agreed(Scope::Issue(issue)).await?;
     let anchor = estate.issue(issue).await?;
-    issue_stale(anchor.revision, revision)?;
-    let member = estate.issue_member(issue).await?;
+    stale(anchor.revision, revision)?;
+    let member = estate.member(issue).await?;
     let boundary = member.proof.clone().ok_or_else(|| {
         Error::typed(
             "concord.landing.boundary",
             "Member has no current Boundary proof",
         )
     })?;
-    let path = estate.issue_path(&anchor)?;
-    let source = estate.issue_source(&member)?;
+    let path = estate.seat(&anchor)?;
+    let source = estate.source(&member)?;
     agreement(&source, &path, &member, &boundary)?;
     Ok(Context {
         issue: anchor.coordinate,
@@ -167,7 +167,7 @@ async fn context(
     })
 }
 
-fn agreement(source: &Path, path: &Path, member: &IssueWorktree, proof: &Proof) -> Result<()> {
+fn agreement(source: &Path, path: &Path, member: &Worktree, proof: &Proof) -> Result<()> {
     if !git::at(source).registered(path)? {
         return Err(Error::typed(
             "concord.member.disagreement",
@@ -209,7 +209,7 @@ fn verify(
         .map_err(|error| Error::typed("concord.landing.guard", error))
 }
 
-fn member(member: &IssueWorktree) -> Member {
+fn member(member: &Worktree) -> Member {
     Member {
         key: member.key,
         integration: member.integration.clone(),

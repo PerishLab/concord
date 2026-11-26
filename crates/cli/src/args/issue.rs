@@ -27,15 +27,15 @@ pub enum Command {
     Brief {
         issue: String,
         #[arg(long = "page-size", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
-        page_size: u16,
+        size: u16,
         #[arg(long = "sub-issues-after")]
-        sub_issues_after: Option<String>,
+        children: Option<String>,
         #[arg(long = "blocked-by-after")]
-        blocked_by_after: Option<String>,
+        blockers: Option<String>,
         #[arg(long = "blocking-after")]
-        blocking_after: Option<String>,
+        blocking: Option<String>,
         #[arg(long = "pulls-after")]
-        pulls_after: Option<String>,
+        pulls: Option<String>,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
@@ -48,11 +48,11 @@ pub enum Command {
     Graph {
         issue: String,
         #[arg(long = "page-size", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
-        page_size: u16,
+        size: u16,
         #[arg(long = "max-nodes", default_value_t = 100, value_parser = clap::value_parser!(u16).range(1..=500))]
-        max_nodes: u16,
+        nodes: u16,
         #[arg(long = "max-pages", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
-        max_pages: u16,
+        pages: u16,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
@@ -122,9 +122,9 @@ pub enum Preflight {
         #[arg(long)]
         outcome: String,
         #[arg(long = "page-size", default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=100))]
-        page_size: u16,
+        size: u16,
         #[arg(long = "max-pages", default_value_t = 4, value_parser = clap::value_parser!(u16).range(1..=20))]
-        max_pages: u16,
+        pages: u16,
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
@@ -139,9 +139,9 @@ pub enum Preflight {
 pub struct Relations {
     pub issue: String,
     #[arg(long = "page-size", default_value_t = 50, value_parser = clap::value_parser!(u16).range(1..=100))]
-    pub page_size: u16,
+    pub size: u16,
     #[arg(long = "max-pages", default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=100))]
-    pub max_pages: u16,
+    pub pages: u16,
     #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
     pub timeout: u64,
 }
@@ -156,7 +156,7 @@ pub enum Delivery {
             default_value = "plumb",
             help = "Explicit authority: plumb, wharf-native or governance-manual"
         )]
-        authority: concord_core::issue_delivery::Mode,
+        authority: concord_core::delivery::Mode,
         #[arg(
             long,
             value_name = "PATH|-",
@@ -196,7 +196,7 @@ pub enum Delivery {
             default_value = "plumb",
             help = "Must match the prepared proof authority"
         )]
-        authority: concord_core::issue_delivery::Mode,
+        authority: concord_core::delivery::Mode,
         #[arg(long, value_name = "PATH|-", default_value = "-")]
         plan: PathBuf,
         #[arg(

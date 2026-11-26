@@ -6,7 +6,7 @@ pub(crate) mod observation;
 pub(super) mod projections;
 pub(crate) mod pull;
 
-use super::projection::{Fault, PageRequest, Projection};
+use super::projection::{Fault, Projection, Request};
 use concord_core::Coordinate;
 use serde::Deserialize;
 
@@ -14,78 +14,90 @@ pub(super) const LIMIT: usize = 1024 * 1024;
 
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct RawIssue {
+pub(super) struct Snapshot {
     pub id: String,
     pub number: i64,
     pub url: String,
     pub title: String,
     pub body: String,
     pub state: String,
-    pub updated_at: String,
-    pub issue_type: Option<RawType>,
-    pub repository: RawName,
-    pub parent: Option<RawIssueNode>,
-    pub sub_issues: RawConnection<RawIssueNode>,
-    pub sub_issues_summary: RawSubIssueSummary,
-    pub blocked_by: RawConnection<RawIssueNode>,
-    pub blocking: RawConnection<RawIssueNode>,
-    pub timeline_items: RawConnection<RawEvent>,
-    pub comments: RawConnection<RawComment>,
+    #[serde(rename = "updatedAt")]
+    pub updated: String,
+    #[serde(rename = "issueType")]
+    pub kind: Option<Kind>,
+    pub repository: Name,
+    pub parent: Option<Node>,
+    #[serde(rename = "subIssues")]
+    pub children: Connection<Node>,
+    #[serde(rename = "subIssuesSummary")]
+    pub summary: Summary,
+    #[serde(rename = "blockedBy")]
+    pub blockers: Connection<Node>,
+    pub blocking: Connection<Node>,
+    #[serde(rename = "timelineItems")]
+    pub timeline: Connection<Event>,
+    pub comments: Connection<Comment>,
 }
 
 #[derive(Clone, Deserialize)]
-pub(super) struct RawType {
+pub(super) struct Kind {
     pub name: String,
 }
 
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct RawIssueNode {
+pub(super) struct Node {
     pub id: String,
     pub number: i64,
     pub url: String,
     pub title: String,
     pub state: String,
-    pub repository: RawName,
+    pub repository: Name,
 }
 
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct RawName {
-    pub name_with_owner: String,
+pub(super) struct Name {
+    #[serde(rename = "nameWithOwner")]
+    pub full: String,
 }
 
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct RawConnection<T> {
-    pub total_count: usize,
-    pub page_info: RawPageInfo,
+pub(super) struct Connection<T> {
+    #[serde(rename = "totalCount")]
+    pub total: usize,
+    #[serde(rename = "pageInfo")]
+    pub info: Paging,
     pub nodes: Vec<T>,
 }
 
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct RawPageInfo {
-    pub has_next_page: bool,
-    pub end_cursor: Option<String>,
+pub(super) struct Paging {
+    #[serde(rename = "hasNextPage")]
+    pub more: bool,
+    #[serde(rename = "endCursor")]
+    pub cursor: Option<String>,
 }
 
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct RawSubIssueSummary {
+pub(super) struct Summary {
     pub total: usize,
     pub completed: usize,
-    pub percent_completed: usize,
+    #[serde(rename = "percentCompleted")]
+    pub percent: usize,
 }
 
 #[derive(Clone, Deserialize)]
-pub(super) struct RawEvent {
-    pub source: Option<RawSource>,
+pub(super) struct Event {
+    pub source: Option<Source>,
 }
 
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct RawSource {
+pub(super) struct Source {
     #[serde(rename = "__typename")]
     pub kind: String,
     pub id: Option<String>,
@@ -93,13 +105,15 @@ pub(super) struct RawSource {
     pub url: Option<String>,
     pub title: Option<String>,
     pub state: Option<String>,
-    pub merged_at: Option<String>,
-    pub updated_at: Option<String>,
-    pub repository: Option<RawName>,
+    #[serde(rename = "mergedAt")]
+    pub merged: Option<String>,
+    #[serde(rename = "updatedAt")]
+    pub updated: Option<String>,
+    pub repository: Option<Name>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub(super) struct RawComment {
+pub(super) struct Comment {
     pub body: String,
     pub url: String,
 }
@@ -108,8 +122,8 @@ impl Projection {
     pub(super) async fn query(
         &self,
         coordinate: &Coordinate,
-        request: &PageRequest,
-    ) -> std::result::Result<RawIssue, Fault> {
+        request: &Request,
+    ) -> std::result::Result<Snapshot, Fault> {
         self.snapshot(coordinate, request)
     }
 }

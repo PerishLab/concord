@@ -1,6 +1,6 @@
 use super::{fixture, released, request};
 use concord_core::authority::Plumb;
-use concord_core::issue_delivery::{self, execution};
+use concord_core::delivery::{self, execution};
 use concord_core::{Admission, Coordinate};
 use std::future::Future;
 
@@ -8,7 +8,7 @@ use std::future::Future;
 async fn independent() {
     let authority = released();
     let world = fixture(authority.producer(), authority.depot()).await;
-    let plan = issue_delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
+    let plan = delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
         .await
         .expect("plan");
     let permit = execution::acquire(&world.estate, &plan)
@@ -76,7 +76,7 @@ async fn independent() {
 async fn cancellation() {
     let authority = released();
     let world = fixture(authority.producer(), authority.depot()).await;
-    let plan = issue_delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
+    let plan = delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
         .await
         .expect("plan");
     let permit = execution::acquire(&world.estate, &plan)
@@ -113,7 +113,7 @@ async fn cancellation() {
 async fn redirected() {
     let authority = released();
     let world = fixture(authority.producer(), authority.depot()).await;
-    let plan = issue_delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
+    let plan = delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
         .await
         .expect("plan");
     let anchor = world.estate.issue(&world.issue).await.expect("Anchor");
@@ -140,7 +140,7 @@ async fn redirected() {
 async fn publication() {
     let authority = released();
     let world = fixture(authority.producer(), authority.depot()).await;
-    let plan = issue_delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
+    let plan = delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
         .await
         .expect("plan");
     let anchor = world.estate.issue(&world.issue).await.expect("Anchor");
@@ -171,7 +171,7 @@ async fn publication() {
 async fn identity() {
     let authority = released();
     let world = fixture(authority.producer(), authority.depot()).await;
-    let mut plan = issue_delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
+    let mut plan = delivery::prepare::<Plumb>(&world.estate, &request(&world.issue))
         .await
         .unwrap();
     assert_eq!(plan.space, world.estate.identity());
@@ -181,7 +181,7 @@ async fn identity() {
         .err()
         .unwrap();
     assert_eq!(error.code(), "concord.space.identity");
-    let error = issue_delivery::resume::<Plumb>(&world.estate, &plan, &super::snapshot())
+    let error = delivery::resume::<Plumb>(&world.estate, &plan, &super::snapshot())
         .await
         .unwrap_err();
     assert_eq!(error.code(), "concord.space.identity");

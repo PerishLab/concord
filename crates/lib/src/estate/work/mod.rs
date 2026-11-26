@@ -8,16 +8,15 @@ mod status;
 use super::{Estate, fault};
 pub use integration::{Guard, Integration, Rebind, Register, Rename, Repository};
 pub use issue::authority;
-pub use issue::delivery as issue_delivery;
+pub use issue::delivery;
 pub use issue::landing;
 pub use issue::{
-    Finish, IssueArtifact, IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange,
-    IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval, IssueRetirement,
-    IssueWithdrawal, IssueWorktree, Recovery, Start,
+    Artifact, Change, Claiming, Declaration, Finish, Import, Narrowing, Proving, Recovery, Release,
+    Removal, Retirement, Start, Status, Withdrawal, Worktree,
 };
-pub use overlap::{ClaimOverlap, CommittedEvidence, CommittedOverlap};
+pub use overlap::{Committed, Evidence, Overlap};
 use serde::{Deserialize, Serialize};
-pub use status::{BoundaryState, CheckoutState, IntegrationState, UpstreamState};
+pub use status::{Boundary, Checkout, Relation, Upstream};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]

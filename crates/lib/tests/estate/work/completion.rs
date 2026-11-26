@@ -1,5 +1,5 @@
 use super::start::{World, admit, world};
-use concord_core::{Finish, IssueDeclaration, IssueProving, Seat, Start};
+use concord_core::{Declaration, Finish, Proving, Seat, Start};
 use keel::adapt::db::Sqlite;
 use keel::wire::Wire;
 use std::path::PathBuf;
@@ -33,11 +33,7 @@ async fn protected() {
     for mode in ["dirty", "untracked", "commit", "proof", "pull"] {
         let world = world().await;
         let (mut request, path) = member(&world).await;
-        let before = world
-            .estate
-            .issue_member(&request.issue)
-            .await
-            .expect("Member");
+        let before = world.estate.member(&request.issue).await.expect("Member");
         let expected = protect(&world, &mut request, &path, mode).await;
         assert_eq!(
             world
@@ -51,7 +47,7 @@ async fn protected() {
         );
         let held = world
             .estate
-            .issue_member(&request.issue)
+            .member(&request.issue)
             .await
             .expect("retained Member");
         assert_eq!(held.key, before.key);
@@ -88,7 +84,7 @@ async fn database() {
     let (request, path) = member(&world).await;
     let before = world
         .estate
-        .issue_member(&request.issue)
+        .member(&request.issue)
         .await
         .expect("original Member");
     let mut wire = Sqlite::file(Seat::new(world.temp.path()).database())
@@ -103,11 +99,7 @@ async fn database() {
     assert_eq!(error.code(), "concord.member.cleanup");
     assert!(error.message().contains("original Member restored"));
     assert_eq!(
-        world
-            .estate
-            .issue_member(&request.issue)
-            .await
-            .expect("retained"),
+        world.estate.member(&request.issue).await.expect("retained"),
         before
     );
     assert_eq!(
@@ -199,7 +191,7 @@ async fn protect(
         "proof" => {
             world
                 .estate
-                .prove_issue(&IssueProving {
+                .prove(&Proving {
                     issue: request.issue.clone(),
                     revision: 1,
                 })
@@ -211,7 +203,7 @@ async fn protect(
         "pull" => {
             world
                 .estate
-                .refer_issue(&IssueDeclaration {
+                .refer(&Declaration {
                     issue: request.issue.clone(),
                     provider: "github".into(),
                     owner: "PerishLab".into(),

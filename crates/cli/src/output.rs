@@ -3,13 +3,13 @@ pub(crate) mod cookbook;
 mod member;
 
 use concord_core::occupancy::Occupancy;
-use concord_core::{ClaimOverlap, CommittedEvidence, CommittedOverlap, Error, Result};
+use concord_core::{Committed, Error, Evidence, Overlap, Result};
 use plumb::skill::{Done, Record, Report};
 use serde_json::json;
 use std::io::Write;
 
-pub use activity::{issue_activity, unavailable};
-pub use member::issue_status as issue_member_status;
+pub use activity::{activity, unavailable};
+pub use member::status;
 
 pub(crate) fn line(text: impl std::fmt::Display) -> bool {
     match writeln!(std::io::stdout().lock(), "{text}") {
@@ -80,7 +80,7 @@ pub fn blind(error: &Error, output: bool) {
     );
 }
 
-pub fn observations(observations: &[ClaimOverlap]) {
+pub fn observations(observations: &[Overlap]) {
     for observation in observations {
         eprintln!(
             "concord: observation: write Claim overlaps {} at {}",
@@ -88,16 +88,16 @@ pub fn observations(observations: &[ClaimOverlap]) {
             observation.paths.join(", ")
         );
         match &observation.committed {
-            CommittedOverlap::DeclaredOnly => eprintln!(
+            Committed::Declared => eprintln!(
                 "concord: observation: committed deltas are disjoint with {}",
                 observation.peer
             ),
-            CommittedOverlap::Intersecting { paths } => eprintln!(
+            Committed::Intersecting { paths } => eprintln!(
                 "concord: observation: committed delta intersects {} at {}",
                 observation.peer,
                 paths.join(", ")
             ),
-            CommittedOverlap::Unavailable { member, reason } => eprintln!(
+            Committed::Unavailable { member, reason } => eprintln!(
                 "concord: observation: committed-delta evidence for {member} is unavailable: {}",
                 evidence(*reason)
             ),
@@ -105,12 +105,12 @@ pub fn observations(observations: &[ClaimOverlap]) {
     }
 }
 
-fn evidence(reason: CommittedEvidence) -> &'static str {
+fn evidence(reason: Evidence) -> &'static str {
     match reason {
-        CommittedEvidence::Dirty => "dirty worktree",
-        CommittedEvidence::Stale => "stale Member state or Boundary proof",
-        CommittedEvidence::MissingBase => "base commit is missing",
-        CommittedEvidence::Unavailable => "Git evidence is unavailable",
+        Evidence::Dirty => "dirty worktree",
+        Evidence::Stale => "stale Member state or Boundary proof",
+        Evidence::Missing => "base commit is missing",
+        Evidence::Unavailable => "Git evidence is unavailable",
     }
 }
 

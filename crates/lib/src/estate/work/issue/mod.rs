@@ -15,15 +15,15 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 
-pub use artifact::{IssueArtifact, IssueImport, IssueRemoval};
-pub use claim::{IssueClaiming, IssueMemberChange, IssueNarrowing};
-pub use lifecycle::{Finish, IssueMemberStatus, IssueRelease, IssueRetirement, Recovery};
-pub use proof::IssueProving;
-pub use reference::{IssueDeclaration, IssueWithdrawal};
+pub use artifact::{Artifact, Import, Removal};
+pub use claim::{Change, Claiming, Narrowing};
+pub use lifecycle::{Finish, Recovery, Release, Retirement, Status};
+pub use proof::Proving;
+pub use reference::{Declaration, Withdrawal};
 pub use start::Start;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct IssueWorktree {
+pub struct Worktree {
     pub key: i64,
     pub issue: Coordinate,
     pub node: String,
@@ -35,7 +35,7 @@ pub struct IssueWorktree {
 }
 
 impl Estate {
-    pub async fn issue_worktrees(&self) -> Result<Vec<IssueWorktree>> {
+    pub async fn worktrees(&self) -> Result<Vec<Worktree>> {
         let anchors = self.core.live("Anchor").await.map_err(fault)?;
         let integrations = self.core.live("Integration").await.map_err(fault)?;
         let claims = self.core.live("IssueClaim").await.map_err(fault)?;
@@ -67,7 +67,7 @@ impl Estate {
                 })
                 .collect::<Result<Vec<_>>>()?;
             held.sort();
-            out.push(IssueWorktree {
+            out.push(Worktree {
                 key: row.key(),
                 issue: anchor.coordinate,
                 node: anchor.node,
@@ -75,16 +75,16 @@ impl Estate {
                 branch,
                 base,
                 claims: held,
-                proof: issue_proof(&proofs, row.key(), anchor.key)?,
+                proof: proof(&proofs, row.key(), anchor.key)?,
             });
         }
         out.sort_by_key(|member| member.node.clone());
         Ok(out)
     }
 
-    pub async fn issue_member(&self, issue: &Coordinate) -> Result<IssueWorktree> {
+    pub async fn member(&self, issue: &Coordinate) -> Result<Worktree> {
         let anchor = self.issue(issue).await?;
-        self.issue_worktrees()
+        self.worktrees()
             .await?
             .into_iter()
             .find(|member| member.node == anchor.node)
@@ -96,17 +96,17 @@ impl Estate {
             })
     }
 
-    pub async fn issue_source_path(&self, issue: &Coordinate) -> Result<PathBuf> {
-        let member = self.issue_member(issue).await?;
-        self.issue_source(&member)
+    pub async fn origin(&self, issue: &Coordinate) -> Result<PathBuf> {
+        let member = self.member(issue).await?;
+        self.source(&member)
     }
 
-    pub(in crate::estate) fn issue_path(&self, anchor: &Anchor) -> Result<PathBuf> {
+    pub(in crate::estate) fn seat(&self, anchor: &Anchor) -> Result<PathBuf> {
         component("issue node", &anchor.node)?;
         Ok(self.layout.issue(&anchor.node).join("worktree"))
     }
 
-    pub(in crate::estate) fn issue_source(&self, member: &IssueWorktree) -> Result<PathBuf> {
+    pub(in crate::estate) fn source(&self, member: &Worktree) -> Result<PathBuf> {
         Ok(PathBuf::from(&member.integration.path))
     }
 }
@@ -132,7 +132,7 @@ pub(super) fn legacy(node: &str) -> String {
     format!("concord/issue-{digest:x}")
 }
 
-fn issue_proof(rows: &[keel::Row], member: i64, anchor: i64) -> Result<Option<super::Proof>> {
+fn proof(rows: &[keel::Row], member: i64, anchor: i64) -> Result<Option<super::Proof>> {
     let Some(row) = rows.iter().find(|row| row.int("member") == Some(member)) else {
         return Ok(None);
     };
@@ -149,7 +149,7 @@ fn issue_proof(rows: &[keel::Row], member: i64, anchor: i64) -> Result<Option<su
     }))
 }
 
-pub(super) fn issue_stale(found: i64, expected: i64) -> Result<()> {
+pub(super) fn stale(found: i64, expected: i64) -> Result<()> {
     if found == expected {
         return Ok(());
     }

@@ -1,4 +1,4 @@
-use super::{Anchor, Coordinate, Estate, Integration, IssueWorktree};
+use super::{Anchor, Coordinate, Estate, Integration, Worktree};
 use crate::{Error, Result};
 use serde::Serialize;
 
@@ -71,7 +71,7 @@ impl Scope<'_> {
         }
     }
 
-    pub(super) fn member(self, member: &IssueWorktree) -> bool {
+    pub(super) fn member(self, member: &Worktree) -> bool {
         match self {
             Self::All => true,
             Self::Control | Self::Seat(_) => false,
@@ -131,7 +131,7 @@ impl Estate {
     pub async fn structure(&self) -> Result<Agreement> {
         let _shared = self.share()?;
         let mut report = self.survey(Scope::Control).await?;
-        for member in self.issue_worktrees().await? {
+        for member in self.worktrees().await? {
             if crate::claim::normalize(&member.claims).ok().as_ref() != Some(&member.claims) {
                 report.fault(
                     "claim.shape",

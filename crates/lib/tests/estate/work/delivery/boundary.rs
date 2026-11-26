@@ -1,6 +1,6 @@
 use super::{Fixture, fixture, released, request};
 use concord_core::authority::Plumb;
-use concord_core::issue_delivery;
+use concord_core::delivery;
 use std::process::Command;
 
 #[tokio::test(flavor = "current_thread")]
@@ -19,7 +19,7 @@ async fn moved() {
         .status()
         .expect("git");
     assert!(status.success());
-    let error = issue_delivery::prepare::<Plumb>(&estate, &request(&issue))
+    let error = delivery::prepare::<Plumb>(&estate, &request(&issue))
         .await
         .expect_err("moved HEAD");
     assert_eq!(error.code(), "concord.delivery.boundary");

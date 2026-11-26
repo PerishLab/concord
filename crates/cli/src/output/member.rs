@@ -1,6 +1,6 @@
-use concord_core::IssueMemberStatus;
+use concord_core::Status;
 
-pub fn issue_status(status: &IssueMemberStatus) {
+pub fn status(status: &Status) {
     if !super::line(format_args!(
         "member status: {}",
         status.member.issue.identity()
@@ -28,7 +28,7 @@ pub fn issue_status(status: &IssueMemberStatus) {
     if !checkout("worktree", &status.worktree) {
         return;
     }
-    if !checkout("integration", &status.integration_checkout) {
+    if !checkout("integration", &status.checkout) {
         return;
     }
     if !super::line(format_args!("  boundary: {}", status.boundary.name())) {
@@ -40,7 +40,7 @@ pub fn issue_status(status: &IssueMemberStatus) {
     )) {
         return;
     }
-    let ok = match &status.local_upstream {
+    let ok = match &status.upstream {
         Some(upstream) => super::line(format_args!(
             "  local upstream: {} {} ahead={} behind={}",
             upstream.reference, upstream.head, upstream.ahead, upstream.behind
@@ -50,21 +50,21 @@ pub fn issue_status(status: &IssueMemberStatus) {
     if !ok {
         return;
     }
-    if status.local_tracking_refs.is_empty() {
+    if status.tracking.is_empty() {
         let _ = super::line("  local tracking refs: -");
     } else {
         let _ = super::line(format_args!(
             "  local tracking refs: {}",
-            status.local_tracking_refs.join(" ")
+            status.tracking.join(" ")
         ));
     }
 }
 
-fn checkout(name: &str, state: &concord_core::CheckoutState) -> bool {
+fn checkout(name: &str, state: &concord_core::Checkout) -> bool {
     super::line(format_args!("  {name}: {}", state.path))
         && super::line(format_args!("    head: {}", state.head))
         && super::line(format_args!(
             "    files: clean={} tracked={} untracked={}",
-            state.clean, state.tracked_changes, state.untracked_files
+            state.clean, state.tracked, state.untracked
         ))
 }

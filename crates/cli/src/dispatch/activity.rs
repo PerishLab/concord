@@ -22,8 +22,8 @@ impl Run {
         let Ok(anchor) = estate.issue(&coordinate).await else {
             return;
         };
-        match estate.touch_issue(&anchor, self.operator.as_ref(), operation) {
-            Ok(activity) => output::issue_activity(&activity, self.json),
+        match estate.touch(&anchor, self.operator.as_ref(), operation) {
+            Ok(activity) => output::activity(&activity, self.json),
             Err(error) => output::unavailable(&coordinate.identity(), &error, self.json),
         }
     }

@@ -23,12 +23,11 @@ pub(crate) use protocol::{claim, component};
 pub use config::{host, session};
 pub use error::{Error, Result};
 pub use estate::{
-    Admission, Agreement, Anchor, BoundaryState, CheckoutState, ClaimOverlap, CommittedEvidence,
-    CommittedOverlap, Coordinate, Estate, Finding, Finish, Guard, Integration, IntegrationState,
-    IssueArtifact, IssueClaiming, IssueDeclaration, IssueImport, IssueMemberChange,
-    IssueMemberStatus, IssueNarrowing, IssueProving, IssueRelease, IssueRemoval, IssueRetirement,
-    IssueWithdrawal, IssueWorktree, Proof, Rebind, Reconcile, Recovery, Reference, ReferenceKind,
-    Register, Rename, Repository, Seat, Start, UpstreamState,
+    Admission, Agreement, Anchor, Artifact, Boundary, Change, Checkout, Claiming, Committed,
+    Coordinate, Declaration, Estate, Evidence, Finding, Finish, Guard, Import, Integration, Kind,
+    Narrowing, Overlap, Proof, Proving, Rebind, Reconcile, Recovery, Reference, Register, Relation,
+    Release, Removal, Rename, Repository, Retirement, Seat, Start, Status, Upstream, Withdrawal,
+    Worktree,
 };
-pub use estate::{authority, issue_delivery, landing};
+pub use estate::{authority, delivery, landing};
 pub use protocol::PLUMB;

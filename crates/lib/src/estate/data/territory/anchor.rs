@@ -1,4 +1,4 @@
-use super::super::{Agreement, Anchor, Estate, IssueWorktree, Proof, Scope, fault};
+use super::super::{Agreement, Anchor, Estate, Proof, Scope, Worktree, fault};
 use crate::{Result, git};
 use std::path::Path;
 
@@ -12,7 +12,7 @@ pub(super) async fn inspect(
         identities: git::Identities::default(),
     };
     let anchors = plane.core.live("Anchor").await.map_err(fault)?;
-    let members = plane.issue_worktrees().await?;
+    let members = plane.worktrees().await?;
     super::integration::survey(plane, &members, report, scope).await?;
     for row in &anchors {
         let anchor = match super::super::forge::anchor::decode(row) {
@@ -64,7 +64,7 @@ struct Survey<'a> {
 }
 
 impl Survey<'_> {
-    fn seat(&self, anchor: &Anchor, held: &[&IssueWorktree], report: &mut Agreement) -> Result<()> {
+    fn seat(&self, anchor: &Anchor, held: &[&Worktree], report: &mut Agreement) -> Result<()> {
         let root = self.estate.layout.root.join("issues").join(&anchor.node);
         if !root.exists() {
             if !held.is_empty() {
@@ -125,13 +125,13 @@ impl Survey<'_> {
         Ok(())
     }
 
-    fn valid(&mut self, member: &IssueWorktree, path: &Path) -> bool {
+    fn valid(&mut self, member: &Worktree, path: &Path) -> bool {
         if member.integration.repository.owner != member.issue.owner
             || member.integration.repository.name != member.issue.repository
         {
             return false;
         }
-        let Ok(source) = self.estate.issue_source(member) else {
+        let Ok(source) = self.estate.source(member) else {
             return false;
         };
         if !path.is_dir() || self.identities.read(&source).ok() != self.identities.read(path).ok() {
@@ -144,7 +144,7 @@ impl Survey<'_> {
     }
 }
 
-fn member(root: &Path, held: &[&IssueWorktree], report: &mut Agreement) -> Result<()> {
+fn member(root: &Path, held: &[&Worktree], report: &mut Agreement) -> Result<()> {
     if root.exists() && held.is_empty() {
         report.fault(
             "territory.unknown",
@@ -172,12 +172,7 @@ fn artifacts(root: &Path, report: &mut Agreement) -> Result<()> {
     Ok(())
 }
 
-fn agreement(
-    survey: &mut Survey<'_>,
-    anchor: &Anchor,
-    member: &IssueWorktree,
-    report: &mut Agreement,
-) {
+fn agreement(survey: &mut Survey<'_>, anchor: &Anchor, member: &Worktree, report: &mut Agreement) {
     let subject = anchor.coordinate.identity();
     let path = survey
         .estate
@@ -203,19 +198,15 @@ fn agreement(
     }
 }
 
-fn overlaps(
-    survey: &mut Survey<'_>,
-    members: &[IssueWorktree],
-    report: &mut Agreement,
-) -> Result<()> {
+fn overlaps(survey: &mut Survey<'_>, members: &[Worktree], report: &mut Agreement) -> Result<()> {
     for (index, left) in members.iter().enumerate() {
         for right in members.iter().skip(index + 1) {
             if left.integration.key != right.integration.key {
                 continue;
             }
             let sources = (
-                survey.identities.read(&survey.estate.issue_source(left)?),
-                survey.identities.read(&survey.estate.issue_source(right)?),
+                survey.identities.read(&survey.estate.source(left)?),
+                survey.identities.read(&survey.estate.source(right)?),
             );
             let (Ok(a), Ok(b)) = sources else {
                 continue;
@@ -238,7 +229,7 @@ fn overlaps(
     Ok(())
 }
 
-fn stale(proof: &Proof, member: &IssueWorktree, path: &Path) -> Option<String> {
+fn stale(proof: &Proof, member: &Worktree, path: &Path) -> Option<String> {
     let claim = crate::claim::digest(&member.claims);
     match git::at(path).head() {
         Ok(head) => proof.stale(&head, &claim),

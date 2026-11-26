@@ -99,10 +99,10 @@ pub(in crate::dispatch) async fn read(args: &Observe) -> Result<Projection> {
         relations.blockers(),
     );
     let conditions = [
-        ("sections", checks.required_sections),
-        ("checklist", checks.acceptance_settled),
-        ("children", checks.sub_issues_closed),
-        ("blockers", checks.blockers_closed),
+        ("sections", checks.sections),
+        ("checklist", checks.settled),
+        ("children", checks.children),
+        ("blockers", checks.blockers),
     ]
     .into_iter()
     .map(|(name, satisfied)| Check {

@@ -5,8 +5,10 @@ use keel::adapt::db::Sqlite;
 use keel::wire::Wire;
 
 mod legacy {
-    use keel::atom::{int, string};
+    use keel::atom::{Kind as Atom, int, string};
+    use keel::bond::Kind as Bond;
     use keel::resource;
+    use keel::spec::{Resource, Spec};
 
     #[resource]
     struct Anchor {
@@ -22,21 +24,26 @@ mod legacy {
         revision: int,
     }
 
-    #[resource]
-    struct IssueMember {
-        #[field(string, unique = anchor)]
-        name: string,
-        #[field(string)]
-        source: string,
-        #[field(string)]
-        branch: string,
-        #[relation(Anchor, many2one, root)]
-        anchor: Anchor,
+    struct Member;
+
+    impl Resource for Member {
+        fn name() -> &'static str {
+            "IssueMember"
+        }
+
+        fn spec() -> Spec {
+            Spec::build("IssueMember")
+                .per("name", Atom::Text, &["anchor"])
+                .field("source", Atom::Text)
+                .field("branch", Atom::Text)
+                .root("anchor", Bond::Many2one, "Anchor")
+                .seal()
+        }
     }
 
     pub fn graph() -> keel::Graph {
         let mut graph = keel::Graph::new();
-        graph.plug::<Anchor>().plug::<IssueMember>();
+        graph.plug::<Anchor>().plug::<Member>();
         graph
     }
 }

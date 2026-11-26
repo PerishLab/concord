@@ -1,8 +1,8 @@
 use super::super::Estate;
 use super::super::integration::{self, TRACKING};
-use super::super::overlap::OverlapMember;
+use super::super::overlap::Subject;
 use super::super::provision::Provision;
-use super::{IssueMemberChange, IssueWorktree, branch, issue_stale, legacy};
+use super::{Change, Worktree, branch, legacy, stale};
 use crate::estate::Scope;
 use crate::{Error, Result, component, git};
 use plumb::integration::{Expectation, Relation};
@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 struct Replay<'a> {
     request: &'a Start,
     anchor: &'a super::super::super::Anchor,
-    member: &'a IssueWorktree,
+    member: &'a Worktree,
     claims: &'a [String],
     path: &'a Path,
     target: &'a str,
@@ -29,7 +29,7 @@ pub struct Start {
 }
 
 impl Estate {
-    pub async fn start(&self, request: &Start) -> Result<IssueMemberChange> {
+    pub async fn start(&self, request: &Start) -> Result<Change> {
         component("Issue node", &request.node)?;
         component("repository node", &request.stable)?;
         let claims = crate::claim::normalize(&request.claims)?;
@@ -38,7 +38,7 @@ impl Estate {
         observed(&anchor.node, &request.node, "Issue")?;
         let integration = self.integration(&anchor.coordinate).await?;
         observed(&integration.node, &request.stable, "repository")?;
-        let path = self.issue_path(&anchor)?;
+        let path = self.seat(&anchor)?;
         self.allow(&request.issue, &path).await?;
         let _integration = integration::guard(self, &integration)?;
         let source = PathBuf::from(&integration.path);
@@ -75,7 +75,7 @@ impl Estate {
                 "registered Integration changed while Issue start was in progress",
             ));
         }
-        let members = self.issue_worktrees().await?;
+        let members = self.worktrees().await?;
         if let Some(member) = members.iter().find(|member| member.node == anchor.node) {
             return self
                 .resume(Replay {
@@ -89,7 +89,7 @@ impl Estate {
                 })
                 .await;
         }
-        issue_stale(anchor.revision, request.revision)?;
+        stale(anchor.revision, request.revision)?;
         Provision {
             source: &source,
             path: &path,
@@ -98,7 +98,7 @@ impl Estate {
             inspection: &inspection,
         }
         .apply()?;
-        let subject = OverlapMember {
+        let subject = Subject {
             key: None,
             identity: request.issue.identity(),
             path: path.clone(),
@@ -106,7 +106,7 @@ impl Estate {
             claims: claims.clone(),
             proof: None,
         };
-        let observations = self.issue_overlaps(&subject, &source).await?;
+        let observations = self.overlaps(&subject, &source).await?;
         let revision = anchor.revision + 1;
         let next = revision.to_string();
         let root = anchor.key.to_string();
@@ -151,16 +151,16 @@ impl Estate {
                     ),
                 )
             })?;
-        Ok(IssueMemberChange {
-            member: self.issue_member(&request.issue).await?,
+        Ok(Change {
+            member: self.member(&request.issue).await?,
             observations,
         })
     }
 
-    async fn resume(&self, replay: Replay<'_>) -> Result<IssueMemberChange> {
+    async fn resume(&self, replay: Replay<'_>) -> Result<Change> {
         if replay.verify().is_err()
             || !self
-                .issue_references(replay.member.key, replay.anchor.key)
+                .references(replay.member.key, replay.anchor.key)
                 .await?
                 .is_empty()
         {
@@ -172,11 +172,11 @@ impl Estate {
                 ),
             ));
         }
-        Ok(IssueMemberChange {
+        Ok(Change {
             member: replay.member.clone(),
             observations: self
-                .issue_overlaps(
-                    &OverlapMember {
+                .overlaps(
+                    &Subject {
                         key: Some(replay.member.key),
                         identity: replay.member.issue.identity(),
                         path: replay.path.to_path_buf(),
