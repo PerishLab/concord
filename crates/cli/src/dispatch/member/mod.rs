@@ -76,13 +76,7 @@ pub async fn run(estate: &Estate, command: Command, output: bool) -> Result<()> 
                 output,
             )
         }
-        Command::Prove { issue, revision } => emit(
-            json!({"member":
-            estate.prove(&Proving {
-                issue: Coordinate::parse(&issue)?, revision,
-            }).await?}),
-            output,
-        ),
+        Command::Prove { issue, revision } => prove(estate, &issue, revision, output).await,
         Command::Landing { command } => landing::run(&command),
         Command::Reference { command } => reference::run(estate, command, output).await,
         Command::Release {
@@ -165,4 +159,54 @@ fn changed(change: Change, output: bool) -> Result<()> {
         json!({"member": change.member, "observations": change.observations}),
         output,
     )
+}
+
+async fn prove(estate: &Estate, issue: &str, revision: i64, output: bool) -> Result<()> {
+    let coordinate = Coordinate::parse(issue)?;
+    let member = estate
+        .prove(&Proving {
+            issue: coordinate.clone(),
+            revision,
+        })
+        .await?;
+    let advisory = match estate.status(&coordinate).await.ok() {
+        Some(status) => stale(&status).await,
+        None => None,
+    };
+    let Some(note) = advisory else {
+        return emit(json!({"member": member}), output);
+    };
+    if !output {
+        eprintln!("concord: advisory: {note}");
+    }
+    emit(json!({"member": member, "advisory": note}), output)
+}
+
+async fn stale(status: &concord_core::Status) -> Option<String> {
+    let remote = &status.member.integration.remote;
+    let branch = &status.member.integration.branch;
+    let tracking = format!("refs/remotes/{remote}/{branch}");
+    let head = tokio::process::Command::new("git")
+        .args(["rev-parse", "--verify", &tracking])
+        .current_dir(&status.worktree.path)
+        .output()
+        .await
+        .ok()?;
+    if !head.status.success() {
+        return None;
+    }
+    let upstream = String::from_utf8_lossy(&head.stdout).trim().to_string();
+    let check = tokio::process::Command::new("git")
+        .args(["merge-base", "--is-ancestor", &upstream, "HEAD"])
+        .current_dir(&status.worktree.path)
+        .status()
+        .await
+        .ok()?;
+    if check.code() != Some(1) {
+        return None;
+    }
+    Some(format!(
+        "local {remote}/{branch} ({upstream}) is ahead of Member HEAD ({}); merge {remote}/{branch} and rerun plumb guard before delivery",
+        status.worktree.head
+    ))
 }
