@@ -1,47 +1,70 @@
 use concord_core::IssueMemberStatus;
 
 pub fn issue_status(status: &IssueMemberStatus) {
-    println!("member status: {}", status.member.issue.identity());
+    if !super::line(format_args!(
+        "member status: {}",
+        status.member.issue.identity()
+    )) {
+        return;
+    }
     if status.references.is_empty() {
-        println!("  references: -");
+        if !super::line("  references: -") {
+            return;
+        }
     } else {
         for reference in &status.references {
-            println!(
+            if !super::line(format_args!(
                 "  reference: {} {}/{}/{}#{}",
                 reference.kind.name(),
                 reference.provider,
                 reference.owner,
                 reference.repository,
                 reference.number
-            );
+            )) {
+                return;
+            }
         }
     }
-    checkout("worktree", &status.worktree);
-    checkout("integration", &status.integration_checkout);
-    println!("  boundary: {}", status.boundary.name());
-    println!("  integration relation: {}", status.integration.name());
-    match &status.local_upstream {
-        Some(upstream) => println!(
+    if !checkout("worktree", &status.worktree) {
+        return;
+    }
+    if !checkout("integration", &status.integration_checkout) {
+        return;
+    }
+    if !super::line(format_args!("  boundary: {}", status.boundary.name())) {
+        return;
+    }
+    if !super::line(format_args!(
+        "  integration relation: {}",
+        status.integration.name()
+    )) {
+        return;
+    }
+    let ok = match &status.local_upstream {
+        Some(upstream) => super::line(format_args!(
             "  local upstream: {} {} ahead={} behind={}",
             upstream.reference, upstream.head, upstream.ahead, upstream.behind
-        ),
-        None => println!("  local upstream: -"),
+        )),
+        None => super::line("  local upstream: -"),
+    };
+    if !ok {
+        return;
     }
     if status.local_tracking_refs.is_empty() {
-        println!("  local tracking refs: -");
+        let _ = super::line("  local tracking refs: -");
     } else {
-        println!(
+        let _ = super::line(format_args!(
             "  local tracking refs: {}",
             status.local_tracking_refs.join(" ")
-        );
+        ));
     }
 }
 
-fn checkout(name: &str, state: &concord_core::CheckoutState) {
-    println!("  {name}: {}", state.path);
-    println!("    head: {}", state.head);
-    println!(
-        "    files: clean={} tracked={} untracked={}",
-        state.clean, state.tracked_changes, state.untracked_files
-    );
+fn checkout(name: &str, state: &concord_core::CheckoutState) -> bool {
+    super::line(format_args!("  {name}: {}", state.path))
+        && super::line(format_args!("    head: {}", state.head))
+        && super::line(format_args!(
+            "    files: clean={} tracked={} untracked={}",
+            state.clean, state.tracked_changes, state.untracked_files
+        ))
 }

@@ -108,3 +108,36 @@ fn https() {
     assert!(queue.join("queue.db").is_file());
     assert!(!home.buffer().exists());
 }
+
+#[cfg(unix)]
+#[test]
+fn pipe() {
+    use std::io::Read;
+    use std::process::Stdio;
+    let home = Observed::new(&format!(
+        "[locus]\nenabled = true\nendpoint = '{}'\n",
+        closed()
+    ));
+    let mut child = process(home.0.path(), &["cookbook"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn cookbook");
+    let mut stdout = child.stdout.take().expect("stdout");
+    let mut head = [0u8; 1];
+    stdout.read_exact(&mut head).expect("first byte");
+    drop(stdout);
+    let output = child.wait_with_output().expect("wait cookbook");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(0), "{stderr}");
+    assert!(!stderr.contains("panicked"), "{stderr}");
+    assert!(!stderr.contains("Broken pipe"), "{stderr}");
+    let atoms = home.atoms();
+    assert!(
+        atoms
+            .iter()
+            .any(|atom| atom["payload"]["event"] == "cli.start")
+    );
+    let finish = home.finish();
+    assert_eq!(finish["payload"]["code"], 0);
+}

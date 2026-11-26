@@ -9,20 +9,41 @@ pub(crate) use runtime::{config, observation, phase};
 
 use args::Cli;
 use clap::Parser;
+use std::io::Write;
+
+struct Session(Option<plumb::observation::Run>);
+
+impl Session {
+    fn finish(&mut self, code: i32) {
+        if let Some(run) = self.0.take() {
+            run.finish(code);
+        }
+    }
+}
+
+impl Drop for Session {
+    fn drop(&mut self) {
+        self.finish(101);
+    }
+}
+
+fn err(text: impl std::fmt::Display) {
+    let _ = writeln!(std::io::stderr().lock(), "{text}");
+}
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     if let Err(error) = plumb::identity!("CONCORD") {
-        eprintln!("concord: {error}");
+        err(format_args!("concord: {error}"));
         std::process::exit(1);
     }
     let cli = Cli::parse();
     let json = cli.json;
-    let observation = observation::start(
+    let mut session = Session(observation::start(
         cli.command.name(),
         cli.config.as_deref(),
         cli.home.as_deref(),
-    );
+    ));
     let result = match plumb::identity::ready() {
         Ok(()) => dispatch::run(cli).await,
         Err(error) => Err(concord_core::Error::new(error)),
@@ -31,19 +52,17 @@ async fn main() {
     if let Err(error) = &result {
         observation::fault(error);
     }
-    if let Some(observation) = observation {
-        observation.finish(code);
-    }
+    session.finish(code);
     if let Err(error) = result {
         if json {
-            eprintln!("{}", failure(&error));
+            err(failure(&error));
         } else {
-            eprintln!("concord: {error}");
+            err(format_args!("concord: {error}"));
             for fault in faults(&error) {
-                eprintln!("concord:   {fault}");
+                err(format_args!("concord:   {fault}"));
             }
             if let Some(code) = output::cookbook::reference(error.code()) {
-                eprintln!("concord: see: concord cookbook {code}");
+                err(format_args!("concord: see: concord cookbook {code}"));
             }
         }
     }
@@ -93,7 +112,8 @@ fn failure(error: &concord_core::Error) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::failure;
+    use super::{Session, failure};
+    use plumb::observation::{Declaration, Run};
 
     #[test]
     fn references() {
@@ -106,5 +126,40 @@ mod tests {
         let simple: serde_json::Value =
             serde_json::from_str(&failure(&simple)).expect("simple error JSON");
         assert!(simple["error"].get("cookbook").is_none());
+    }
+
+    #[test]
+    fn unwind() {
+        let root = tempfile::tempdir().expect("root");
+        let file = root.path().join("config.toml");
+        let buffer = root.path().join("locus");
+        std::fs::write(
+            &file,
+            "[locus]\nenabled = true\nendpoint = \"http://127.0.0.1:9\"\n",
+        )
+        .expect("config");
+        let run = Run::start(
+            Declaration {
+                producer: "concord",
+                file: &file,
+                buffer: buffer.clone(),
+            },
+            "cookbook",
+        );
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            let _session = Session(run);
+            panic!("simulated");
+        }));
+        assert!(outcome.is_err());
+        let atoms = std::fs::read_to_string(buffer.join("active.jsonl"))
+            .expect("active buffer")
+            .lines()
+            .map(|line| serde_json::from_str::<serde_json::Value>(line).expect("atom"))
+            .collect::<Vec<_>>();
+        let finish = atoms
+            .iter()
+            .find(|atom| atom["payload"]["event"] == "cli.finish")
+            .expect("cli.finish on panic");
+        assert_eq!(finish["payload"]["code"], 101);
     }
 }

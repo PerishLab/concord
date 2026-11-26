@@ -61,13 +61,14 @@ pub(super) async fn run(
     );
     if output {
         crate::output::value(json!({"next":result,"version":1}), true);
-    } else if let Some(url) = result["issue"]["url"].as_str() {
-        println!(
+    } else if let Some(url) = result["issue"]["url"].as_str()
+        && crate::output::line(format_args!(
             "{url}\n{}\n{}",
             result["issue"]["title"].as_str().unwrap_or(""),
             result["reason"].as_str().unwrap_or("")
-        );
-        println!("Phase: {}", result["phase"]);
+        ))
+    {
+        let _ = crate::output::line(format_args!("Phase: {}", result["phase"]));
     }
     Ok(())
 }

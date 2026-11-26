@@ -49,17 +49,19 @@ pub fn output(comment: Declared, json: bool) -> Result<()> {
     if json {
         return super::super::super::emit(json!({"comment": comment}), true);
     }
-    println!("{}", comment.url);
+    if !crate::output::line(&comment.url) {
+        return Ok(());
+    }
     let host = comment
         .execution
         .host
         .as_ref()
         .map(|host| format!(" host={host}"))
         .unwrap_or_default();
-    println!(
+    let _ = crate::output::line(format_args!(
         "Concord observation: agent={} session={}{}; non-authoritative",
         comment.execution.agent, comment.execution.session, host
-    );
+    ));
     Ok(())
 }
 
