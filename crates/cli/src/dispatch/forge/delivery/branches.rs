@@ -4,8 +4,13 @@ use super::git::Git;
 use super::pull::provider;
 use concord_core::{Error, Estate, Integration, Result};
 use serde_json::json;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
+
+pub(super) struct Remote {
+    pub heads: BTreeMap<String, String>,
+    pub auto: Vec<String>,
+}
 
 const BOUND: usize = 100;
 const KINDS: [(&str, &str); 3] = [("feature", "Feature"), ("bug", "Bug"), ("task", "Task")];
@@ -42,7 +47,11 @@ enum Verdict {
     Refused(Reason),
 }
 
-pub(super) async fn clean(estate: &Estate, integration: &Integration, timeout: u64) -> Result<()> {
+pub(super) async fn clean(
+    estate: &Estate,
+    integration: &Integration,
+    timeout: u64,
+) -> Result<Remote> {
     let live = estate
         .worktrees()
         .await?
@@ -51,9 +60,17 @@ pub(super) async fn clean(estate: &Estate, integration: &Integration, timeout: u
         .flat_map(|member| [format!("land/{}", member.branch), member.branch])
         .collect::<BTreeSet<_>>();
     let held = listed(Path::new(&integration.path), &integration.remote).await?;
+    let mut heads = BTreeMap::new();
+    let mut auto = BTreeSet::new();
     let mut offenses = Vec::new();
     let mut pending = Vec::new();
     for (branch, place, head) in held {
+        if place == "origin" {
+            heads.insert(branch.clone(), head.clone());
+            if concord_core::automation::branch(&branch).is_some() {
+                auto.insert(branch.clone());
+            }
+        }
         match judge(&branch, &integration.branch, &live) {
             Verdict::Held => {}
             Verdict::Refused(reason) => offenses.push(Offense {
@@ -128,7 +145,11 @@ pub(super) async fn clean(estate: &Estate, integration: &Integration, timeout: u
             });
         }
     }
-    refuse(integration, offenses)
+    refuse(integration, offenses)?;
+    Ok(Remote {
+        heads,
+        auto: auto.into_iter().collect(),
+    })
 }
 
 fn judge(branch: &str, main: &str, live: &BTreeSet<String>) -> Verdict {

@@ -1,7 +1,9 @@
 use super::super::super::emit;
 use super::adaptor;
+use super::branches::Remote;
+use super::git::Git;
 use concord_core::authority::Plumb;
-use concord_core::{Coordinate, Error, Estate, Result, delivery};
+use concord_core::{Coordinate, Error, Estate, Integration, Result, delivery};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::path::Path;
@@ -54,7 +56,8 @@ async fn request(estate: &Estate, parameters: &Parameters<'_>) -> Result<deliver
     let member = estate.member(&issue).await?;
     adaptor::integration(&member.integration).await?;
     let observed = adaptor::observe(parameters.timeout, &issue).await?;
-    super::branches::clean(estate, &member.integration, parameters.timeout).await?;
+    let remote = super::branches::clean(estate, &member.integration, parameters.timeout).await?;
+    drift(&member.integration, &parameters.base, &remote).await?;
     delivery::prepare::<Plumb>(
         estate,
         &delivery::Request {
@@ -87,4 +90,37 @@ impl Refusal {
             None => Error::typed(self.code, self.message),
         }
     }
+}
+
+async fn drift(integration: &Integration, base: &str, remote: &Remote) -> Result<()> {
+    let Some(upstream) = remote.heads.get(base) else {
+        return Ok(());
+    };
+    let tracking = format!("refs/remotes/{}/{base}", integration.remote);
+    let local = Git::optional(Path::new(&integration.path), &tracking).await?;
+    if local.is_empty() || local == *upstream {
+        return Ok(());
+    }
+    let notice = if remote.auto.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "; active Auto follow branch(es) on {}: {}",
+            integration.remote,
+            remote.auto.join(", ")
+        )
+    };
+    let kind = &integration.remote;
+    Err(Error::detailed(
+        "concord.delivery.stale",
+        format!(
+            "remote {kind}/{base} ({upstream}) differs from local {kind}/{base} ({local}); fetch {kind}, merge {kind}/{base} into the Member, and rerun plumb guard before preparing delivery{notice}"
+        ),
+        json!({
+            "base": base,
+            "local": local,
+            "remote": upstream,
+            "auto": remote.auto,
+        }),
+    ))
 }

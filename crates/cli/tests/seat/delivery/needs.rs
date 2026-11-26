@@ -72,6 +72,8 @@ fn unadopted() {
 
 #[path = "branches.rs"]
 mod branches;
+#[path = "calls/drift.rs"]
+mod drift;
 
 struct Seat<'a> {
     space: &'a Path,
