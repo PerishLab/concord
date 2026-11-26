@@ -74,6 +74,57 @@ fn moved() {
     assert_eq!(seat.read("merge-attempts"), "merge\n");
 }
 
+#[test]
+fn missing() {
+    let fixture = tempfile::tempdir().expect("fixture");
+    let seat = Fixture::open(fixture.path());
+    let member = fixture.path().join("workspace/issues/I_delivery/worktree");
+    seat.change("first\n");
+    let first = seat.plan();
+    seat.write("incomplete", "one\n");
+    refused(&seat.land(&first), "concord.delivery.incomplete");
+    git(
+        &member,
+        &[
+            "config",
+            "remote.origin.fetch",
+            "+refs/heads/main:refs/remotes/origin/main",
+        ],
+    );
+    for tracking in [
+        "refs/remotes/origin/feature/1",
+        "refs/remotes/origin/land/feature/1",
+    ] {
+        git(&member, &["update-ref", "-d", tracking]);
+    }
+    std::fs::write(member.join("topic.md"), "rewritten\n").expect("rewrite");
+    git(&member, &["add", "topic.md"]);
+    git(&member, &["commit", "--amend", "-m", "rewritten"]);
+    guard(&member, "PerishLab/probe");
+    let revision = seat.revision();
+    success(
+        fixture.path(),
+        &[
+            "member",
+            "prove",
+            "PerishLab/probe#1",
+            "--revision",
+            &revision,
+        ],
+    );
+    std::fs::remove_file(fixture.path().join("incomplete")).expect("enable merge");
+    let second = seat.plan();
+    let landed = seat.land(&second);
+    assert!(
+        landed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&landed.stderr)
+    );
+    let report: Value = serde_json::from_slice(&landed.stdout).expect("land report");
+    assert_eq!(report["pull"]["state"], "MERGED");
+    assert_eq!(report["candidate"], delivery(&second)["candidate"]);
+}
+
 struct Fixture<'a> {
     space: &'a Path,
     server: Server,

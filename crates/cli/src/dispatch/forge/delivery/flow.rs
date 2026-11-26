@@ -236,6 +236,11 @@ impl Flow<'_> {
 
     async fn mutation(&self, check: Check) -> Result<issue_delivery::Ready> {
         pull::fetch(&self.plan.delivery.root).await?;
+        pull::sync(
+            &self.plan.delivery.root,
+            &[&self.plan.delivery.branch, &self.plan.delivery.projection],
+        )
+        .await?;
         let observed = self.observe().await?;
         let ready = issue_delivery::revalidate::<Plumb>(
             self.estate,
