@@ -155,7 +155,7 @@ mod unix {
 
     fn search(more: bool) -> Value {
         let issue = json!({
-            "id": "I_candidate", "number": 62,
+            "__typename": "Issue", "id": "I_candidate", "number": 62,
             "url": "https://github.com/PerishLab/concord/issues/62",
             "title": "Preflight Issue collisions",
             "body": "## Outcome\nWarn before duplicate execution", "state": "OPEN",
@@ -163,7 +163,7 @@ mod unix {
             "repository": {"name": "PerishLab/concord"},
         });
         let related = json!({
-            "id": "I_related", "number": 66,
+            "__typename": "Issue", "id": "I_related", "number": 66,
             "url": "https://github.com/PerishLab/concord/issues/66",
             "title": "Join GitHub candidates to active work",
             "body": "## Outcome\nReport duplicate execution before allocation", "state": "OPEN",

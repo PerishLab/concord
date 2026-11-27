@@ -247,7 +247,7 @@ pub(in crate::estate) fn decode(row: &Row) -> Result<Anchor> {
     })
 }
 
-fn node(node: &str) -> Result<()> {
+pub(super) fn node(node: &str) -> Result<()> {
     component("issue node", node)?;
     if node.chars().any(char::is_whitespace) {
         return Err(Error::typed(

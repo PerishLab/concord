@@ -8,6 +8,7 @@ use serde_json::json;
 
 pub(super) mod comment;
 mod observe;
+mod transfer;
 
 const SCHEMA: &str = "concord.issue-delivery/v1";
 const SHAPE: &str = r#"{"schema":"concord.issue-delivery/v1","anchor":{"key":1,"node":"I_node","owner":"PerishLab","repository":"concord","number":25,"revision":0},"observation":{"node":"I_node","stable":"R_node","owner":"PerishLab","repository":"concord","number":25,"url":"https://github.com/PerishLab/concord/issues/25","state":"open","kind":"Feature","updated":"2026-09-27T00:00:00Z","seen":0}}"#;
@@ -152,6 +153,7 @@ pub async fn run(
                 output,
             )
         }
+        Command::Transfer(request) => transfer::run(estate, &request, output).await,
         Command::Reconcile {
             issue,
             coordinate,

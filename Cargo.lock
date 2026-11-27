@@ -1779,9 +1779,9 @@ dependencies = [
 
 [[package]]
 name = "runseal"
-version = "0.60.0"
+version = "0.65.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "bcb59ef632175fca4c0578f0f9a56e28b2c35f9776a7dd8414e1bc63848dfddc"
+checksum = "631f0e17976eb68b8c1c65f597d11612a9ef09f1ab0e03b3938e2122a500317d"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1792,6 +1792,7 @@ dependencies = [
  "ipnet",
  "libc",
  "path-absolutize",
+ "radicula-config",
  "radicula-http",
  "radicula-lock",
  "radicula-oidc",
