@@ -540,9 +540,9 @@ dependencies = [
 
 [[package]]
 name = "ensign-client"
-version = "0.12.0"
+version = "0.18.1"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "14569f89d28bd6aac8a6194df83b29fbbbfa3dbdab71dda97bd5124b0a8796c1"
+checksum = "eb665bae7ccdb209e0e0116ab75e069ef37b67176fc303b252d3c9fd4a4f19b5"
 dependencies = [
  "radicula-oidc",
  "serde",
@@ -1181,9 +1181,9 @@ dependencies = [
 
 [[package]]
 name = "locus"
-version = "0.30.0"
+version = "0.31.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "11bf716e7eee40dad4557cd01a3a649d18f78babbd1725caee55ebab8799cf70"
+checksum = "7f9487bf669e84020be47b51ef669a12c126d38b9592d43fdbde3ad999365b7f"
 dependencies = [
  "getrandom 0.3.4",
  "locus-macro",
@@ -1199,9 +1199,9 @@ dependencies = [
 
 [[package]]
 name = "locus-macro"
-version = "0.30.0"
+version = "0.31.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "19ebcc84f5fec63a22e47a31319ca24736291a3c737277c7d77d9c90469d4aa0"
+checksum = "1026e943bcad484ef42fd2bb1b285e64ca1e59637e34d15a7aae9e84f7d95114"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1474,9 +1474,9 @@ checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
 name = "plumb"
-version = "0.164.0"
+version = "0.169.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "36a824d2a284db290458810bce23fc6784b6c2a6247e7c72edf91776d639c3f2"
+checksum = "347ffe463ba4c71f5ddc8a7100f129de8e4b871f4338153fd98424e73042ac9d"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -1505,9 +1505,9 @@ dependencies = [
 
 [[package]]
 name = "plumb-macro"
-version = "0.164.0"
+version = "0.169.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "f7a6615a104c6ccfe3a5bb8f0212b8ace2fcc4a52dc39eb6309b86fda14cf3d6"
+checksum = "2aa26c92ed36e0863577486695b63b4d8ce0e70258d546c415ae8306abad19a4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1640,9 +1640,9 @@ checksum = "d1d5ffcaa0f7373b86521aea2566c43ebc867f78e907542a37114fca29779ea6"
 
 [[package]]
 name = "radicula-http"
-version = "0.20.0"
+version = "0.21.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "4e0d7b9e0203b1ce41a7cf233facb81a12a3beeae7849517458c3a01455a5367"
+checksum = "dad16c472d568e1fac8cab4b01696c199b6d6c586c9894d7a09e1eb1b82199e1"
 dependencies = [
  "anyhow",
  "serde_json",
@@ -1658,9 +1658,9 @@ checksum = "52e481c6aaef11591ae3fd19438e85afd6e0398662c5ce2d3379f7a1f0f4392d"
 
 [[package]]
 name = "radicula-oidc"
-version = "0.20.0"
+version = "0.21.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "99f959ba2b4d886c68c2faedafdb6fcbd3b3e8ec54b25deb224bd9ae49990e75"
+checksum = "e638e4a0e57ae87d9aca8c7d73f37670e4fdb0a9cc271f132ec202a9823aadbd"
 dependencies = [
  "base64 0.22.1",
  "jsonwebtoken",
