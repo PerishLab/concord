@@ -15,6 +15,13 @@ use serde::Serialize;
 use sha2::{Digest as _, Sha256};
 use std::path::Path;
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static CLOCK: AtomicU64 = AtomicU64::new(1_700_000_000);
+
+pub(super) fn stamp() -> String {
+    format!("{} +0000", CLOCK.fetch_add(1, Ordering::Relaxed))
+}
 
 #[derive(Serialize)]
 struct Claim<'a> {
@@ -67,28 +74,13 @@ pub(super) async fn fixture(producer: &str, depot: &str) -> Fixture {
     std::fs::write(source.join("README.md"), "fixture\n").expect("fixture");
     git(&source, &["add", "README.md"]);
     git(&source, &["commit", "-m", "fixture"]);
-    git(
-        &source,
-        &["remote", "add", "origin", remote.to_str().expect("remote")],
-    );
+    let origin = remote.to_str().expect("remote");
+    git(&source, &["remote", "add", "origin", origin]);
     git(&source, &["push", "-u", "origin", "main"]);
-    git(
-        &source,
-        &[
-            "remote",
-            "set-url",
-            "origin",
-            "https://github.com/PerishLab/probe.git",
-        ],
-    );
-    git(
-        &source,
-        &[
-            "config",
-            &format!("url.{}.insteadOf", remote.display()),
-            "https://github.com/PerishLab/probe.git",
-        ],
-    );
+    let url = "https://github.com/PerishLab/probe.git";
+    git(&source, &["remote", "set-url", "origin", url]);
+    let key = format!("url.{}.insteadOf", remote.display());
+    git(&source, &["config", &key, url]);
 
     let estate = Seat::new(temp.path())
         .bootstrap()
@@ -274,12 +266,15 @@ fn proof(tree: String, producer: &str, depot: &str) -> Descriptor {
 }
 
 fn git(root: &Path, args: &[&str]) {
-    let status = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(args)
-        .status()
-        .expect("git");
+    let mut command = Command::new("git");
+    command.arg("-C").arg(root).args(args);
+    if matches!(args.first(), Some(&"commit" | &"commit-tree")) {
+        let moment = stamp();
+        command
+            .env("GIT_AUTHOR_DATE", &moment)
+            .env("GIT_COMMITTER_DATE", &moment);
+    }
+    let status = command.status().expect("git");
     assert!(status.success(), "git {args:?}");
 }
 

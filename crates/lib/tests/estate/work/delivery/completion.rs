@@ -1,4 +1,4 @@
-use super::{Fixture, fixture, released, request, snapshot};
+use super::{Fixture, fixture, released, request, snapshot, stamp};
 use concord_core::authority::Plumb;
 use concord_core::{Declaration, Estate, Guard, Kind, Reference, delivery};
 use std::io::Write;
@@ -139,6 +139,10 @@ pub(super) async fn merged(
         &["log", "-1", "--format=%B", &plan.delivery.candidate],
     );
     let merge = commit(&source, &tree, &plan.delivery.target, &message);
+    assert_ne!(
+        merge, plan.delivery.candidate,
+        "squash merge commit must differ from candidate"
+    );
     git(
         &source,
         &["push", "origin", &format!("{merge}:refs/heads/main")],
@@ -237,10 +241,19 @@ fn text(root: &Path, args: &[&str]) -> String {
 }
 
 fn commit(root: &Path, tree: &str, parent: &str, message: &str) -> String {
+    let moment = stamp();
     let mut process = Command::new("git")
         .arg("-C")
         .arg(root)
+        .args([
+            "-c",
+            "user.name=GitHub",
+            "-c",
+            "user.email=noreply@github.com",
+        ])
         .args(["commit-tree", tree, "-p", parent, "-F", "-"])
+        .env("GIT_AUTHOR_DATE", &moment)
+        .env("GIT_COMMITTER_DATE", &moment)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()

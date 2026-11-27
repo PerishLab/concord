@@ -4,7 +4,10 @@ use serde_json::{Value, json};
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
+
+static CLOCK: AtomicU64 = AtomicU64::new(1_700_000_000);
 
 struct State {
     status: &'static str,
@@ -230,8 +233,11 @@ fn state(root: &Path) -> State {
 fn commit(remote: &Path, candidate: &str, subject: &str, message: &str) -> Option<String> {
     let tree = rev(remote, &format!("{candidate}^{{tree}}"))?;
     let parent = rev(remote, "refs/heads/main")?;
+    let moment = format!("{} +0000", CLOCK.fetch_add(1, Ordering::Relaxed));
     let mut child = Command::new("git")
         .env("GIT_DIR", remote)
+        .env("GIT_AUTHOR_DATE", &moment)
+        .env("GIT_COMMITTER_DATE", &moment)
         .args([
             "-c",
             "user.name=GitHub",

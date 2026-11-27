@@ -1095,9 +1095,9 @@ dependencies = [
 
 [[package]]
 name = "keel"
-version = "0.31.0"
+version = "0.32.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "a12406cb5a89da0c4ee0c08e631446e90e47e0399280b417460bdfba481b17e5"
+checksum = "ebaa01120da1e91810a7f539d4483a1bdb58ae5885aafd1c0009318845fe80d1"
 dependencies = [
  "getrandom 0.3.4",
  "keel-macro",
@@ -1111,9 +1111,9 @@ dependencies = [
 
 [[package]]
 name = "keel-macro"
-version = "0.31.0"
+version = "0.32.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "3a3f738a3357ea90c757dda426dcf6b07532f5f3a75faba581b061def6f500dd"
+checksum = "af51cc3f33337f31fbdc8ded0700815017da89f9f36684f0fd553bbccfc4cec5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1181,9 +1181,9 @@ dependencies = [
 
 [[package]]
 name = "locus"
-version = "0.25.0"
+version = "0.30.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "e8ae2401096c24687a328cb1b4e91c6831ad75e6b518a93f88292d2f5d1f6496"
+checksum = "11bf716e7eee40dad4557cd01a3a649d18f78babbd1725caee55ebab8799cf70"
 dependencies = [
  "getrandom 0.3.4",
  "locus-macro",
@@ -1199,9 +1199,9 @@ dependencies = [
 
 [[package]]
 name = "locus-macro"
-version = "0.25.0"
+version = "0.30.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "364295ea318f195a39fc5dfee1d2179bf4e91041c0fc177c3aae4cbfee98f1ee"
+checksum = "19ebcc84f5fec63a22e47a31319ca24736291a3c737277c7d77d9c90469d4aa0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1779,9 +1779,9 @@ dependencies = [
 
 [[package]]
 name = "runseal"
-version = "0.65.0"
+version = "0.66.0"
 source = "sparse+https://cargo.perish.uk/"
-checksum = "631f0e17976eb68b8c1c65f597d11612a9ef09f1ab0e03b3938e2122a500317d"
+checksum = "415e3c663bb17a541595595a17a9fa51dbee51e114cacd1c042d5cbcdddd3ca5"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1796,6 +1796,7 @@ dependencies = [
  "radicula-http",
  "radicula-lock",
  "radicula-oidc",
+ "rustls",
  "serde",
  "serde_json",
  "sha1",
