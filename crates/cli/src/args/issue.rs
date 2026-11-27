@@ -99,6 +99,11 @@ pub enum Command {
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
+    #[command(
+        about = "Record a GitHub Issue transfer and retire an unused source Anchor",
+        long_about = "Qualify a direct GitHub redirect from the old Issue coordinate and independently verify the destination Issue and node. The old node comes from its exact local Anchor. Only an unused revision-zero Anchor without a local payload or execution resources can be retired. An existing destination Anchor keeps its identity and resources. Without flags this command previews. --apply confirms a lineage comment on the destination Issue before retiring the old Anchor. If a write outcome is unknown, use --recover for read-only observations. A later explicit apply uses a confirmed existing comment without posting another."
+    )]
+    Transfer(Transfer),
     #[command(about = "Reconcile a moved Issue when its stable node is unchanged")]
     Reconcile {
         issue: String,
@@ -108,6 +113,29 @@ pub enum Command {
         #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
         timeout: u64,
     },
+}
+
+#[derive(clap::Args)]
+pub struct Transfer {
+    pub issue: String,
+    pub destination: String,
+    #[arg(long = "source-node")]
+    pub old: String,
+    #[arg(long = "destination-node")]
+    pub node: String,
+    #[arg(
+        long,
+        help = "Record the qualified transfer and settle local execution"
+    )]
+    pub apply: bool,
+    #[arg(
+        long,
+        conflicts_with = "apply",
+        help = "Observe the GitHub record and local settlement without writing"
+    )]
+    pub recover: bool,
+    #[arg(long = "observe-timeout", default_value_t = 10, value_parser = clap::value_parser!(u64).range(1..=60))]
+    pub timeout: u64,
 }
 
 #[derive(Subcommand)]
@@ -227,6 +255,7 @@ impl Command {
             Self::Prepare { .. } => "issue.prepare",
             Self::Validate { .. } => "issue.validate",
             Self::Reconcile { .. } => "issue.reconcile",
+            Self::Transfer(_) => "issue.transfer",
         }
     }
 }

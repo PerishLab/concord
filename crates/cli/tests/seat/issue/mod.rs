@@ -5,6 +5,8 @@ mod fixture;
 mod landing;
 #[cfg(unix)]
 mod phase;
+#[cfg(unix)]
+mod transfer;
 
 #[cfg(unix)]
 mod unix {

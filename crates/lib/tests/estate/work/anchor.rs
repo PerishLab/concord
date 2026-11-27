@@ -107,3 +107,39 @@ fn coordinates() {
         assert!(Coordinate::parse(raw).is_err(), "{raw}");
     }
 }
+
+#[tokio::test]
+async fn transfer() {
+    let temp = tempfile::tempdir().expect("temporary Space");
+    let estate = Seat::new(temp.path()).bootstrap().await.unwrap();
+    let source = estate
+        .admit(&Admission {
+            node: "I_source".into(),
+            coordinate: coordinate("PerishLab/concord#25"),
+        })
+        .await
+        .unwrap();
+    let destination = Admission {
+        node: "I_destination".into(),
+        coordinate: coordinate("PerishLab/plumb#40"),
+    };
+    let held = estate.admit(&destination).await.unwrap();
+    let conflict = Admission {
+        node: "I_conflict".into(),
+        coordinate: destination.coordinate.clone(),
+    };
+
+    let error = estate
+        .transfer(&source, &conflict, async || {
+            panic!("must refuse before recording")
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), "concord.issue.transfer.conflict");
+    assert_eq!(estate.issue(&source.coordinate).await.unwrap(), source);
+    estate
+        .transfer(&source, &destination, async || Ok(()))
+        .await
+        .unwrap();
+    assert_eq!(estate.issues().await.unwrap(), vec![held]);
+}
